@@ -96,7 +96,8 @@ export default function NovoKO() {
             )}
             
             {preview && (
-              <button 
+              <button
+                disabled={salvando} 
                 onClick={() => { setPreview(null); setArquivo(null); }}
                 className="absolute top-4 right-4 bg-black/50 p-2 rounded-full text-white"
               >

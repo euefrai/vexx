@@ -112,6 +112,7 @@ export default function NovoTreino() {
                   />
                   {exercicios.length > 1 && (
                     <button 
+                      disabled={salvando}
                       onClick={() => removerExercicio(i)}
                       className="text-zinc-600 hover:text-red-500 px-2"
                     >
@@ -124,6 +125,7 @@ export default function NovoTreino() {
 
             <button
               onClick={adicionarExercicio}
+              disabled={salvando}
               className="mt-4 w-full py-2 border-2 border-dashed border-zinc-800 rounded-xl text-zinc-500 text-sm font-bold hover:border-green-500/50 hover:text-green-500 transition-all"
             >
               + Adicionar mais um

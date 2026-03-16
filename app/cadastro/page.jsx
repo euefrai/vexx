@@ -51,6 +51,7 @@ export default function Cadastro(){
 
    <button
     onClick={cadastrar}
+    disabled={salvando}
     className="bg-green-500 text-black font-bold py-3 px-6 rounded-xl"
    >
     Criar conta

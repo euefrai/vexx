@@ -90,6 +90,7 @@ export default function KO() {
                 <div className="p-4">
                   <div className="flex gap-6 text-xl mb-3 items-center">
                     <button onClick={() => curtir(p.id)} className="flex items-center gap-2 active:scale-90">
+                      disabled={salvando}
                       <span>❤️</span>
                       <span className="text-sm font-bold">{p.likes_ko?.length || 0}</span>
                     </button>

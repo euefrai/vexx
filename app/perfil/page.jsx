@@ -121,6 +121,7 @@ export default function Perfil() {
           <h1 className="text-xl font-black uppercase italic tracking-tighter text-green-500">Elite Squad</h1>
           <button 
             onClick={() => setEditando(true)} 
+            disabled={salvando}
             className="p-2 bg-zinc-900 rounded-full border border-zinc-800 hover:scale-110 transition-transform"
           >
             ⚙️
