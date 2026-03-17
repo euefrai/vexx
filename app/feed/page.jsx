@@ -1,68 +1,77 @@
 "use client"
 
-
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import TreinoCard from "@/components/TreinoCard"
 import Navbar from "@/components/Navbar"
 import BotaoFlutuante from "@/components/BotaoFlutuante"
-import useAuth from "@/hooks/useAuth"
 
-export default function Feed(){
+export default function Feed() {
+  const [treinos, setTreinos] = useState([])
+  const [loading, setLoading] = useState(true)
 
- const [treinos,setTreinos] = useState([])
- const [loading,setLoading] = useState(true)
+  useEffect(() => {
+    carregar()
+  }, [])
 
- useEffect(()=>{
-  carregar()
- },[])
+  async function carregar() {
+    try {
+      setLoading(true)
+      
+      const { data, error } = await supabase
+        .from("treinos")
+        .select(`
+          *,
+          usuarios (username, foto)
+        `)
+        .order("created_at", { ascending: false })
 
- async function carregar(){
+      if (error) throw error
 
-  const { data, error } = await supabase
-   .from("treinos")
-   .select("*")
-   .order("created_at",{ascending:false})
-
-  if(error){
-   console.log("Erro ao carregar treinos:", error)
-  } else {
-   setTreinos(data)
+      // ✅ CORREÇÃO: Removido o setPosts que não existe e usado apenas setTreinos
+      setTreinos(data || []) 
+      
+    } catch (error) {
+      // ✅ MELHORIA: Ver detalhadamente o erro no console
+      console.error("Erro detalhado ao carregar treinos:", error.message || error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  setLoading(false)
- }
+  return (
+    <>
+      <div className="max-w-md mx-auto p-4 pb-24 min-h-screen bg-black">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-green-500 text-2xl font-black italic uppercase tracking-tighter">
+            🔥 Feed de Treinos
+          </h1>
+          <span className="text-[10px] bg-zinc-900 text-zinc-500 px-3 py-1 rounded-full font-bold border border-zinc-800">
+            COMUNIDADE
+          </span>
+        </div>
 
- return(
-
-  <>
-   <div className="max-w-md mx-auto p-4 pb-24">
-
-    <h1 className="text-white text-2xl mb-6">
-     💪 Feed de Treinos
-    </h1>
-
-    {loading && (
-     <p className="text-zinc-400">
-      carregando treinos...
-     </p>
-    )}
-
-    {!loading && treinos.length === 0 && (
-     <p className="text-zinc-400">
-      nenhum treino postado ainda.
-     </p>
-    )}
-
-    {treinos?.map(t => (
-     <TreinoCard key={t.id} treino={t}/>
-    ))}
-
-   </div>
-
-   <BotaoFlutuante/>
-   <Navbar/>
-
-  </>
- )
+        {loading ? (
+          <div className="flex flex-col items-center py-20 gap-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-green-500"></div>
+            <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest animate-pulse">
+              Sincronizando...
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {treinos.length === 0 ? (
+              <div className="text-center py-20 bg-zinc-900/30 rounded-[2rem] border border-dashed border-zinc-800 text-zinc-600 font-bold uppercase text-xs">
+                Nenhum treino postado ainda.
+              </div>
+            ) : (
+              treinos.map(t => <TreinoCard key={t.id} treino={t}/>)
+            )}
+          </div>
+        )}
+      </div>
+      <BotaoFlutuante />
+      <Navbar />
+    </>
+  )
 }

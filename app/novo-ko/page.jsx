@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState } from "react" // Adicione esta linha!
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
@@ -12,7 +12,6 @@ export default function NovoKO() {
   const [preview, setPreview] = useState(null)
   const [enviando, setEnviando] = useState(false)
 
-  // Função para lidar com a escolha do arquivo e gerar o preview
   function handleFileChange(e) {
     const file = e.target.files[0]
     if (file) {
@@ -30,31 +29,27 @@ export default function NovoKO() {
     setEnviando(true)
 
     try {
-      // 1. Pega o ID do usuário atual
       const { data: { user } } = await supabase.auth.getUser()
 
-      // 2. Define o nome do arquivo e o tipo (image ou video)
       const extensao = arquivo.name.split('.').pop()
       const tipo = arquivo.type.startsWith('video') ? 'video' : 'image'
       const nomeArquivo = `${user.id}-${Date.now()}.${extensao}`
 
-      // 3. Upload para o bucket 'fotos' (ou crie um chamado 'midia')
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("fotos")
         .upload(nomeArquivo, arquivo)
 
       if (uploadError) throw uploadError
 
-      // 4. Pega a URL pública do arquivo
       const { data: { publicUrl } } = supabase.storage
         .from("fotos")
         .getPublicUrl(nomeArquivo)
 
-      // 5. Salva os dados na tabela 'posts_ko'
+      // ✅ CORREÇÃO: Usando 'usuario_id' para bater com seu banco de dados
       const { error: postError } = await supabase
         .from("posts_ko")
         .insert({
-          user_id: user.id,
+          usuario_id: user.id, 
           legenda: legenda,
           midia_url: publicUrl,
           tipo: tipo
@@ -66,7 +61,6 @@ export default function NovoKO() {
       router.push("/ko")
     } catch (err) {
       alert("Erro ao postar: " + err.message)
-      console.error(err)
     } finally {
       setEnviando(false)
     }
@@ -75,11 +69,10 @@ export default function NovoKO() {
   return (
     <>
       <div className="max-w-md mx-auto p-6 pb-24 text-white min-h-screen bg-black">
-        <h1 className="text-2xl font-bold mb-8">Novo Nocaute 🥊</h1>
+        <h1 className="text-2xl font-black uppercase italic text-green-500 mb-8 tracking-tighter">Novo Nocaute 🥊</h1>
 
         <div className="flex flex-col gap-6">
           
-          {/* ÁREA DE PREVIEW / UPLOAD */}
           <div className="relative w-full aspect-square bg-zinc-900 rounded-3xl border-2 border-dashed border-zinc-800 flex items-center justify-center overflow-hidden">
             {preview ? (
               arquivo.type.startsWith('video') ? (
@@ -90,39 +83,38 @@ export default function NovoKO() {
             ) : (
               <label className="flex flex-col items-center cursor-pointer">
                 <span className="text-4xl mb-2">📸</span>
-                <span className="text-zinc-500 text-sm font-medium">Toque para selecionar</span>
+                <span className="text-zinc-500 text-sm font-black uppercase tracking-widest">Toque para selecionar</span>
                 <input type="file" accept="image/*,video/*" onChange={handleFileChange} className="hidden" />
               </label>
             )}
             
             {preview && (
               <button
-                disabled={salvando} 
+                // ✅ CORREÇÃO: Trocado 'salvando' por 'enviando'
+                disabled={enviando} 
                 onClick={() => { setPreview(null); setArquivo(null); }}
-                className="absolute top-4 right-4 bg-black/50 p-2 rounded-full text-white"
+                className="absolute top-4 right-4 bg-black/50 p-2 rounded-full text-white hover:bg-red-500 transition-colors"
               >
                 ✕
               </button>
             )}
           </div>
 
-          {/* INPUT DE LEGENDA */}
           <textarea
             value={legenda}
             onChange={(e) => setLegenda(e.target.value)}
             placeholder="Escreva algo sobre esse K.O..."
-            className="w-full bg-zinc-900 p-4 rounded-2xl border border-zinc-800 focus:border-green-500 outline-none resize-none h-32"
+            className="w-full bg-zinc-900 p-4 rounded-2xl border border-zinc-800 focus:border-green-500 outline-none resize-none h-32 font-bold"
           />
 
-          {/* BOTÃO POSTAR */}
           <button
             onClick={postar}
             disabled={enviando}
-            className={`w-full py-4 rounded-2xl font-bold text-black transition-all ${
-              enviando ? "bg-zinc-700 opacity-50" : "bg-green-500 hover:bg-green-400 active:scale-95"
+            className={`w-full py-5 rounded-2xl font-black text-black transition-all uppercase tracking-widest ${
+              enviando ? "bg-zinc-700 opacity-50 cursor-not-allowed" : "bg-green-500 hover:scale-[1.02] active:scale-95 shadow-lg shadow-green-500/20"
             }`}
           >
-            {enviando ? "Lançando..." : "POSTAR K.O. 🔥"}
+            {enviando ? "LANÇANDO..." : "POSTAR K.O. 🔥"}
           </button>
 
         </div>

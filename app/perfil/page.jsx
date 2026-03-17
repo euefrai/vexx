@@ -28,7 +28,7 @@ export default function Perfil() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) return
 
-      // Carrega Perfil completo (incluindo XP e Nível que adicionamos no banco)
+      // 1. Carrega Perfil
       const { data: profileData } = await supabase
         .from("usuarios")
         .select("*")
@@ -41,16 +41,16 @@ export default function Perfil() {
         setFoto(profileData.foto || "")
       }
 
-      // Carrega os treinos do usuário
+      // 2. Carrega os treinos
       const { data: treinosData } = await supabase
         .from("treinos")
         .select("*")
-        .eq("user_id", authUser.id)
+        .eq("usuario_id", authUser.id)
         .order("created_at", { ascending: false })
 
       setTreinos(treinosData || [])
 
-      // Conta o total de likes recebidos nos treinos
+      // 3. Conta likes recebidos
       if (treinosData?.length > 0) {
         const ids = treinosData.map(t => t.id)
         const { count } = await supabase
@@ -80,7 +80,6 @@ export default function Perfil() {
         urlFoto = urlData.publicUrl
       }
 
-      // O upsert garante que o registro seja criado ou atualizado
       const { error: updateError } = await supabase
         .from("usuarios")
         .upsert({
@@ -94,7 +93,7 @@ export default function Perfil() {
 
       alert("Perfil atualizado com sucesso! 🔥")
       setEditando(false)
-      carregarDados() // Atualiza a tela com os novos dados
+      carregarDados()
     } catch (err) {
       alert("Erro ao salvar: " + err.message)
     } finally {
@@ -108,7 +107,6 @@ export default function Perfil() {
     </div>
   )
 
-  // Lógica da Barra de XP
   const xpAtualNoNivel = perfil?.xp % xpParaProximoNivel || 0
   const progresso = (xpAtualNoNivel / xpParaProximoNivel) * 100
 
@@ -116,19 +114,17 @@ export default function Perfil() {
     <>
       <div className="max-w-md mx-auto p-4 pb-24 text-white min-h-screen bg-black font-sans">
         
-        {/* HEADER COM CONFIGURAÇÕES */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-xl font-black uppercase italic tracking-tighter text-green-500">Elite Squad</h1>
           <button 
             onClick={() => setEditando(true)} 
             disabled={salvando}
-            className="p-2 bg-zinc-900 rounded-full border border-zinc-800 hover:scale-110 transition-transform"
+            className="p-2 bg-zinc-900 rounded-full border border-zinc-800"
           >
             ⚙️
           </button>
         </div>
 
-        {/* AVATAR E NÍVEL */}
         <div className="flex flex-col items-center mb-8">
           <div className="relative mb-4">
             <img 
@@ -142,25 +138,19 @@ export default function Perfil() {
           <h2 className="text-2xl font-black uppercase tracking-tighter italic">{username || "Guerreiro"}</h2>
         </div>
 
-        {/* CARD DE XP */}
         <div className="bg-zinc-900 p-5 rounded-[2rem] border border-zinc-800 mb-8 shadow-2xl">
           <div className="flex justify-between items-end mb-3">
             <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Progressão de XP</span>
             <span className="text-[10px] text-zinc-400 font-bold">{xpAtualNoNivel} / {xpParaProximoNivel} XP</span>
           </div>
-          
           <div className="w-full h-3 bg-black rounded-full overflow-hidden border border-zinc-800 p-[2px]">
             <div 
-              className="h-full bg-gradient-to-r from-green-600 to-green-400 rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(34,197,94,0.4)]"
+              className="h-full bg-gradient-to-r from-green-600 to-green-400 rounded-full transition-all duration-1000 ease-out"
               style={{ width: `${progresso}%` }}
             ></div>
           </div>
-          <p className="text-[9px] text-zinc-600 mt-3 text-center font-bold uppercase tracking-tighter">
-            Ganhe XP postando treinos e nocauteando no K.O.
-          </p>
         </div>
 
-        {/* ESTATÍSTICAS RÁPIDAS */}
         <div className="grid grid-cols-2 gap-4 mb-10">
           <div className="bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800 text-center">
             <p className="text-2xl font-black">{treinos.length}</p>
@@ -172,7 +162,6 @@ export default function Perfil() {
           </div>
         </div>
 
-        {/* HISTÓRICO */}
         <h3 className="text-xs font-black uppercase tracking-widest mb-4 ml-2 text-zinc-400">Minhas Atividades</h3>
         <div className="space-y-4">
           {treinos.length > 0 ? (
@@ -182,12 +171,11 @@ export default function Perfil() {
           )}
         </div>
 
-        {/* MODAL DE EDIÇÃO (OVERLAY) */}
         {editando && (
           <div className="fixed inset-0 bg-black/95 z-50 flex flex-col p-8 animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-12">
               <h2 className="text-2xl font-black uppercase italic tracking-tighter">Configurações</h2>
-              <button onClick={() => setEditando(false)} className="text-4xl text-zinc-500 hover:text-white">&times;</button>
+              <button onClick={() => setEditando(false)} className="text-4xl text-zinc-500">&times;</button>
             </div>
 
             <div className="flex flex-col items-center mb-10">
@@ -209,7 +197,7 @@ export default function Perfil() {
                 <input 
                   value={username} 
                   onChange={(e) => setUsername(e.target.value)} 
-                  className="w-full p-5 bg-zinc-900 rounded-2xl border border-zinc-800 outline-none focus:border-green-500 text-sm font-bold" 
+                  className="w-full p-5 bg-zinc-900 rounded-2xl border border-zinc-800 outline-none focus:border-green-500 text-sm font-bold text-white" 
                   placeholder="Seu nome de guerra..." 
                 />
               </div>
@@ -217,14 +205,13 @@ export default function Perfil() {
               <button 
                 onClick={salvarPerfil} 
                 disabled={salvando} 
-                className="w-full bg-green-500 text-black font-black py-5 rounded-2xl shadow-xl shadow-green-500/10 active:scale-95 transition-all disabled:opacity-50 uppercase tracking-widest"
+                className="w-full bg-green-500 text-black font-black py-5 rounded-2xl transition-all disabled:opacity-50 uppercase tracking-widest"
               >
                 {salvando ? "PROCESSANDO..." : "SALVAR ALTERAÇÕES"}
               </button>
             </div>
           </div>
         )}
-
       </div>
       <Navbar />
     </>

@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar"
 export default function KO() {
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [curtindo, setCurtindo] = useState(false) // Adicionado para controlar o clique duplo
 
   useEffect(() => {
     carregar()
@@ -15,7 +16,6 @@ export default function KO() {
   async function carregar() {
     try {
       setLoading(true)
-      // Query unificada para trazer os likes e os dados do usuário efrain
       const { data, error } = await supabase
         .from("posts_ko")
         .select(`
@@ -35,10 +35,14 @@ export default function KO() {
   }
 
   async function curtir(postId) {
+    if (curtindo) return // Evita múltiplos cliques
+    
     try {
+      setCurtindo(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return alert("Faça login para curtir!")
 
+      // Verifica se já curtiu
       const { data: jaCurtiu } = await supabase
         .from("likes_ko")
         .select("*")
@@ -50,9 +54,13 @@ export default function KO() {
       } else {
         await supabase.from("likes_ko").insert({ usuario_id: user.id, post_id: postId })
       }
-      carregar() // Atualiza a contagem na tela
+      
+      // Atualiza apenas os dados necessários sem dar reload na página inteira
+      carregar() 
     } catch (err) {
       console.error("Erro ao curtir:", err)
+    } finally {
+      setCurtindo(false)
     }
   }
 
@@ -60,46 +68,63 @@ export default function KO() {
     <>
       <div className="max-w-md mx-auto p-4 pb-24 text-white min-h-screen bg-black font-sans">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-black italic text-green-500 tracking-tighter">K.O. 🔥</h1>
-          <span className="bg-zinc-800 text-[10px] px-2 py-1 rounded-full text-zinc-400 font-bold">LIVE FEED</span>
+          <h1 className="text-3xl font-black italic text-green-500 tracking-tighter uppercase">K.O. 🔥</h1>
+          <span className="bg-zinc-800 text-[10px] px-2 py-1 rounded-full text-zinc-400 font-black tracking-widest">LIVE FEED</span>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-green-500"></div></div>
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-green-500"></div>
+          </div>
         ) : (
           <div className="space-y-6">
             {posts?.map((p) => (
-              <div key={p.id} className="bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800/50">
-                <div className="flex items-center gap-3 p-3">
+              <div key={p.id} className="bg-zinc-900 rounded-[2rem] overflow-hidden border border-zinc-800/50 shadow-2xl">
+                {/* Header do Post */}
+                <div className="flex items-center gap-3 p-4">
                   <img
                     src={p.usuarios?.foto || "https://via.placeholder.com/150"}
-                    className="w-10 h-10 rounded-full object-cover border border-zinc-700"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-green-500/20"
                   />
-                  {/* Agora vai aparecer "efrain" em vez de "Guerreiro" após você salvar o perfil */}
-                  <span className="font-bold text-sm">{p.usuarios?.username || "Guerreiro"}</span>
+                  <div className="flex flex-col">
+                    <span className="font-black text-sm uppercase tracking-tighter italic">
+                      {p.usuarios?.username || "Guerreiro"}
+                    </span>
+                    <span className="text-[9px] text-zinc-500 font-bold uppercase">Membro Elite</span>
+                  </div>
                 </div>
 
-                <div className="bg-black">
+                {/* Mídia */}
+                <div className="bg-black aspect-video flex items-center justify-center overflow-hidden">
                   {p.tipo === "image" ? (
-                    <img src={p.midia_url} className="w-full h-auto" />
+                    <img src={p.midia_url} className="w-full h-full object-cover" />
                   ) : (
-                    <video controls className="w-full max-h-[500px]"><source src={p.midia_url} /></video>
+                    <video controls className="w-full h-full object-cover">
+                      <source src={p.midia_url} />
+                    </video>
                   )}
                 </div>
 
-                <div className="p-4">
-                  <div className="flex gap-6 text-xl mb-3 items-center">
-                    <button onClick={() => curtir(p.id)} className="flex items-center gap-2 active:scale-90">
-                      disabled={salvando}
-                      <span>❤️</span>
-                      <span className="text-sm font-bold">{p.likes_ko?.length || 0}</span>
+                {/* Ações e Legenda */}
+                <div className="p-5">
+                  <div className="flex gap-6 mb-4 items-center">
+                    <button 
+                      onClick={() => curtir(p.id)} 
+                      disabled={curtindo}
+                      className="flex items-center gap-2 group transition-all active:scale-90 disabled:opacity-50"
+                    >
+                      <span className="text-2xl group-hover:scale-120 transition-transform">❤️</span>
+                      <span className="text-sm font-black">{p.likes_ko?.length || 0}</span>
                     </button>
-                    <span>💬</span>
-                    <button className="hover:scale-110">🔥</button>
+                    <button className="text-2xl hover:scale-110 transition-transform">💬</button>
+                    <button className="text-2xl hover:scale-110 transition-transform">🔥</button>
                   </div>
-                  <p className="text-sm">
-                    <span className="font-bold text-green-500 mr-2">@{p.usuarios?.username?.toLowerCase() || "user"}</span>
-                    {p.legenda}
+                  
+                  <p className="text-sm leading-relaxed">
+                    <span className="font-black text-green-500 mr-2 uppercase italic text-xs">
+                      @{p.usuarios?.username || "user"}
+                    </span>
+                    <span className="text-zinc-300 font-medium">{p.legenda}</span>
                   </p>
                 </div>
               </div>
