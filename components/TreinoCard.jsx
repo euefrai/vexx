@@ -29,8 +29,6 @@ export default function TreinoCard({ treino }) {
   async function carregarLikes() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
-      // Conta o total de likes para este treino
       const { count, error } = await supabase
         .from("likes")
         .select("*", { count: 'exact', head: true })
@@ -39,7 +37,6 @@ export default function TreinoCard({ treino }) {
       if (error) throw error
       setLikes(count || 0)
 
-      // Verifica se o usuário logado já curtiu este treino
       if (user) {
         const { data: curtidaExistente } = await supabase
           .from("likes")
@@ -55,6 +52,31 @@ export default function TreinoCard({ treino }) {
     }
   }
 
+  // --- FUNÇÃO DE COMPARTILHAR ---
+  async function compartilharTreino() {
+    const textoCompartilhar = `🔥 Saca só esse treino de ${treino.grupo.toUpperCase()} que vi no VEXX!\n\n💪 ${treino.titulo}\n\n${treino.descricao}\n\nBora treinar? ⚡`
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Treino: ${treino.titulo}`,
+          text: textoCompartilhar,
+          url: window.location.href // Ou o link específico do treino se você tiver
+        })
+      } catch (err) {
+        console.error("Erro ao compartilhar:", err)
+      }
+    } else {
+      // Fallback: Copiar para área de transferência
+      try {
+        await navigator.clipboard.writeText(textoCompartilhar)
+        alert("Texto do treino copiado! Agora é só colar onde quiser. 🚀")
+      } catch (err) {
+        alert("Ops, não consegui compartilhar.")
+      }
+    }
+  }
+
   async function handleLike() {
     if (loadingLike) return
     try {
@@ -63,7 +85,6 @@ export default function TreinoCard({ treino }) {
       if (!currentUser) return router.push("/login")
 
       if (jaCurtiu) {
-        // Remove o like
         const { error } = await supabase
           .from("likes")
           .delete()
@@ -74,7 +95,6 @@ export default function TreinoCard({ treino }) {
         setJaCurtiu(false)
         setLikes(prev => Math.max(0, prev - 1))
       } else {
-        // Adiciona o like na tabela
         const { error } = await supabase
           .from("likes")
           .insert({ treino_id: treino.id, user_id: currentUser.id })
@@ -84,7 +104,6 @@ export default function TreinoCard({ treino }) {
         setJaCurtiu(true)
         setLikes(prev => prev + 1)
 
-        // XP para o autor do treino (se não for o próprio usuário)
         if (treino.usuario_id !== currentUser.id) {
           await adicionarXP(treino.usuario_id, 10)
         }
@@ -122,7 +141,7 @@ export default function TreinoCard({ treino }) {
         .from("comentarios")
         .insert({
           treino_id: treino.id,
-          user_id: user.id, // Verifique se é user_id ou usuario_id no seu banco
+          user_id: user.id,
           texto: novoComentario
         })
 
@@ -155,6 +174,13 @@ export default function TreinoCard({ treino }) {
         </div>
         
         <div className="flex gap-2">
+            {/* BOTÃO COMPARTILHAR */}
+            <button 
+              onClick={compartilharTreino}
+              className="bg-zinc-800 text-zinc-400 p-2 rounded-full text-xs transition-colors hover:text-green-500"
+            >
+                📤
+            </button>
             <button onClick={() => setMostrarComentarios(!mostrarComentarios)} className="bg-zinc-800 text-zinc-400 px-3 py-2 rounded-full text-xs font-black">
                 💬 {comentarios.length}
             </button>
@@ -194,7 +220,7 @@ export default function TreinoCard({ treino }) {
           </div>
 
           <div className="flex gap-2">
-            <input 
+            <input  
               value={novoComentario}
               onChange={(e) => setNovoComentario(e.target.value)}
               placeholder="Escreva um comentário..."
