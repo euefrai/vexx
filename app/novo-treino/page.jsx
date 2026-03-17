@@ -46,7 +46,7 @@ export default function NovoTreino() {
       const { error } = await supabase
         .from("treinos")
         .insert({
-          user_id: user.id, // Conforme corrigimos antes, use usuario_id
+          usuario_id: user.id, // Conforme corrigimos antes, use usuario_id
           titulo,
           autor, // NOVO: Enviando o autor para o banco
           grupo,
