@@ -4,12 +4,14 @@ import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
+import { useGamificacao } from "@/hooks/useGamificacao" // 1. Importando o hook
 
 export default function NovoTreino() {
   const router = useRouter()
+  const { adicionarXP } = useGamificacao() // 2. Inicializando a função de XP
 
   const [titulo, setTitulo] = useState("")
-  const [autor, setAutor] = useState("") // NOVO: Estado para o autor
+  const [autor, setAutor] = useState("") 
   const [grupo, setGrupo] = useState("Peito")
   const [exercicios, setExercicios] = useState([""])
   const [loading, setLoading] = useState(false)
@@ -31,7 +33,6 @@ export default function NovoTreino() {
   }
 
   async function salvar() {
-    // Validação: agora verifica se o autor também foi preenchido
     if (!titulo || !autor || exercicios[0] === "") {
       return alert("Preencha o título, o autor e pelo menos um exercício!")
     }
@@ -40,22 +41,35 @@ export default function NovoTreino() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
-      const descricao = exercicios.filter(ex => ex.trim() !== "").join("\n")
+      if (!user) throw new Error("Usuário não autenticado")
 
+      const exerciciosValidos = exercicios.filter(ex => ex.trim() !== "")
+      const descricao = exerciciosValidos.join("\n")
+
+      // 3. Salvando o treino no banco
       const { error } = await supabase
         .from("treinos")
         .insert({
-          usuario_id: user.id, // Conforme corrigimos antes, use usuario_id
+          usuario_id: user.id,
           titulo,
-          autor, // NOVO: Enviando o autor para o banco
+          autor,
           grupo,
           descricao
         })
 
       if (error) throw error
 
-      alert("Treino criado com sucesso! 💪")
+      // --- SISTEMA DE XP ---
+      // 4. Calculando XP: 100 base pelo treino + 15 por cada exercício
+      const xpTotal = 100 + (exerciciosValidos.length * 15)
+      
+      const resultado = await adicionarXP(user.id, xpTotal)
+      
+      if (resultado?.subiuDeNivel) {
+        alert(`PARABÉNS! Você subiu para o Nível ${resultado.novoNivel}! 🎖️`)
+      }
+
+      alert(`Treino finalizado! Você ganhou +${xpTotal} XP 💪`)
       router.push("/feed")
     } catch (err) {
       console.error(err)
@@ -84,7 +98,7 @@ export default function NovoTreino() {
             />
           </div>
 
-          {/* NOVO: Campo do Autor */}
+          {/* Campo do Autor */}
           <div>
             <label className="text-[10px] text-zinc-500 font-black ml-1 uppercase tracking-widest">Criador / Autor</label>
             <input
@@ -125,6 +139,7 @@ export default function NovoTreino() {
                   />
                   {exercicios.length > 1 && (
                     <button 
+                      type="button"
                       disabled={loading} 
                       onClick={() => removerExercicio(i)}
                       className="text-zinc-600 hover:text-red-500 px-2 transition-colors"
@@ -137,6 +152,7 @@ export default function NovoTreino() {
             </div>
 
             <button
+              type="button"
               onClick={adicionarExercicio}
               disabled={loading}
               className="mt-4 w-full py-3 border-2 border-dashed border-zinc-800 rounded-xl text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:border-green-500/50 hover:text-green-500 transition-all"
