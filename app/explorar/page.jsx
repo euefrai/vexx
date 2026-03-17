@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import Navbar from "@/components/Navbar"
+import { motion } from "framer-motion"
 
 export default function Explorar() {
   const [busca, setBusca] = useState("")
@@ -10,7 +11,6 @@ export default function Explorar() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Chamamos a busca sempre que o termo mudar
     const timer = setTimeout(carregarUsuarios, 400)
     return () => clearTimeout(timer)
   }, [busca])
@@ -22,7 +22,6 @@ export default function Explorar() {
         .from("usuarios")
         .select("id, username, foto, bio")
 
-      // Se houver busca, filtra. Se não, traz todos (limitado a 20 por performance)
       if (busca.length >= 1) {
         query = query.ilike("username", `%${busca}%`)
       } else {
@@ -49,12 +48,38 @@ export default function Explorar() {
           Encontre novos parceiros de treino
         </p>
       </div>
+
+      {/* BOTÃO DE RANKING EM DESTAQUE */}
+      <Link href="/ranking">
+        <motion.div 
+          whileTap={{ scale: 0.98 }}
+          className="mb-6 p-4 rounded-[2rem] bg-gradient-to-br from-zinc-900 to-black border border-green-500/30 flex items-center justify-between overflow-hidden relative group"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 blur-[40px] rounded-full group-hover:bg-green-500/20 transition-all" />
+          
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(34,197,94,0.4)]">
+              🏆
+            </div>
+            <div>
+              <p className="text-sm font-black uppercase italic tracking-tighter text-white">Ranking Global</p>
+              <p className="text-[10px] text-zinc-400 font-bold uppercase">Veja quem são os generais da squad</p>
+            </div>
+          </div>
+          
+          <div className="relative z-10 bg-zinc-800/50 p-2 rounded-full border border-zinc-700">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-4 h-4 text-green-500">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </div>
+        </motion.div>
+      </Link>
       
       {/* BARRA DE BUSCA */}
-      <div className="sticky top-0 bg-black py-2 z-10">
+      <div className="sticky top-0 bg-black/80 backdrop-blur-md py-2 z-10">
         <input 
           placeholder="Buscar @username..."
-          className="w-full p-4 bg-zinc-900 border border-zinc-800 rounded-[1.5rem] outline-none focus:border-green-500 transition-colors shadow-2xl"
+          className="w-full p-4 bg-zinc-900 border border-zinc-800 rounded-[1.5rem] outline-none focus:border-green-500 transition-colors shadow-2xl text-sm"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
         />
@@ -94,7 +119,6 @@ export default function Explorar() {
                       </div>
                     </div>
                     
-                    {/* Botão de Ver Perfil Visual */}
                     <div className="bg-green-500/10 text-green-500 p-2 rounded-lg">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />

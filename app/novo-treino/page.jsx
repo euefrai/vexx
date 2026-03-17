@@ -1,28 +1,48 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
-import { useGamificacao } from "@/hooks/useGamificacao" // 1. Importando o hook
+import { useGamificacao } from "@/hooks/useGamificacao"
+import { motion, AnimatePresence } from "framer-motion"
 
 export default function NovoTreino() {
   const router = useRouter()
-  const { adicionarXP } = useGamificacao() // 2. Inicializando a função de XP
+  const { adicionarXP } = useGamificacao()
 
   const [titulo, setTitulo] = useState("")
   const [autor, setAutor] = useState("") 
   const [grupo, setGrupo] = useState("Peito")
-  const [exercicios, setExercicios] = useState([""])
+  const [duracao, setDuracao] = useState("60")
+  const [intensidade, setIntensidade] = useState("Moderado")
+  
+  // Agora cada exercício é um objeto com campos específicos
+  const [exercicios, setExercicios] = useState([
+    { nome: "", series: "", peso: "" }
+  ])
+  
   const [loading, setLoading] = useState(false)
 
+  // Carrega o nome do usuário automaticamente
+  useEffect(() => {
+    async function getUsuario() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase.from("usuarios").select("username").eq("id", user.id).single()
+        if (data?.username) setAutor(data.username)
+      }
+    }
+    getUsuario()
+  }, [])
+
   function adicionarExercicio() {
-    setExercicios([...exercicios, ""])
+    setExercicios([...exercicios, { nome: "", series: "", peso: "" }])
   }
 
-  function atualizarExercicio(index, valor) {
+  function atualizarExercicio(index, campo, valor) {
     const novos = [...exercicios]
-    novos[index] = valor
+    novos[index][campo] = valor
     setExercicios(novos)
   }
 
@@ -33,8 +53,9 @@ export default function NovoTreino() {
   }
 
   async function salvar() {
-    if (!titulo || !autor || exercicios[0] === "") {
-      return alert("Preencha o título, o autor e pelo menos um exercício!")
+    // Validação básica
+    if (!titulo || exercicios.some(ex => !ex.nome || !ex.peso)) {
+      return alert("Preencha o título e os detalhes (nome e peso) de todos os exercícios!")
     }
 
     setLoading(true)
@@ -43,33 +64,53 @@ export default function NovoTreino() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Usuário não autenticado")
 
-      const exerciciosValidos = exercicios.filter(ex => ex.trim() !== "")
-      const descricao = exerciciosValidos.join("\n")
+      // Formata a descrição para o feed
+      const descricaoFormatada = exercicios
+        .map(ex => `• ${ex.nome}: ${ex.series} sets | ${ex.peso}kg`)
+        .join("\n")
 
-      // 3. Salvando o treino no banco
-      const { error } = await supabase
+      // 1. Salva o treino principal
+      const { data: treinoInserido, error: errorTreino } = await supabase
         .from("treinos")
         .insert({
           usuario_id: user.id,
           titulo,
           autor,
           grupo,
-          descricao
+          descricao: descricaoFormatada,
+          // Se você tiver essas colunas no banco, pode adicionar:
+          // duracao,
+          // intensidade 
         })
+        .select()
+        .single()
 
-      if (error) throw error
+      if (errorTreino) throw errorTreino
+
+      // 2. Salva cada exercício individualmente na tabela de registros (para o Ranking de Peso)
+      const registrosParaInserir = exercicios.map(ex => ({
+        usuario_id: user.id,
+        treino_id: treinoInserido.id,
+        exercicio: ex.nome,
+        peso: Number(ex.peso),
+        series: ex.series
+      }))
+
+      const { error: errorReg } = await supabase
+        .from("registros_treino")
+        .insert(registrosParaInserir)
+
+      if (errorReg) throw errorReg
 
       // --- SISTEMA DE XP ---
-      // 4. Calculando XP: 100 base pelo treino + 15 por cada exercício
-      const xpTotal = 100 + (exerciciosValidos.length * 15)
-      
+      const xpTotal = 100 + (exercicios.length * 20) + (intensidade === "Insano" ? 50 : 0)
       const resultado = await adicionarXP(user.id, xpTotal)
       
       if (resultado?.subiuDeNivel) {
-        alert(`PARABÉNS! Você subiu para o Nível ${resultado.novoNivel}! 🎖️`)
+        alert(`NÍVEL MÁXIMO! Você subiu para o Nível ${resultado.novoNivel}! 🎖️`)
       }
 
-      alert(`Treino finalizado! Você ganhou +${xpTotal} XP 💪`)
+      alert(`Missão Cumprida! +${xpTotal} XP na conta.`)
       router.push("/feed")
     } catch (err) {
       console.error(err)
@@ -81,93 +122,121 @@ export default function NovoTreino() {
 
   return (
     <>
-      <div className="max-w-md mx-auto p-4 pb-24 text-white min-h-screen bg-black">
-        <h1 className="text-2xl font-black uppercase italic mb-6 flex items-center gap-2 text-green-500">
-          Novo Treino 💪
-        </h1>
+      <div className="max-w-md mx-auto p-4 pb-24 text-white min-h-screen bg-black font-sans">
+        <header className="mb-8 mt-4 text-center">
+          <h1 className="text-3xl font-black uppercase italic tracking-tighter text-green-500">
+            REGISTRAR MISSÃO
+          </h1>
+          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">Treino de Elite</p>
+        </header>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           
-          {/* Título do Treino */}
-          <div>
-            <label className="text-[10px] text-zinc-500 font-black ml-1 uppercase tracking-widest">Nome do Treino</label>
-            <input
-              placeholder="Ex: Treino de Segunda"
-              className="w-full p-4 bg-zinc-900 rounded-2xl border border-zinc-800 focus:border-green-500 outline-none font-bold"
-              onChange={(e) => setTitulo(e.target.value)}
-            />
+          {/* INFO BÁSICA */}
+          <div className="bg-zinc-900/40 p-5 rounded-[2.5rem] border border-zinc-800 space-y-4">
+            <div>
+              <label className="text-[10px] text-zinc-500 font-black ml-2 uppercase tracking-widest">Nome da Operação</label>
+              <input
+                placeholder="Ex: Destruição de Peitoral"
+                className="w-full p-4 bg-black rounded-2xl border border-zinc-800 focus:border-green-500 outline-none font-bold text-sm"
+                value={titulo}
+                onChange={(e) => setTitulo(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-zinc-500 font-black ml-2 uppercase tracking-widest">Foco</label>
+                <select
+                  className="w-full p-4 bg-black rounded-2xl border border-zinc-800 text-green-500 font-black text-xs outline-none"
+                  value={grupo}
+                  onChange={(e) => setGrupo(e.target.value)}
+                >
+                  {["Peito", "Costas", "Perna", "Ombro", "Bíceps", "Tríceps", "Full Body"].map(g => (
+                    <option key={g} value={g}>{g.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-zinc-500 font-black ml-2 uppercase tracking-widest">Intensidade</label>
+                <select
+                  className="w-full p-4 bg-black rounded-2xl border border-zinc-800 text-yellow-500 font-black text-xs outline-none"
+                  value={intensidade}
+                  onChange={(e) => setIntensidade(e.target.value)}
+                >
+                  <option value="Leve">LEVE</option>
+                  <option value="Moderado">MODERADO</option>
+                  <option value="Pesado">PESADO</option>
+                  <option value="Insano">INSANO 🔥</option>
+                </select>
+              </div>
+            </div>
           </div>
 
-          {/* Campo do Autor */}
-          <div>
-            <label className="text-[10px] text-zinc-500 font-black ml-1 uppercase tracking-widest">Criador / Autor</label>
-            <input
-              placeholder="Seu nome ou apelido"
-              className="w-full p-4 bg-zinc-900 rounded-2xl border border-zinc-800 focus:border-green-500 outline-none font-bold text-white"
-              onChange={(e) => setAutor(e.target.value)}
-            />
-          </div>
-
-          {/* Grupo Muscular */}
-          <div>
-            <label className="text-[10px] text-zinc-500 font-black ml-1 uppercase tracking-widest">Foco do Dia</label>
-            <select
-              className="w-full p-4 bg-zinc-900 rounded-2xl border border-zinc-800 focus:border-green-500 outline-none appearance-none font-bold text-green-500"
-              value={grupo}
-              onChange={(e) => setGrupo(e.target.value)}
-            >
-              {["Peito", "Costas", "Perna", "Ombro", "Bíceps", "Tríceps", "Full Body","full legg"].map(g => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Lista de Exercícios */}
-          <div className="bg-zinc-900/50 p-5 rounded-[2rem] border border-zinc-800 shadow-xl">
-            <p className="mb-4 text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">
-              Exercícios & Séries
-            </p>
-
-            <div className="space-y-3">
+          {/* LISTA DE EXERCÍCIOS */}
+          <div className="space-y-3">
+            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Explosivos / Exercícios</p>
+            
+            <AnimatePresence>
               {exercicios.map((ex, i) => (
-                <div key={i} className="flex gap-2">
-                  <input
-                    placeholder="Ex: Supino 3x10"
-                    className="flex-1 p-3 bg-black rounded-xl border border-zinc-800 focus:border-green-500 outline-none text-sm font-medium"
-                    value={ex}
-                    onChange={(e) => atualizarExercicio(i, e.target.value)}
-                  />
+                <motion.div 
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  key={i} 
+                  className="p-4 bg-zinc-900/80 rounded-[2rem] border border-zinc-800 relative group"
+                >
+                  <div className="grid grid-cols-12 gap-2">
+                    <input
+                      placeholder="Exercício"
+                      className="col-span-12 p-3 bg-black rounded-xl border border-zinc-800 focus:border-green-500 outline-none text-sm font-bold"
+                      value={ex.nome}
+                      onChange={(e) => atualizarExercicio(i, "nome", e.target.value)}
+                    />
+                    <input
+                      placeholder="Séries (ex: 3x12)"
+                      className="col-span-6 p-3 bg-black rounded-xl border border-zinc-800 focus:border-green-500 outline-none text-xs"
+                      value={ex.series}
+                      onChange={(e) => atualizarExercicio(i, "series", e.target.value)}
+                    />
+                    <div className="col-span-6 relative">
+                      <input
+                        placeholder="Peso total"
+                        type="number"
+                        className="w-full p-3 bg-black rounded-xl border border-zinc-800 focus:border-green-500 outline-none text-xs pr-8"
+                        value={ex.peso}
+                        onChange={(e) => atualizarExercicio(i, "peso", e.target.value)}
+                      />
+                      <span className="absolute right-3 top-3.5 text-[10px] text-zinc-600 font-black">KG</span>
+                    </div>
+                  </div>
+
                   {exercicios.length > 1 && (
                     <button 
-                      type="button"
-                      disabled={loading} 
                       onClick={() => removerExercicio(i)}
-                      className="text-zinc-600 hover:text-red-500 px-2 transition-colors"
+                      className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-[10px] shadow-lg"
                     >
                       ✕
                     </button>
                   )}
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </AnimatePresence>
 
             <button
               type="button"
               onClick={adicionarExercicio}
-              disabled={loading}
-              className="mt-4 w-full py-3 border-2 border-dashed border-zinc-800 rounded-xl text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:border-green-500/50 hover:text-green-500 transition-all"
+              className="w-full py-4 border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-500 text-[10px] font-black uppercase hover:border-green-500/50 hover:text-green-500 transition-all"
             >
-              + Adicionar mais um
+              + Adicionar Próximo Alvo
             </button>
           </div>
 
-          {/* Botão Salvar */}
           <button
             onClick={salvar}
             disabled={loading}
-            className="w-full bg-green-500 text-black py-5 rounded-2xl font-black text-lg shadow-xl shadow-green-500/10 active:scale-95 transition-all disabled:opacity-50 uppercase tracking-tighter italic"
+            className="w-full bg-green-500 text-black py-5 rounded-[2rem] font-black text-xl shadow-[0_10px_30px_rgba(34,197,94,0.2)] active:scale-95 transition-all disabled:opacity-50 uppercase italic flex items-center justify-center gap-2"
           >
-            {loading ? "SALVANDO..." : "FINALIZAR TREINO 🔥"}
+            {loading ? "PROCESSANDO..." : "FINALIZAR MISSÃO 🔥"}
           </button>
         </div>
       </div>
