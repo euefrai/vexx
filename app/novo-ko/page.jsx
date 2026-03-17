@@ -45,11 +45,11 @@ export default function NovoKO() {
         .from("fotos")
         .getPublicUrl(nomeArquivo)
 
-      // ✅ CORREÇÃO: Usando 'usuario_id' para bater com seu banco de dados
+      // ✅ CORREÇÃO: Usando 'user.id' que já foi capturado acima e enviando para a coluna 'usuario_id'
       const { error: postError } = await supabase
         .from("posts_ko")
         .insert({
-          usuario_id: user.id, 
+          usuario_id: user.id, // Antes estava 'usuario_id: usuario_id', o que causava o erro de 'not defined'
           legenda: legenda,
           midia_url: publicUrl,
           tipo: tipo

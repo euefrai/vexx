@@ -37,6 +37,12 @@ export default function Navbar() {
             +
           </Link>
 
+          {/* Explorar (IGUAL INSTAGRAM) */}
+          <Link href="/explorar" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/explorar')}`}>
+            <span className="text-xl">🔍</span>
+            <span className="text-[10px] font-semibold">Explorar</span>
+          </Link>
+
           {/* Treino */}
           <Link href="/novo-treino" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/novo-treino')}`}>
             <span className="text-xl">🏋️</span>
@@ -48,6 +54,8 @@ export default function Navbar() {
             <span className="text-xl">👤</span>
             <span className="text-[10px] font-semibold">Perfil</span>
           </Link>
+
+          
 
         </div>
       </div>
