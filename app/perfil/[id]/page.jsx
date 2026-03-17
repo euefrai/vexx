@@ -24,38 +24,44 @@ export default function PerfilPublico() {
   async function carregarPerfil() {
     try {
       setLoading(true)
+      
+      // 1. Verifica sessão e se o perfil é do próprio usuário
       const { data: { user: authUser } } = await supabase.auth.getUser()
       
       if (authUser?.id === id) {
         setSouEu(true)
       } else if (authUser) {
         // Verifica se eu já sigo esse usuário
-        const { data } = await supabase
+        const { data: followData } = await supabase
           .from("seguidores")
           .select("*")
           .eq("seguidor_id", authUser.id)
           .eq("seguido_id", id)
           .single()
-        if (data) setSeguindoStatus(true)
+        
+        if (followData) setSeguindoStatus(true)
       }
 
-      // 1. Dados do usuário
-      const { data: userData } = await supabase
+      // 2. Busca dados do usuário (Username, Foto, Nível)
+      const { data: userData, error: userError } = await supabase
         .from("usuarios")
         .select("*")
         .eq("id", id)
         .single()
+
+      if (userError) throw userError
       setPerfil(userData)
 
-      // 2. Treinos
+      // 3. Busca os treinos postados
       const { data: treinosData } = await supabase
         .from("treinos")
         .select("*")
         .eq("usuario_id", id)
         .order("created_at", { ascending: false })
+      
       setTreinos(treinosData || [])
 
-      // 3. Contadores de Seguidores/Seguindo
+      // 4. Busca Contadores (Seguidores e Seguindo)
       const { count: segCount } = await supabase
         .from("seguidores")
         .select("*", { count: 'exact', head: true })
@@ -66,27 +72,56 @@ export default function PerfilPublico() {
         .select("*", { count: 'exact', head: true })
         .eq("seguidor_id", id)
 
-      setStats({ seguidores: segCount || 0, seguindo: followingCount || 0 })
+      setStats({ 
+        seguidores: segCount || 0, 
+        seguindo: followingCount || 0 
+      })
 
     } catch (err) {
-      console.error("Erro:", err)
+      console.error("Erro ao carregar perfil:", err)
     } finally {
       setLoading(false)
     }
   }
 
   async function toggleSeguir() {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) return router.push("/login")
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      
+      if (!authUser) {
+        router.push("/login")
+        return
+      }
 
-    if (seguindoStatus) {
-      await supabase.from("seguidores").delete().eq("seguidor_id", authUser.id).eq("seguido_id", id)
-      setSeguindoStatus(false)
-      setStats(prev => ({ ...prev, seguidores: prev.seguidores - 1 }))
-    } else {
-      await supabase.from("seguidores").insert({ seguidor_id: authUser.id, seguido_id: id })
-      setSeguindoStatus(true)
-      setStats(prev => ({ ...prev, seguidores: prev.seguidores + 1 }))
+      if (seguindoStatus) {
+        // Lógica para Deixar de Seguir
+        const { error } = await supabase
+          .from("seguidores")
+          .delete()
+          .eq("seguidor_id", authUser.id)
+          .eq("seguido_id", id)
+
+        if (error) throw error
+        
+        setSeguindoStatus(false)
+        setStats(prev => ({ ...prev, seguidores: Math.max(0, prev.seguidores - 1) }))
+      } else {
+        // Lógica para Seguir
+        const { error } = await supabase
+          .from("seguidores")
+          .insert({
+            seguidor_id: authUser.id,
+            seguido_id: id
+          })
+
+        if (error) throw error
+        
+        setSeguindoStatus(true)
+        setStats(prev => ({ ...prev, seguidores: prev.seguidores + 1 }))
+      }
+    } catch (err) {
+      console.error("Erro na ação de seguir:", err)
+      alert("Erro ao processar: " + err.message)
     }
   }
 
@@ -121,24 +156,33 @@ export default function PerfilPublico() {
           <h2 className="text-xl font-black uppercase italic tracking-tighter">@{perfil?.username || "Guerreiro"}</h2>
           
           {souEu ? (
-            <button onClick={() => router.push('/perfil')} className="mt-4 w-full py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-[10px] font-black uppercase">Editar Perfil</button>
+            <button 
+              onClick={() => router.push('/perfil')} 
+              className="mt-4 w-full py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-[10px] font-black uppercase"
+            >
+              Editar Meu Perfil
+            </button>
           ) : (
             <button 
               onClick={toggleSeguir}
-              className={`mt-4 w-full py-2 rounded-lg text-[10px] font-black uppercase transition-all ${seguindoStatus ? 'bg-zinc-800 text-white' : 'bg-green-500 text-black'}`}
+              className={`mt-4 w-full py-2 rounded-lg text-[10px] font-black uppercase transition-all shadow-lg ${
+                seguindoStatus 
+                ? 'bg-zinc-800 text-white border border-zinc-700' 
+                : 'bg-green-500 text-black shadow-green-500/20'
+              }`}
             >
               {seguindoStatus ? "Seguindo" : "Seguir +"}
             </button>
           )}
         </div>
 
-        {/* ESTATÍSTICAS (3 COLUNAS ESTILO INSTAGRAM) */}
-        <div className="flex justify-around w-full py-4 border-y border-zinc-900 my-6 bg-zinc-950/50 rounded-2xl">
+        {/* ESTATÍSTICAS (3 COLUNAS) */}
+        <div className="flex justify-around w-full py-4 border-y border-zinc-900 my-6 bg-zinc-950/40 rounded-2xl">
           <div className="text-center">
             <p className="font-black text-lg leading-none">{treinos.length}</p>
             <p className="text-[9px] text-zinc-500 uppercase font-bold mt-1">Posts</p>
           </div>
-          <div className="text-center">
+          <div className="text-center border-x border-zinc-900 px-8">
             <p className="font-black text-lg leading-none">{stats.seguidores}</p>
             <p className="text-[9px] text-zinc-500 uppercase font-bold mt-1">Seguidores</p>
           </div>
@@ -148,12 +192,20 @@ export default function PerfilPublico() {
           </div>
         </div>
 
-        {/* FEED OU GRADE */}
-        <h3 className="text-[10px] font-black uppercase tracking-widest mb-4 ml-1 text-zinc-500 italic">Linha do Tempo</h3>
+        {/* FEED */}
+        <div className="flex items-center gap-2 mb-4 ml-1">
+          <div className="h-[2px] w-4 bg-green-500"></div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 italic">Linha do Tempo</h3>
+        </div>
+
         <div className="space-y-4">
-          {treinos.map(t => (
-            <TreinoCard key={t.id} treino={t} />
-          ))}
+          {treinos.length > 0 ? (
+            treinos.map(t => (
+              <TreinoCard key={t.id} treino={t} />
+            ))
+          ) : (
+            <p className="text-center py-10 text-zinc-600 text-xs italic font-bold uppercase">Nenhum treino registrado ainda.</p>
+          )}
         </div>
 
       </div>

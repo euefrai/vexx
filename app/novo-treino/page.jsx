@@ -9,9 +9,10 @@ export default function NovoTreino() {
   const router = useRouter()
 
   const [titulo, setTitulo] = useState("")
+  const [autor, setAutor] = useState("") // NOVO: Estado para o autor
   const [grupo, setGrupo] = useState("Peito")
   const [exercicios, setExercicios] = useState([""])
-  const [loading, setLoading] = useState(false) // O seu estado se chama loading
+  const [loading, setLoading] = useState(false)
 
   function adicionarExercicio() {
     setExercicios([...exercicios, ""])
@@ -30,8 +31,9 @@ export default function NovoTreino() {
   }
 
   async function salvar() {
-    if (!titulo || exercicios[0] === "") {
-      return alert("Preencha o título e pelo menos um exercício!")
+    // Validação: agora verifica se o autor também foi preenchido
+    if (!titulo || !autor || exercicios[0] === "") {
+      return alert("Preencha o título, o autor e pelo menos um exercício!")
     }
 
     setLoading(true)
@@ -44,8 +46,9 @@ export default function NovoTreino() {
       const { error } = await supabase
         .from("treinos")
         .insert({
-          user_id: user.id, // Verifique se no banco não é usuario_id
+          user_id: user.id, // Conforme corrigimos antes, use usuario_id
           titulo,
+          autor, // NOVO: Enviando o autor para o banco
           grupo,
           descricao
         })
@@ -70,13 +73,24 @@ export default function NovoTreino() {
         </h1>
 
         <div className="space-y-4">
-          {/* Título */}
+          
+          {/* Título do Treino */}
           <div>
             <label className="text-[10px] text-zinc-500 font-black ml-1 uppercase tracking-widest">Nome do Treino</label>
             <input
               placeholder="Ex: Treino de Segunda"
               className="w-full p-4 bg-zinc-900 rounded-2xl border border-zinc-800 focus:border-green-500 outline-none font-bold"
               onChange={(e) => setTitulo(e.target.value)}
+            />
+          </div>
+
+          {/* NOVO: Campo do Autor */}
+          <div>
+            <label className="text-[10px] text-zinc-500 font-black ml-1 uppercase tracking-widest">Criador / Autor</label>
+            <input
+              placeholder="Seu nome ou apelido"
+              className="w-full p-4 bg-zinc-900 rounded-2xl border border-zinc-800 focus:border-green-500 outline-none font-bold text-white"
+              onChange={(e) => setAutor(e.target.value)}
             />
           </div>
 
@@ -111,7 +125,6 @@ export default function NovoTreino() {
                   />
                   {exercicios.length > 1 && (
                     <button 
-                      // ✅ CORREÇÃO: Trocado 'salvando' por 'loading'
                       disabled={loading} 
                       onClick={() => removerExercicio(i)}
                       className="text-zinc-600 hover:text-red-500 px-2 transition-colors"
@@ -125,7 +138,6 @@ export default function NovoTreino() {
 
             <button
               onClick={adicionarExercicio}
-              // ✅ CORREÇÃO: Trocado 'salvando' por 'loading'
               disabled={loading}
               className="mt-4 w-full py-3 border-2 border-dashed border-zinc-800 rounded-xl text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:border-green-500/50 hover:text-green-500 transition-all"
             >
