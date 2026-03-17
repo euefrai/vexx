@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase"
 import TreinoCard from "@/components/TreinoCard"
 import Navbar from "@/components/Navbar"
 import BotaoFlutuante from "@/components/BotaoFlutuante"
+import Link from "next/link" // Adicionado para navegação
 
 export default function Feed() {
   const [treinos, setTreinos] = useState([])
@@ -27,12 +28,9 @@ export default function Feed() {
         .order("created_at", { ascending: false })
 
       if (error) throw error
-
-      // ✅ CORREÇÃO: Removido o setPosts que não existe e usado apenas setTreinos
       setTreinos(data || []) 
       
     } catch (error) {
-      // ✅ MELHORIA: Ver detalhadamente o erro no console
       console.error("Erro detalhado ao carregar treinos:", error.message || error)
     } finally {
       setLoading(false)
@@ -44,11 +42,16 @@ export default function Feed() {
       <div className="max-w-md mx-auto p-4 pb-24 min-h-screen bg-black">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-green-500 text-2xl font-black italic uppercase tracking-tighter">
-            🔥 Feed de Treinos
+            Elite Squad
           </h1>
-          <span className="text-[10px] bg-zinc-900 text-zinc-500 px-3 py-1 rounded-full font-bold border border-zinc-800">
-            COMUNIDADE
-          </span>
+          
+          {/* LINK PARA MENSAGENS */}
+          <Link href="/mensagens">
+            <span className="text-[10px] bg-zinc-900 text-zinc-500 px-3 py-1 rounded-full font-bold border border-zinc-800 active:scale-95 transition-all hover:text-green-500 hover:border-green-500/50 cursor-pointer flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+              COMUNIDADE
+            </span>
+          </Link>
         </div>
 
         {loading ? (
