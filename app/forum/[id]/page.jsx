@@ -60,7 +60,6 @@ export default function TopicoDetalhes() {
         setRespostas([])
       }
       
-      // Rola para o fim para ver a última resposta
       setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: "smooth" }), 500)
     } catch (error) {
       console.error("Erro tático na busca:", error)
@@ -105,8 +104,8 @@ export default function TopicoDetalhes() {
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-black uppercase text-[10px] animate-pulse">CARREGANDO BRIEFING...</div>
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans pb-40"> {/* Aumentei o PB aqui */}
-      <div className="max-w-md mx-auto p-4">
+    <div className="min-h-screen bg-black text-white font-sans relative">
+      <div className="max-w-md mx-auto p-4 pb-48"> {/* PB aumentado para não cobrir as mensagens */}
         
         <button onClick={() => router.back()} className="mb-6 flex items-center gap-2 text-zinc-600 hover:text-green-500 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
@@ -145,7 +144,7 @@ export default function TopicoDetalhes() {
         </h2>
 
         {/* LISTA DE RESPOSTAS */}
-        <div className="space-y-4 mb-20">
+        <div className="space-y-4">
           {respostas.length > 0 ? (
             respostas.map((res) => (
               <div key={res.id} className="bg-zinc-950 border border-zinc-900 p-5 rounded-[1.5rem] animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -169,23 +168,23 @@ export default function TopicoDetalhes() {
                <p className="text-[8px] font-black uppercase tracking-[0.3em]">Aguardando Suporte Tático...</p>
             </div>
           )}
-          <div ref={scrollRef} className="h-10" />
+          <div ref={scrollRef} className="h-20" />
         </div>
 
-        {/* CAMPO FIXO - REPOSICIONADO PARA FICAR ACIMA DA NAVBAR */}
-        <div className="fixed bottom-[72px] left-0 right-0 p-3 bg-black/90 backdrop-blur-xl border-t border-zinc-900 max-w-md mx-auto z-[60] shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
+        {/* CAMPO FIXO - SUBI PARA 85PX PARA FICAR BEM VISÍVEL ACIMA DA NAVBAR */}
+        <div className="fixed bottom-[85px] left-0 right-0 p-4 bg-black/80 backdrop-blur-md border-t border-zinc-900/50 max-w-md mx-auto z-[60]">
           <form onSubmit={enviarResposta} className="flex gap-2">
             <input 
               ref={inputRef}
               value={novaResposta}
               onChange={(e) => setNovaResposta(e.target.value)}
               placeholder="ENVIE SEU SUPORTE TÁTICO..."
-              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-[11px] font-black uppercase outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all placeholder:text-zinc-700 text-white"
+              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-[11px] font-black uppercase outline-none focus:border-green-500 transition-all placeholder:text-zinc-700 text-white"
             />
             <button 
               type="submit" 
               disabled={enviando}
-              className="bg-green-500 text-black px-4 rounded-xl font-black text-[10px] uppercase italic active:scale-95 disabled:opacity-50"
+              className="bg-green-500 text-black px-5 rounded-2xl font-black text-[10px] uppercase italic active:scale-95 disabled:opacity-50 shadow-[0_0_15px_rgba(34,197,94,0.3)]"
             >
               OK
             </button>

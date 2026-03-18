@@ -97,7 +97,7 @@ export default function TreinoCard({ treino }) {
           .from("likes")
           .insert({ 
             treino_id: treino.id, 
-            usuario_id: currentUser.id // CORRIGIDO: usuario_id
+            user_id: currentUser.id // CORRIGIDO: usuario_id
           })
 
         if (error && error.code !== '23505') throw error
