@@ -52,7 +52,7 @@ export default function Explorar() {
   // Função para navegar para o chat sem disparar o clique do Link do perfil
   const irParaChat = (e, destinatarioId) => {
     e.preventDefault() // Evita que abra o perfil
-    router.push(`/chat/${destinatarioId}`)
+    router.push(`/mensagens/${destinatarioId}`)
   }
 
   return (
