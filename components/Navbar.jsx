@@ -30,7 +30,7 @@ export default function Navbar() {
   }, [])
 
   const isActive = (path) =>
-    pathname === path
+    pathname.startsWith(path) // Usei startsWith para o fórum continuar ativo em [id]
       ? "text-green-400 scale-110"
       : "text-zinc-500"
 
@@ -38,6 +38,12 @@ export default function Navbar() {
     <nav className="fixed bottom-0 left-0 right-0 z-50">
       <div className="bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-800 px-6 py-3">
         <div className="max-w-md mx-auto flex justify-between items-center">
+
+          {/* Fórum - PRIMEIRO À ESQUERDA */}
+          <Link href="/forum" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/forum')}`}>
+            <span className="text-xl">💬</span>
+            <span className="text-[10px] font-semibold uppercase tracking-tighter">Fórum</span>
+          </Link>
 
           {/* Feed */}
           <Link href="/feed" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/feed')}`}>
@@ -57,7 +63,7 @@ export default function Navbar() {
             <span className="text-[10px] font-semibold uppercase tracking-tighter">Treino</span>
           </Link>
 
-          {/* Perfil - TRAVA FIXA DE TAMANHO */}
+          {/* Perfil */}
           <Link href="/perfil" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/perfil')}`}>
             <div 
               style={{ 
