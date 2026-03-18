@@ -42,7 +42,7 @@ export default function TreinoCard({ treino }) {
           .from("likes")
           .select("*")
           .eq("treino_id", treino.id)
-          .eq("user_id", user.id)
+          .eq("usuario_id", user.id) // CORRIGIDO: de user_id para usuario_id
           .maybeSingle()
 
         if (curtidaExistente) setJaCurtiu(true)
@@ -52,7 +52,6 @@ export default function TreinoCard({ treino }) {
     }
   }
 
-  // --- FUNÇÃO DE COMPARTILHAR ---
   async function compartilharTreino() {
     const textoCompartilhar = `🔥 Saca só esse treino de ${treino.grupo.toUpperCase()} que vi no VEXX!\n\n💪 ${treino.titulo}\n\n${treino.descricao}\n\nBora treinar? ⚡`
 
@@ -61,13 +60,12 @@ export default function TreinoCard({ treino }) {
         await navigator.share({
           title: `Treino: ${treino.titulo}`,
           text: textoCompartilhar,
-          url: window.location.href // Ou o link específico do treino se você tiver
+          url: window.location.href 
         })
       } catch (err) {
         console.error("Erro ao compartilhar:", err)
       }
     } else {
-      // Fallback: Copiar para área de transferência
       try {
         await navigator.clipboard.writeText(textoCompartilhar)
         alert("Texto do treino copiado! Agora é só colar onde quiser. 🚀")
@@ -88,7 +86,7 @@ export default function TreinoCard({ treino }) {
         const { error } = await supabase
           .from("likes")
           .delete()
-          .eq("user_id", currentUser.id)
+          .eq("usuario_id", currentUser.id) // CORRIGIDO: usuario_id
           .eq("treino_id", treino.id)
 
         if (error) throw error
@@ -97,7 +95,10 @@ export default function TreinoCard({ treino }) {
       } else {
         const { error } = await supabase
           .from("likes")
-          .insert({ treino_id: treino.id, user_id: currentUser.id })
+          .insert({ 
+            treino_id: treino.id, 
+            usuario_id: currentUser.id // CORRIGIDO: usuario_id
+          })
 
         if (error && error.code !== '23505') throw error
         
@@ -141,7 +142,7 @@ export default function TreinoCard({ treino }) {
         .from("comentarios")
         .insert({
           treino_id: treino.id,
-          user_id: user.id,
+          usuario_id: user.id, // CORRIGIDO: de user_id para usuario_id
           texto: novoComentario
         })
 
@@ -174,7 +175,6 @@ export default function TreinoCard({ treino }) {
         </div>
         
         <div className="flex gap-2">
-            {/* BOTÃO COMPARTILHAR */}
             <button 
               onClick={compartilharTreino}
               className="bg-zinc-800 text-zinc-400 p-2 rounded-full text-xs transition-colors hover:text-green-500"
@@ -238,8 +238,8 @@ export default function TreinoCard({ treino }) {
       )}
 
       <div className="flex justify-between items-center text-[10px] font-black uppercase text-zinc-600 tracking-widest mt-4">
-         <span>Criado por {autor?.username}</span>
-         <span className="text-green-900">#ELITESQUAD</span>
+          <span>Criado por {autor?.username}</span>
+          <span className="text-green-900">#ELITESQUAD</span>
       </div>
     </motion.div>
   )
