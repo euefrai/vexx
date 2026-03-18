@@ -4,9 +4,9 @@ import Link from "next/link"
 import Navbar from "@/components/Navbar"
 import OpenAI from "openai"
 
-// Sua chave OpenAI configurada, Paul.
+// Agora a chave vem de forma segura das variáveis de ambiente
 const openai = new OpenAI({
-  apiKey: "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",
+  apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
   dangerouslyAllowBrowser: true 
 });
 
@@ -45,7 +45,6 @@ export default function MacrosPage() {
       ];
 
       if (arquivo) {
-        // Conversão para Base64 para a OpenAI processar a imagem
         const base64 = await new Promise((resolve) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
@@ -83,7 +82,7 @@ export default function MacrosPage() {
 
     } catch (err) {
       console.error("ERRO OPENAI:", err);
-      setErro("FALHA NO PROCESSAMENTO. VERIFIQUE SALDO/CHAVE.");
+      setErro("FALHA NO PROCESSAMENTO. VERIFIQUE SALDO/CHAVE NO .ENV");
     } finally {
       setAnalisando(false);
     }
@@ -98,7 +97,6 @@ export default function MacrosPage() {
         <p className="text-zinc-800 text-[8px] font-black uppercase tracking-[0.4em]">Intelligence by OpenAI</p>
       </header>
 
-      {/* Histórico Dinâmico */}
       <div className="space-y-4 mb-6 max-w-md mx-auto">
         {historico.length === 0 && !analisando && (
           <div className="text-center py-24 opacity-10 italic font-black uppercase text-[10px] tracking-[0.5em]">Standby...</div>
@@ -134,7 +132,6 @@ export default function MacrosPage() {
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input de Comando */}
       <div className="fixed bottom-24 left-0 right-0 px-4">
         <div className="max-w-md mx-auto bg-zinc-900/90 backdrop-blur-md border border-zinc-800 p-2 rounded-[2.5rem] flex items-center gap-2 shadow-2xl">
           <button 
