@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { supabase } from "@/lib/supabase"
 import Navbar from "@/components/Navbar"
 import TreinoCard from "@/components/TreinoCard"
@@ -8,7 +8,10 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 
-export default function Perfil() {
+// Força a página a ser renderizada no servidor apenas no momento da requisição
+export const dynamic = 'force-dynamic';
+
+function ConteudoPerfil() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const usuarioIdUrl = searchParams.get("id")
@@ -54,27 +57,18 @@ export default function Perfil() {
       const targetId = usuarioIdUrl || authUser.id
       setIsProprioPerfil(targetId === authUser.id)
 
-      // 1. Dados do Perfil (Dono da página)
       const { data: userData } = await supabase.from("usuarios").select("*").eq("id", targetId).single()
       if (userData) setPerfil(userData)
 
-      // 2. Arsenal: Injetamos o perfil no treino para o TreinoCard exibir Nome/Foto do dono
       const { data: treinosData } = await supabase.from("treinos").select("*").eq("usuario_id", targetId).order("created_at", { ascending: false })
       setTreinos(treinosData?.map(t => ({ ...t, usuarios: userData })) || [])
 
-      // 3. Registros (Fotos)
       const { data: postsData } = await supabase.from("postagens").select("*").eq("usuario_id", targetId).order("created_at", { ascending: false })
       setPostagens(postsData || [])
 
-      // 4. Salvos (Treinos Curtidos): Busca o treino + o dono original desse treino
-      const { data: curtidosData } = await supabase
-        .from("likes")
-        .select("treinos(*, usuarios(*))")
-        .eq("user_id", targetId)
-      
+      const { data: curtidosData } = await supabase.from("likes").select("treinos(*, usuarios(*))").eq("user_id", targetId)
       setTreinosCurtidos(curtidosData?.map(item => item.treinos).filter(Boolean) || [])
 
-      // 5. Contadores de Seguidores
       const { count: cSeg } = await supabase.from("seguidores").select("*", { count: 'exact', head: true }).eq("seguido_id", targetId)
       const { count: cSeguindo } = await supabase.from("seguidores").select("*", { count: 'exact', head: true }).eq("seguidor_id", targetId)
       setStats({ seguidores: cSeg || 0, seguindo: cSeguindo || 0 })
@@ -127,10 +121,7 @@ export default function Perfil() {
   )
 
   return (
-    <>
-      <div className="max-w-md mx-auto p-4 pb-24 text-white min-h-screen bg-black font-sans">
-        
-        {/* TOP BAR */}
+    <div className="max-w-md mx-auto p-4 pb-24 text-white min-h-screen bg-black font-sans">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-xl font-black uppercase italic tracking-tighter text-green-500">
             {isProprioPerfil ? "Elite Squad / Perfil" : `Dossiê / ${perfil?.username}`}
@@ -140,9 +131,7 @@ export default function Perfil() {
           )}
         </div>
 
-        {/* HEADER DASHBOARD */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center mb-6 bg-zinc-900/40 p-6 rounded-[3rem] border border-zinc-800/50 shadow-2xl relative">
-          
           <div className="flex gap-2 mb-4">
              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-white/5">
                 <span className="text-sm">{status.icon}</span>
@@ -190,7 +179,6 @@ export default function Perfil() {
           </div>
         </motion.div>
         
-        {/* BARRA DE PROGRESSO XP */}
         <div className="mb-8 px-2">
             <div className="flex justify-between items-end mb-1.5 px-1">
                 <span className={`text-[9px] font-black uppercase italic ${status.cor}`}>Evolução de Rank</span>
@@ -201,18 +189,15 @@ export default function Perfil() {
             </div>
         </div>
 
-        {/* ABAS */}
         <div className="flex bg-zinc-900/50 p-1 rounded-2xl mb-8 border border-zinc-800/50">
           <button onClick={() => setAbaAtiva("meus_treinos")} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "meus_treinos" ? "bg-green-500 text-black shadow-lg shadow-green-500/20" : "text-zinc-500"}`}>Arsenal</button>
           <button onClick={() => setAbaAtiva("registros")} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "registros" ? "bg-green-500 text-black shadow-lg shadow-green-500/20" : "text-zinc-500"}`}>Registros</button>
           <button onClick={() => setAbaAtiva("salvos")} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "salvos" ? "bg-green-500 text-black shadow-lg shadow-green-500/20" : "text-zinc-500"}`}>Salvos</button>
         </div>
 
-        {/* CONTEÚDO */}
         <div className="min-h-[300px]">
           <AnimatePresence mode="wait">
             <motion.div key={abaAtiva} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-              
               {abaAtiva === "meus_treinos" && (
                 <div className="space-y-4">
                   {treinos.length > 0 ? treinos.map(t => <TreinoCard key={t.id} treino={t} />) : <p className="text-center py-10 text-zinc-700 text-[10px] font-bold uppercase italic font-black">Vazio.</p>}
@@ -250,21 +235,28 @@ export default function Perfil() {
                   {treinosCurtidos.length > 0 ? treinosCurtidos.map(t => <TreinoCard key={t.id} treino={t} />) : <p className="text-center py-10 text-zinc-700 text-[10px] font-bold uppercase italic font-black">Sem referências salvas.</p>}
                 </div>
               )}
-              
             </motion.div>
           </AnimatePresence>
         </div>
-      </div>
 
-      {/* MODAL ZOOM */}
-      <AnimatePresence>
-        {imagemSelecionada && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setImagemSelecionada(null)} className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
-            <img src={imagemSelecionada} className="max-w-full max-h-[85vh] rounded-3xl border border-zinc-800 shadow-[0_0_50px_rgba(0,0,0,1)]" />
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <AnimatePresence>
+          {imagemSelecionada && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setImagemSelecionada(null)} className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
+              <img src={imagemSelecionada} className="max-w-full max-h-[85vh] rounded-3xl border border-zinc-800 shadow-[0_0_50px_rgba(0,0,0,1)]" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+    </div>
+  )
+}
 
+// O componente principal exportado envolve tudo em Suspense para evitar erros de Build
+export default function Perfil() {
+  return (
+    <>
+      <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-black italic">CARREGANDO...</div>}>
+        <ConteudoPerfil />
+      </Suspense>
       <Navbar />
     </>
   )
