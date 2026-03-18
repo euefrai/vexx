@@ -3,7 +3,8 @@ import withPWAInit from 'next-pwa';
 const withPWA = withPWAInit({
   dest: 'public',
   register: true,
-  skipWaiting: true,
+  skipWaiting: true, // Importante para o SKIP_WAITING funcionar
+  clientsClaim: true, // Faz o novo SW assumir as abas abertas imediatamente
   disable: process.env.NODE_ENV === 'development',
 });
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/InstallPrompt";
+import UpdatePrompt from "@/components/UpdatePrompt";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,13 +14,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Metadados unificados para o PWA
+// Metadados unificados para a Elite Squad
 export const metadata: Metadata = {
   title: "VEXX SQUAD",
   description: "Elite Training Log & Community",
   manifest: "/manifest.json",
   themeColor: "#22c55e",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
 };
 
 export default function RootLayout({
@@ -33,9 +33,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
+        {/* Banner de Atualização (Topo) */}
+        <UpdatePrompt />
+        
         {children}
         
-        {/* O alerta de instalação fica aqui no final do body */}
+        {/* Alerta de Instalação (Rodapé) */}
         <InstallPrompt />
       </body>
     </html>
