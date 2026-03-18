@@ -125,7 +125,6 @@ export default function Ranking() {
         ) : (
           usuarios.map((user, index) => {
             const patente = getPatente(user.xp || 0)
-            {/* CORREÇÃO DA CONTA AQUI: dividido por 500 */}
             const nivel = Math.floor((user.xp || 0) / 500) + 1
 
             return (
@@ -167,6 +166,13 @@ export default function Ranking() {
           })
         )}
       </div>
+
+      {/* RODAPÉ DE COPYRIGHT */}
+      <footer className="mt-12 mb-6 text-center">
+        <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
+          © 2026 @eu.efrai - Todos os direitos reservados.
+        </p>
+      </footer>
 
       <Navbar />
     </div>

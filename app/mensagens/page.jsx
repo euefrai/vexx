@@ -64,7 +64,6 @@ export default function ListaMensagens() {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans">
-      {/* Container Centralizado para Desktop e Mobile */}
       <div className="max-w-md mx-auto p-4 pb-24">
         
         <div className="flex flex-col mb-6">
@@ -81,7 +80,6 @@ export default function ListaMensagens() {
             <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
               {seguindo.map(u => (
                 <Link href={`/chat/${u.id}`} key={u.id} className="flex flex-col items-center gap-2 shrink-0">
-                  {/* Foto Fixa em 64px para não esticar */}
                   <div className="w-16 h-16 rounded-full p-0.5 border-2 border-green-500/30 overflow-hidden bg-zinc-900 shrink-0">
                     <img 
                       src={u.foto || "https://via.placeholder.com/150"} 
@@ -115,11 +113,11 @@ export default function ListaMensagens() {
               conversas.map(chat => (
                 <Link href={`/chat/${chat.id}`} key={chat.id} className="block group">
                   <div className="flex items-center gap-4 bg-zinc-900/40 p-4 rounded-[1.5rem] border border-zinc-800/50 group-hover:bg-zinc-900 transition-all active:scale-[0.98]">
-                    {/* Foto da Lista Fixa em 56px */}
                     <div className="relative shrink-0 w-14 h-14">
                       <img 
                         src={chat.foto || "https://via.placeholder.com/150"} 
                         className="w-full h-full rounded-full object-cover border border-zinc-700" 
+                        alt={chat.username}
                       />
                       <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full shadow-lg"></div>
                     </div>
@@ -137,6 +135,13 @@ export default function ListaMensagens() {
             )}
           </div>
         )}
+
+        {/* RODAPÉ DE COPYRIGHT */}
+        <footer className="mt-16 mb-8 text-center">
+          <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
+            © 2026 @eu.efrai - Todos os direitos reservados.
+          </p>
+        </footer>
       </div>
 
       <Navbar />

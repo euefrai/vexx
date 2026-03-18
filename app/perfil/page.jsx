@@ -18,22 +18,19 @@ export default function Perfil() {
   const [loading, setLoading] = useState(true)
   const [seguidoresCount, setSeguidoresCount] = useState(0)
   const [seguindoCount, setSeguindoCount] = useState(0)
-  const [modalLista, setModalLista] = useState({ aberto: false, titulo: "", lista: [] })
 
   // LÓGICA DINÂMICA DE PATENTES E XP
   function getStatusEvolucao(xp = 0) {
- 
-    if (xp >= 8000) return { nome: "aura", cor: "text-red-500", icon: "⚡" }
-    if (xp >= 4000) return { nome: "no have enemies", cor: "text-purple-500", icon: "🛡️" }
-    if (xp >= 2000) return { nome: "high cortisol", cor: "text-blue-500", icon: "🦅" }
-    if (xp >= 1000) return { nome: "beta", cor: "text-yellow-500", icon: "⚔️" }
-    if (xp >= 500) return { nome: "frango", cor: "text-green-500", icon: "🎖️" }
-    return { nome: "RECRUTA", cor: "text-zinc-500", icon: "🔰" }
+    if (xp >= 8000) return { nome: "aura", cor: "text-red-500", icon: "⚡", min: 8000, max: 20000 }
+    if (xp >= 4000) return { nome: "no have enemies", cor: "text-purple-500", icon: "🛡️", min: 4000, max: 8000 }
+    if (xp >= 2000) return { nome: "high cortisol", cor: "text-blue-500", icon: "🦅", min: 2000, max: 4000 }
+    if (xp >= 1000) return { nome: "beta", cor: "text-yellow-500", icon: "⚔️", min: 1000, max: 2000 }
+    if (xp >= 500) return { nome: "frango", cor: "text-green-500", icon: "🎖️", min: 500, max: 1000 }
+    return { nome: "RECRUTA", cor: "text-zinc-500", icon: "🔰", min: 0, max: 500 }
   }
 
   const status = getStatusEvolucao(perfil?.xp || 0)
   
-  // Cálculo de progresso baseado na faixa da patente atual
   const xpNaFaixa = (perfil?.xp || 0) - status.min
   const totalNecessarioNaFaixa = status.max - status.min
   const progresso = Math.min(Math.max((xpNaFaixa / totalNecessarioNaFaixa) * 100, 0), 100)
@@ -115,7 +112,6 @@ export default function Perfil() {
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/5 blur-[50px] rounded-full" />
           
-          {/* PATENTE ACIMA DA FOTO */}
           <motion.div 
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -163,7 +159,7 @@ export default function Perfil() {
           </div>
         </motion.div>
         
-        {/* BARRA DE XP DINÂMICA */}
+        {/* BARRA DE XP */}
         <motion.div variants={item} initial="hidden" animate="show" className="mb-8">
             <div className="flex justify-between items-end mb-2 px-2">
                 <span className={`text-[10px] font-black uppercase ${status.cor}`}>Rumo ao próximo Rank</span>
@@ -181,13 +177,8 @@ export default function Perfil() {
             </div>
         </motion.div>
 
-        {/* ATRIBUTOS RÁPIDOS */}
-        <motion.div 
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-2 gap-3 mb-10"
-        >
+        {/* BOTÕES DE ABA */}
+        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 gap-3 mb-10">
           <motion.button 
             variants={item}
             whileTap={{ scale: 0.95 }}
@@ -211,16 +202,8 @@ export default function Perfil() {
           </motion.button>
         </motion.div>
 
-        {/* FEED DO PERFIL */}
+        {/* FEED */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-6 px-2">
-            <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent to-zinc-800" />
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
-              {abaAtiva === "meus_treinos" ? "Treinos Criados" : "Treinos Favoritos"}
-            </h3>
-            <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-zinc-800" />
-          </div>
-          
           <AnimatePresence mode="wait">
             <motion.div
               key={abaAtiva}
@@ -245,6 +228,13 @@ export default function Perfil() {
             </motion.div>
           </AnimatePresence>
         </div>
+
+        {/* RODAPÉ DE COPYRIGHT */}
+        <footer className="mt-16 mb-8 text-center">
+          <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
+            © 2026 @eu.efrai - Todos os direitos reservados.
+          </p>
+        </footer>
       </div>
       <Navbar />
     </>

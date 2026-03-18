@@ -17,14 +17,12 @@ export default function NovoTreino() {
   const [duracao, setDuracao] = useState("60")
   const [intensidade, setIntensidade] = useState("Moderado")
   
-  // Agora cada exercício é um objeto com campos específicos
   const [exercicios, setExercicios] = useState([
     { nome: "", series: "", peso: "" }
   ])
   
   const [loading, setLoading] = useState(false)
 
-  // Carrega o nome do usuário automaticamente
   useEffect(() => {
     async function getUsuario() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -53,7 +51,6 @@ export default function NovoTreino() {
   }
 
   async function salvar() {
-    // Validação básica
     if (!titulo || exercicios.some(ex => !ex.nome || !ex.peso)) {
       return alert("Preencha o título e os detalhes (nome e peso) de todos os exercícios!")
     }
@@ -64,12 +61,10 @@ export default function NovoTreino() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Usuário não autenticado")
 
-      // Formata a descrição para o feed
       const descricaoFormatada = exercicios
         .map(ex => `• ${ex.nome}: ${ex.series} sets | ${ex.peso}kg`)
         .join("\n")
 
-      // 1. Salva o treino principal
       const { data: treinoInserido, error: errorTreino } = await supabase
         .from("treinos")
         .insert({
@@ -78,16 +73,12 @@ export default function NovoTreino() {
           autor,
           grupo,
           descricao: descricaoFormatada,
-          // Se você tiver essas colunas no banco, pode adicionar:
-          // duracao,
-          // intensidade 
         })
         .select()
         .single()
 
       if (errorTreino) throw errorTreino
 
-      // 2. Salva cada exercício individualmente na tabela de registros (para o Ranking de Peso)
       const registrosParaInserir = exercicios.map(ex => ({
         usuario_id: user.id,
         treino_id: treinoInserido.id,
@@ -102,7 +93,6 @@ export default function NovoTreino() {
 
       if (errorReg) throw errorReg
 
-      // --- SISTEMA DE XP ---
       const xpTotal = 100 + (exercicios.length * 20) + (intensidade === "Insano" ? 50 : 0)
       const resultado = await adicionarXP(user.id, xpTotal)
       
@@ -239,6 +229,13 @@ export default function NovoTreino() {
             {loading ? "PROCESSANDO..." : "FINALIZAR MISSÃO 🔥"}
           </button>
         </div>
+
+        {/* RODAPÉ DE COPYRIGHT */}
+        <footer className="mt-16 mb-8 text-center">
+          <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
+            © 2026 @eu.efrai - Todos os direitos reservados.
+          </p>
+        </footer>
       </div>
       <Navbar />
     </>

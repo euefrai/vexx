@@ -102,7 +102,6 @@ export default function Explorar() {
                 <Link href={`/perfil/${u.id}`} key={u.id} className="block">
                   <div className="flex items-center justify-between bg-zinc-900/40 p-4 rounded-[1.2rem] border border-zinc-800/50 hover:bg-zinc-900 hover:border-zinc-700 active:scale-[0.98] transition-all">
                     <div className="flex items-center gap-4">
-                      {/* Foto do Usuário */}
                       <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-zinc-800">
                         <img 
                           src={u.foto || "https://via.placeholder.com/150"} 
@@ -110,7 +109,6 @@ export default function Explorar() {
                           alt={u.username}
                         />
                       </div>
-                      {/* Nome e Bio */}
                       <div className="flex flex-col">
                         <p className="font-black text-white text-sm">@{u.username}</p>
                         <p className="text-[10px] text-zinc-500 truncate max-w-[150px]">
@@ -131,6 +129,13 @@ export default function Explorar() {
           </>
         )}
       </div>
+
+      {/* RODAPÉ DE COPYRIGHT */}
+      <footer className="mt-12 mb-6 text-center">
+        <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
+          © 2026 @eu.efrai - Todos os direitos reservados.
+        </p>
+      </footer>
 
       <Navbar />
     </div>

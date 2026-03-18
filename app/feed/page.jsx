@@ -13,7 +13,7 @@ export default function Feed() {
   const [loading, setLoading] = useState(true)
   const [checkinFeito, setCheckinFeito] = useState(false)
   const [loadingCheckin, setLoadingCheckin] = useState(false)
-  const [strike, setStrike] = useState(0) // Estado do Contador
+  const [strike, setStrike] = useState(0) 
   const [busca, setBusca] = useState("")
   const { adicionarXP } = useGamificacao()
 
@@ -32,7 +32,6 @@ export default function Feed() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // 1. Verificar Check-in de Hoje
       const hoje = new Date()
       hoje.setHours(0, 0, 0, 0)
       const { data: hojeData } = await supabase
@@ -44,8 +43,6 @@ export default function Feed() {
 
       setCheckinFeito(!!hojeData)
 
-      // 2. Calcular Strike (Dias seguidos)
-      // Buscamos os últimos 30 dias para calcular
       const { data: historico } = await supabase
         .from("registros_treino")
         .select("created_at")
@@ -53,7 +50,6 @@ export default function Feed() {
         .order("created_at", { ascending: false })
 
       if (historico && historico.length > 0) {
-        // Extrair apenas as datas (YYYY-MM-DD) únicas
         const datasSet = new Set(historico.map(r => r.created_at.split('T')[0]))
         const datasUnicas = Array.from(datasSet)
         
@@ -61,12 +57,10 @@ export default function Feed() {
         let dataVerificar = new Date()
         dataVerificar.setHours(0, 0, 0, 0)
 
-        // Se não treinou hoje, o strike começa a contar a partir de ontem
         if (!datasSet.has(dataVerificar.toISOString().split('T')[0])) {
            dataVerificar.setDate(dataVerificar.getDate() - 1)
         }
 
-        // Loop para verificar sequência retroativa
         while (datasSet.has(dataVerificar.toISOString().split('T')[0])) {
           contador++
           dataVerificar.setDate(dataVerificar.getDate() - 1)
@@ -109,7 +103,6 @@ export default function Feed() {
         if (adicionarXP) await adicionarXP(user.id, 50)
         alert("MISSÃO CUMPRIDA! 🔥")
       }
-      // Recalcula o strike após a ação
       verificarCheckinEStrike()
     } catch (error) {
       alert(`Erro: ${error.message}`)
@@ -189,7 +182,6 @@ export default function Feed() {
             onChange={(e) => setBusca(e.target.value)}
             className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-3 px-11 text-xs text-white placeholder:text-zinc-600 outline-none"
           />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600"></span>
         </div>
 
         {/* LISTA DE TREINOS */}
@@ -200,6 +192,13 @@ export default function Feed() {
             {treinosFiltrados.map(t => <TreinoCard key={t.id} treino={t}/>)}
           </div>
         )}
+
+        {/* RODAPÉ DE COPYRIGHT */}
+        <footer className="mt-16 mb-8 text-center">
+          <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
+            © 2026 @eu.efrai - Todos os direitos reservados.
+          </p>
+        </footer>
       </div>
       <BotaoFlutuante />
       <Navbar />
