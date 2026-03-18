@@ -4,12 +4,6 @@ import Link from "next/link"
 import Navbar from "@/components/Navbar"
 import OpenAI from "openai"
 
-// Agora a chave vem de forma segura das variáveis de ambiente
-const openai = new OpenAI({
-  apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true 
-});
-
 export default function MacrosPage() {
   const [inputTexto, setInputTexto] = useState("");
   const [analisando, setAnalisando] = useState(false);
@@ -17,8 +11,17 @@ export default function MacrosPage() {
   const [erro, setErro] = useState(null);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
+  
+  // Referência para a instância da OpenAI
+  const openaiRef = useRef(null);
 
   useEffect(() => {
+    // Inicializa a OpenAI apenas no lado do cliente
+    openaiRef.current = new OpenAI({
+      apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
+      dangerouslyAllowBrowser: true 
+    });
+
     const saved = localStorage.getItem("elite_macros_history");
     if (saved) setHistorico(JSON.parse(saved));
   }, []);
@@ -30,6 +33,12 @@ export default function MacrosPage() {
 
   const analisarConteudo = async (arquivo = null) => {
     if (!arquivo && !inputTexto.trim()) return;
+    
+    // Verifica se a IA está pronta
+    if (!openaiRef.current) {
+      setErro("IA não inicializada. Tente recarregar.");
+      return;
+    }
 
     setAnalisando(true);
     setErro(null);
@@ -65,7 +74,7 @@ export default function MacrosPage() {
         });
       }
 
-      const response = await openai.chat.completions.create({
+      const response = await openaiRef.current.chat.completions.create({
         model: "gpt-4o-mini",
         messages: messages,
         response_format: { type: "json_object" }
