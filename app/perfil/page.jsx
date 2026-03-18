@@ -69,7 +69,6 @@ function ConteudoPerfil() {
       const { data: curtidosData } = await supabase.from("likes").select("treinos(*, usuarios(*))").eq("user_id", targetId)
       setTreinosCurtidos(curtidosData?.map(item => item.treinos).filter(Boolean) || [])
 
-      // Carregar lista de seguidores e quem segue
       const { data: segData } = await supabase.from("seguidores").select("usuarios!seguidores_seguidor_id_fkey(id, username, foto)").eq("seguido_id", targetId)
       setListaSeguidores(segData?.map(s => s.usuarios) || [])
 
@@ -83,6 +82,20 @@ function ConteudoPerfil() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function excluirTreino(id) {
+    if (!confirm("ELIMINAR ESTE TREINO DO ARSENAL?")) return
+    const { error } = await supabase.from("treinos").delete().eq("id", id)
+    if (error) alert("Erro ao deletar: " + error.message)
+    else carregarDados()
+  }
+
+  async function excluirPostagem(id) {
+    if (!confirm("REMOVER ESTE REGISTRO VISUAL?")) return
+    const { error } = await supabase.from("postagens").delete().eq("id", id)
+    if (error) alert("Erro ao deletar: " + error.message)
+    else carregarDados()
   }
 
   async function handleUploadRegistro(event) {
@@ -110,7 +123,6 @@ function ConteudoPerfil() {
   const status = getStatusEvolucao(perfil?.xp || 0)
   const progresso = perfil ? Math.min(Math.max(((perfil.xp - status.min) / (status.max - status.min)) * 100, 0), 100) : 0
 
-  // Componente reutilizável para renderizar listas de usuários (seguidores/seguindo)
   const RenderListaUsuarios = ({ lista }) => (
     <div className="space-y-3">
       {lista.length > 0 ? lista.map(u => (
@@ -206,9 +218,24 @@ function ConteudoPerfil() {
         <div className="min-h-[300px]">
           <AnimatePresence mode="wait">
             <motion.div key={abaAtiva} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              
               {abaAtiva === "meus_treinos" && (
                 <div className="space-y-4">
-                  {treinos.length > 0 ? treinos.map(t => <TreinoCard key={t.id} treino={t} />) : <p className="text-center py-10 text-zinc-700 text-[10px] font-bold uppercase italic font-black">Vazio.</p>}
+                  {treinos.length > 0 ? treinos.map(t => (
+                    <div key={t.id} className="relative group">
+                      <TreinoCard treino={t} />
+                      {isProprioPerfil && (
+                        <button 
+                          onClick={() => excluirTreino(t.id)}
+                          className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full border-2 border-black shadow-lg hover:scale-110 active:scale-90 transition-all z-10"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )) : <p className="text-center py-10 text-zinc-700 text-[10px] font-bold uppercase italic font-black">Vazio.</p>}
                 </div>
               )}
 
@@ -232,6 +259,19 @@ function ConteudoPerfil() {
                           onClick={() => setImagemSelecionada(post.imagem_url)} 
                           className="w-full h-full object-cover cursor-pointer active:scale-95 transition-transform" 
                         />
+                        {isProprioPerfil && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              excluirPostagem(post.id);
+                            }}
+                            className="absolute top-1 right-1 bg-black/60 hover:bg-red-600 p-1.5 rounded-lg backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
