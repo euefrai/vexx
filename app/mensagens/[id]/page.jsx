@@ -19,6 +19,7 @@ export default function ChatPrivado() {
   const [mensagens, setMensagens] = useState([])
   const [novaMensagem, setNovaMensagem] = useState("")
   const [meuId, setMeuId] = useState(null)
+  const [meuNome, setMeuNome] = useState("") // Para o título da notificação
   const [outroUsuario, setOutroUsuario] = useState(null)
   const [registros, setRegistros] = useState([])
   const [loading, setLoading] = useState(true)
@@ -85,6 +86,11 @@ export default function ChatPrivado() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return router.push("/login")
     setMeuId(user.id)
+
+    // Busca meu username para a notificação push
+    const { data: meuPerfil } = await supabase.from("usuarios").select("username").eq("id", user.id).single()
+    if (meuPerfil) setMeuNome(meuPerfil.username)
+
     const { data: userD } = await supabase.from("usuarios").select("username, foto").eq("id", destinatarioId).single()
     if (userD) setOutroUsuario(userD)
     
@@ -93,6 +99,29 @@ export default function ChatPrivado() {
     const { data: regs } = await supabase.from("registros_treino").select("*").eq("usuario_id", user.id).order("created_at", { ascending: false })
     setRegistros(regs || [])
     setLoading(false)
+  }
+
+  // --- FUNÇÃO DE NOTIFICAÇÃO PUSH ---
+  async function dispararPush(texto) {
+    try {
+      await fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Authorization": "Basic os_v2_app_bvmrw5n3cngnrfk2wfqgewexqmqm2ibu4sle7veqxpenhsia74ppkdf4b6c2jziqrl5hy32bzbj3y4a3uqf7v24vgkkroalvkbv7ycy"
+        },
+        body: JSON.stringify({
+          app_id: "0d591b75-bb13-4cd8-955a-b16062589783",
+          include_external_user_ids: [destinatarioId],
+          headings: { "en": meuNome || "Nova Mensagem", "pt": meuNome || "Nova Mensagem" },
+          contents: { "en": texto, "pt": texto },
+          android_accent_color: "FF22C55E",
+          priority: 10
+        })
+      })
+    } catch (err) {
+      console.error("Push Error:", err)
+    }
   }
 
   // FUNÇÕES DE EXCLUSÃO
@@ -157,7 +186,14 @@ export default function ChatPrivado() {
     
     const texto = novaMensagem
     setNovaMensagem("")
-    await supabase.from("mensagens").insert({ texto, remetente_id: meuId, destinatario_id: destinatarioId })
+    
+    // Insere no banco
+    const { error } = await supabase.from("mensagens").insert({ texto, remetente_id: meuId, destinatario_id: destinatarioId })
+    
+    // Dispara Notificação Push se não houve erro no envio
+    if (!error) {
+      dispararPush(texto)
+    }
   }
 
   return (
