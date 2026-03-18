@@ -1,36 +1,34 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
+// Inicializa a OpenAI (O Next.js vai ler do seu .env ou Vercel)
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 export async function POST(req) {
-  // 1. Log para saber se a requisição chegou
-  console.log("REQUISIÇÃO RECEBIDA NA API /API/MACROS");
-
-  // 2. Verifica se a chave existe antes de instanciar
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    console.error("ERRO: OPENAI_API_KEY NÃO DEFINIDA NO .ENV");
-    return NextResponse.json({ error: "Chave de API ausente no servidor." }, { status: 500 });
-  }
-
-  const openai = new OpenAI({ apiKey });
-
   try {
-    const { messages } = await req.json();
+    const { messages, modo } = await req.json();
+
+    // Prompt dinâmico: muda conforme o botão que você clica no site
+    const instrucaoSistema = modo === 'rotulo' 
+      ? "Atue como um especialista em segurança alimentar. Analise o RÓTULO. Extraia os macros e analise os INGREDIENTES (aditivos, açúcares). Responda APENAS um JSON: {\"alimento\": \"nome\", \"calorias\": 0, \"proteina\": 0, \"carbo\": 0, \"gordura\": 0, \"nota_pureza\": 0, \"veredito\": \"frase curta sobre a qualidade\"}"
+      : "Atue como um nutricionista esportivo. Analise o alimento e estime os macros. Responda APENAS um JSON: {\"alimento\": \"nome\", \"calorias\": 0, \"proteina\": 0, \"carbo\": 0, \"gordura\": 0}";
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: messages,
+      messages: [
+        { role: "system", content: instrucaoSistema },
+        ...messages
+      ],
       response_format: { type: "json_object" }
     });
 
-    const resContent = response.choices[0].message.content;
-    return NextResponse.json(JSON.parse(resContent));
+    const conteudo = JSON.parse(response.choices[0].message.content);
+    return NextResponse.json(conteudo);
+
   } catch (error) {
-    // 3. Isso vai imprimir o erro real no seu terminal do VS Code
-    console.error("ERRO DETALHADO DA OPENAI:", error);
-    return NextResponse.json(
-      { error: error.message || "Erro interno na comunicação com a IA" }, 
-      { status: 500 }
-    );
+    console.error("ERRO NA API:", error);
+    return NextResponse.json({ error: "Falha na IA: " + error.message }, { status: 500 });
   }
 }
