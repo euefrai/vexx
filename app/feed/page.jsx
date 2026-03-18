@@ -51,7 +51,6 @@ export default function Feed() {
 
       if (historico && historico.length > 0) {
         const datasSet = new Set(historico.map(r => r.created_at.split('T')[0]))
-        const datasUnicas = Array.from(datasSet)
         
         let contador = 0
         let dataVerificar = new Date()
@@ -127,76 +126,98 @@ export default function Feed() {
   return (
     <>
       <div className="max-w-md mx-auto p-4 pb-24 min-h-screen bg-black font-sans text-white">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-green-500 text-2xl font-black italic uppercase tracking-tighter">Elite Squad</h1>
+        
+        {/* HEADER REFINADO */}
+        <div className="flex justify-between items-center mb-8 mt-4">
+          <div>
+            <h1 className="text-green-500 text-3xl font-black italic uppercase tracking-tighter leading-none">
+              ELITE SQUAD
+            </h1>
+            <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.3em] mt-1">Status: Operacional</p>
+          </div>
           <Link href="/mensagens">
-            <span className="text-[10px] bg-zinc-900 text-zinc-500 px-3 py-1 rounded-full font-bold border border-zinc-800 flex items-center gap-2 cursor-pointer transition-all active:scale-95">
+            <span className="text-[10px] bg-zinc-900 text-zinc-300 px-4 py-2 rounded-full font-black border border-zinc-800 flex items-center gap-2 cursor-pointer transition-all active:scale-95 hover:border-green-500/50">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-              COMUNIDADE
+              CHAT
             </span>
           </Link>
         </div>
 
-        {/* CARD DE CHECK-IN COM STRIKE */}
-        <div className={`mb-8 p-6 rounded-[2.5rem] border transition-all duration-500 ${
+        {/* CARD DE CHECK-IN ESTILO "ORDEM DE MISSÃO" */}
+        <div className={`mb-8 p-6 rounded-[2.5rem] border transition-all duration-500 relative overflow-hidden ${
           checkinFeito 
           ? 'bg-zinc-900/40 border-zinc-800' 
-          : 'bg-gradient-to-br from-green-500/20 to-black border-green-500/40 shadow-[0_0_20px_rgba(34,197,94,0.1)]'
+          : 'bg-zinc-900 border-green-500/30 shadow-[0_10px_40px_rgba(34,197,94,0.05)]'
         }`}>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center relative z-10">
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className={`font-black uppercase italic text-sm ${checkinFeito ? 'text-zinc-500' : 'text-green-500'}`}>
+                <h3 className={`font-black uppercase italic text-sm tracking-tighter ${checkinFeito ? 'text-zinc-500' : 'text-green-500'}`}>
                   {checkinFeito ? "Treino Confirmado" : "Missão do Dia"}
                 </h3>
                 {strike > 0 && (
-                  <span className="bg-orange-500/20 text-orange-500 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 border border-orange-500/30">
-                    🔥 {strike} {strike === 1 ? 'DIA' : 'DIAS'}
+                  <span className="bg-orange-500 text-black text-[9px] font-black px-2 py-0.5 rounded italic">
+                    {strike}D STREAK
                   </span>
                 )}
               </div>
-              <p className="text-white text-[10px] font-bold uppercase tracking-widest mt-1">
-                {checkinFeito ? "DESEJA CANCELAR?" : "MANTER A OFENSIVA"}
+              <p className="text-white text-[10px] font-black uppercase tracking-widest mt-1 opacity-80">
+                {checkinFeito ? "PAGAMENTO RECEBIDO" : "PAGUE O PREÇO HOJE"}
               </p>
             </div>
             
             <button
               onClick={realizarCheckin}
-              className={`px-8 py-3 rounded-2xl font-black text-xs uppercase italic transition-all active:scale-95 ${
+              className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase italic transition-all active:scale-95 ${
                 checkinFeito 
-                ? "bg-zinc-800 text-zinc-400 border border-zinc-700" 
-                : "bg-green-500 text-black shadow-[0_5px_15px_rgba(34,197,94,0.4)]"
+                ? "bg-zinc-800 text-zinc-500 border border-zinc-700" 
+                : "bg-green-500 text-black shadow-[0_0_20px_rgba(34,197,94,0.3)]"
               }`}
             >
-              {loadingCheckin ? "..." : checkinFeito ? "CONCLUÍDO" : "PAGAR TREINO"}
+              {loadingCheckin ? "..." : checkinFeito ? "CANCELAR" : "MARCAR CHECK-IN"}
             </button>
           </div>
         </div>
 
-        {/* BUSCA */}
-        <div className="relative mb-6">
+        {/* BUSCA TÁTICA */}
+        <div className="relative mb-8">
+          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+            <span className="text-zinc-600 text-xs">⚡</span>
+          </div>
           <input 
             type="text"
-            placeholder="Buscar treino..."
+            placeholder="LOCALIZAR OPERAÇÃO..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-3 px-11 text-xs text-white placeholder:text-zinc-600 outline-none"
+            className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl py-4 px-11 text-[10px] font-black tracking-widest text-white placeholder:text-zinc-700 outline-none focus:border-green-500/50 transition-all uppercase"
           />
         </div>
 
         {/* LISTA DE TREINOS */}
-        {loading ? (
-          <div className="text-center py-20 animate-pulse text-zinc-600 font-black text-[10px] uppercase">Carregando Arsenal...</div>
-        ) : (
-          <div className="space-y-4">
-            {treinosFiltrados.map(t => <TreinoCard key={t.id} treino={t}/>)}
-          </div>
-        )}
+        <div className="space-y-6">
+          <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] ml-2">Relatórios de Campo</p>
+          {loading ? (
+            <div className="text-center py-20 flex flex-col items-center gap-3">
+               <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+               <span className="text-zinc-600 font-black text-[9px] uppercase tracking-[0.2em]">Sincronizando Arsenal...</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {treinosFiltrados.length > 0 ? (
+                treinosFiltrados.map(t => <TreinoCard key={t.id} treino={t}/>)
+              ) : (
+                <div className="text-center py-10 border border-dashed border-zinc-900 rounded-[2rem]">
+                  <p className="text-zinc-700 font-bold text-xs uppercase">Nenhuma operação encontrada</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* RODAPÉ DE COPYRIGHT */}
-        <footer className="mt-16 mb-8 text-center">
-          <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
-            © 2026 @eu.efrai - Todos os direitos reservados.
+        {/* RODAPÉ */}
+        <footer className="mt-20 mb-8 text-center">
+          <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-[0.2em]">
+            SQUAD SYSTEM v2.0 // @eu.efrai
           </p>
         </footer>
       </div>
