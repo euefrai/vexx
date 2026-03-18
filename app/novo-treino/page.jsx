@@ -16,14 +16,12 @@ export default function NovoTreino() {
   const [grupo, setGrupo] = useState("Full Body")
   const [intensidade, setIntensidade] = useState("Moderado")
   
-  // Agora cada item é uma "Descrição" que contém o exercício e as reps
   const [exercicios, setExercicios] = useState([
     { nome: "", series: "" }
   ])
   
   const [loading, setLoading] = useState(false)
 
-  // Lista de grupos expandida conforme solicitado
   const opcoesGrupo = [
     "All Day", "Full Body", "Full Leg", "Push Day", "Pull Day", 
     "Peito", "Costas", "Perna", "Ombro", "Bíceps", "Tríceps", "Cardio"
@@ -67,44 +65,32 @@ export default function NovoTreino() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Usuário não autenticado")
 
+      // Formata a descrição para o banco de dados
       const descricaoFormatada = exercicios
-        .map(ex => `• ${ex.nome}: ${ex.series}`)
+        .map(ex => `${ex.nome}: ${ex.series}`)
         .join("\n")
 
-      const { data: treinoInserido, error: errorTreino } = await supabase
+      // SALVAR APENAS NA TABELA "treinos"
+      const { error: errorTreino } = await supabase
         .from("treinos")
         .insert({
           usuario_id: user.id,
-          titulo,
-          autor,
-          grupo,
+          titulo: titulo,
+          autor: autor,
+          grupo: grupo,
           descricao: descricaoFormatada,
         })
-        .select()
-        .single()
 
       if (errorTreino) throw errorTreino
 
-      const registrosParaInserir = exercicios.map(ex => ({
-        usuario_id: user.id,
-        treino_id: treinoInserido.id,
-        exercicio: ex.nome,
-        series: ex.series
-      }))
-
-      const { error: errorReg } = await supabase
-        .from("registros_treino")
-        .insert(registrosParaInserir)
-
-      if (errorReg) throw errorReg
-
+      // Gamificação de XP baseada na complexidade da missão
       const xpTotal = 100 + (exercicios.length * 20)
-      await adicionarXP(user.id, xpTotal)
+      if (adicionarXP) await adicionarXP(user.id, xpTotal)
       
-      alert(`Missão Finalizada! +${xpTotal} XP na conta.`)
+      alert(`Missão Finalizada! +${xpTotal} XP na conta. 🔥`)
       router.push("/feed")
     } catch (err) {
-      console.error(err)
+      console.error("Erro ao salvar missão:", err)
       alert("Erro ao salvar: " + err.message)
     } finally {
       setLoading(false)
@@ -122,14 +108,13 @@ export default function NovoTreino() {
         </header>
 
         <div className="space-y-6">
-          
-          {/* INFO BÁSICA */}
+          {/* CONFIGURAÇÃO DA MISSÃO */}
           <div className="bg-zinc-900/40 p-5 rounded-[2.5rem] border border-zinc-800 space-y-4">
             <div>
               <label className="text-[10px] text-zinc-500 font-black ml-2 uppercase tracking-widest">Nome da Operação</label>
               <input
                 placeholder="Ex: Destruição Total"
-                className="w-full p-4 bg-black rounded-2xl border border-zinc-800 focus:border-green-500 outline-none font-bold text-sm"
+                className="w-full p-4 bg-black rounded-2xl border border-zinc-800 focus:border-green-500 outline-none font-bold text-sm uppercase"
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}
               />
@@ -151,7 +136,7 @@ export default function NovoTreino() {
               <div>
                 <label className="text-[10px] text-zinc-500 font-black ml-2 uppercase tracking-widest">Intensidade</label>
                 <select
-                  className="w-full p-4 bg-black rounded-2xl border border-zinc-800 text-yellow-500 font-black text-xs outline-none"
+                  className="w-full p-4 bg-black rounded-2xl border border-zinc-800 text-yellow-500 font-black text-xs outline-none uppercase"
                   value={intensidade}
                   onChange={(e) => setIntensidade(e.target.value)}
                 >
@@ -164,9 +149,9 @@ export default function NovoTreino() {
             </div>
           </div>
 
-          {/* LISTA DE DESCRIÇÕES (EXERCÍCIOS) */}
+          {/* LISTAGEM DE ALVOS (EXERCÍCIOS) */}
           <div className="space-y-3">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Descrição dos Alvos</p>
+            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Relatório de Alvos</p>
             
             <AnimatePresence>
               {exercicios.map((ex, i) => (
@@ -184,8 +169,8 @@ export default function NovoTreino() {
                       onChange={(e) => atualizarExercicio(i, "nome", e.target.value)}
                     />
                     <input
-                      placeholder="Quantidade de repetições (ex: 4x12)"
-                      className="w-full p-3 bg-black rounded-xl border border-zinc-800 focus:border-green-500 outline-none text-xs text-zinc-400"
+                      placeholder="Repetições (ex: 4x12)"
+                      className="w-full p-3 bg-black rounded-xl border border-zinc-800 focus:border-green-500 outline-none text-xs text-zinc-400 font-bold uppercase"
                       value={ex.series}
                       onChange={(e) => atualizarExercicio(i, "series", e.target.value)}
                     />
@@ -194,7 +179,7 @@ export default function NovoTreino() {
                   {exercicios.length > 1 && (
                     <button 
                       onClick={() => removerExercicio(i)}
-                      className="absolute top-4 right-4 text-red-500 text-xs font-black"
+                      className="absolute top-4 right-4 text-red-500 text-[10px] font-black uppercase italic active:scale-90"
                     >
                       REMOVER
                     </button>
@@ -206,9 +191,9 @@ export default function NovoTreino() {
             <button
               type="button"
               onClick={adicionarDescricao}
-              className="w-full py-4 border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-500 text-[10px] font-black uppercase hover:border-green-500/50 hover:text-green-500 transition-all"
+              className="w-full py-4 border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-500 text-[10px] font-black uppercase hover:border-green-500/50 hover:text-green-500 transition-all flex items-center justify-center gap-2"
             >
-              + Adicionar Descrição
+              + ADICIONAR ALVO
             </button>
           </div>
 
@@ -217,7 +202,7 @@ export default function NovoTreino() {
             disabled={loading}
             className="w-full bg-green-500 text-black py-5 rounded-[2rem] font-black text-xl shadow-[0_10px_30px_rgba(34,197,94,0.2)] active:scale-95 transition-all disabled:opacity-50 uppercase italic mt-4"
           >
-            {loading ? "SINCRONIZANDO..." : "FINALIZAR MISSÃO 🔥"}
+            {loading ? "PROCESSANDO..." : "FINALIZAR MISSÃO 🔥"}
           </button>
         </div>
 

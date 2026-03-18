@@ -166,8 +166,12 @@ export default function TreinoCard({ treino }) {
       {/* HEADER DO CARD */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-green-500/20 p-0.5 bg-black">
-            <img src={autor?.foto || "https://via.placeholder.com/150"} className="w-full h-full object-cover rounded-full" />
+          <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-green-500/20 p-0.5 bg-black/50">
+            <img 
+              src={autor?.foto || "https://via.placeholder.com/150"} 
+              className="w-full h-full object-cover rounded-full opacity-80" 
+              alt="Autor"
+            />
           </div>
           <div className="flex flex-col">
             <span className="text-[11px] font-black text-white uppercase tracking-tighter leading-none italic">
@@ -180,13 +184,13 @@ export default function TreinoCard({ treino }) {
         <div className="flex gap-1.5">
             <button 
               onClick={compartilharTreino}
-              className="bg-zinc-800/50 text-zinc-400 w-9 h-9 flex items-center justify-center rounded-xl text-xs transition-all active:scale-90 hover:text-green-500"
+              className="bg-zinc-800/50 text-zinc-400 w-9 h-9 flex items-center justify-center rounded-xl text-xs transition-all active:scale-90 hover:text-green-500 border border-zinc-800/50"
             >
               📤
             </button>
             <button 
               onClick={() => setMostrarComentarios(!mostrarComentarios)} 
-              className={`px-3 py-2 rounded-xl text-[10px] font-black transition-all active:scale-90 flex items-center gap-2 ${mostrarComentarios ? 'bg-green-500 text-black' : 'bg-zinc-800 text-zinc-400'}`}
+              className={`px-3 py-2 rounded-xl text-[10px] font-black transition-all active:scale-90 flex items-center gap-2 border ${mostrarComentarios ? 'bg-green-500 text-black border-green-400' : 'bg-zinc-800/50 text-zinc-400 border-zinc-800/50'}`}
             >
               💬 {comentarios.length}
             </button>
@@ -201,7 +205,6 @@ export default function TreinoCard({ treino }) {
         </div>
       </div>
 
-      {/* TÍTULO E DESCRIÇÃO FORMATADA */}
       <h2 className="text-2xl font-black italic uppercase text-white mb-4 tracking-tighter leading-none">{treino.titulo}</h2>
       
       <div className="bg-black/40 rounded-[1.5rem] p-5 mb-4 border border-zinc-800/30">
@@ -209,7 +212,7 @@ export default function TreinoCard({ treino }) {
           {treino.descricao?.split(/[\n,;]+/).map((ex, i) => (
             ex.trim() && (
               <div key={i} className="flex items-start gap-3 group">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)] shrink-0 group-hover:scale-125 transition-transform" />
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)] shrink-0" />
                 <p className="text-[13px] text-zinc-300 font-bold leading-tight uppercase tracking-tight">{ex.trim()}</p>
               </div>
             )
@@ -217,16 +220,15 @@ export default function TreinoCard({ treino }) {
         </div>
       </div>
 
-      {/* SEÇÃO DE COMENTÁRIOS */}
       {mostrarComentarios && (
         <div className="mt-6 pt-6 border-t border-zinc-800/50 space-y-4">
           <div className="max-h-52 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
             {comentarios.map((c) => (
               <div key={c.id} className="flex gap-3 items-start">
-                <img src={c.usuarios?.foto || "https://via.placeholder.com/150"} className="w-7 h-7 rounded-full object-cover border border-zinc-800" />
-                <div className="bg-zinc-800/30 p-3 rounded-2xl flex-1 border border-zinc-800/20">
+                <img src={c.usuarios?.foto || "https://via.placeholder.com/150"} className="w-7 h-7 rounded-full object-cover border border-zinc-800" alt="Comentador" />
+                <div className="bg-zinc-800/30 p-3 rounded-2xl flex-1 border border-zinc-800/20 shadow-inner">
                   <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mb-1">@{c.usuarios?.username}</p>
-                  <p className="text-xs text-zinc-300 leading-normal">{c.texto}</p>
+                  <p className="text-xs text-zinc-300 leading-normal font-medium">{c.texto}</p>
                 </div>
               </div>
             ))}
@@ -242,7 +244,7 @@ export default function TreinoCard({ treino }) {
             <button 
               onClick={enviarComentario}
               disabled={enviandoComentario}
-              className="bg-green-500 text-black px-5 rounded-xl text-[10px] font-black uppercase italic active:scale-95 disabled:opacity-50"
+              className="bg-green-500 text-black px-5 rounded-xl text-[10px] font-black uppercase italic active:scale-95 disabled:opacity-50 shadow-[0_0_15px_rgba(34,197,94,0.2)]"
             >
               {enviandoComentario ? "..." : "ENVIAR"}
             </button>
@@ -250,12 +252,11 @@ export default function TreinoCard({ treino }) {
         </div>
       )}
 
-      {/* FOOTER DO CARD */}
       <div className="flex justify-between items-center mt-6 pt-4 border-t border-zinc-800/30">
-          <span className="text-[8px] font-black uppercase text-zinc-600 tracking-[0.2em]">OPERACIONAL // {autor?.username}</span>
-          <div className="flex gap-1">
-             <span className="w-1 h-1 bg-zinc-800 rounded-full"></span>
-             <span className="w-1 h-1 bg-zinc-800 rounded-full"></span>
+          <span className="text-[8px] font-black uppercase text-zinc-600 tracking-[0.2em]">SQUAD // {autor?.username || "Guerreiro"}</span>
+          <div className="flex gap-1 opacity-30">
+             <span className="w-1 h-1 bg-zinc-700 rounded-full"></span>
+             <span className="w-1 h-1 bg-zinc-700 rounded-full"></span>
              <span className="w-1 h-1 bg-green-500 rounded-full"></span>
           </div>
       </div>
