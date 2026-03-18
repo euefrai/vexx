@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase"
 import Navbar from "@/components/Navbar"
 import TreinoCard from "@/components/TreinoCard"
 import { motion, AnimatePresence } from "framer-motion"
+import Link from "next/link"
 
 export default function PerfilPublico() {
   const { id } = useParams()
@@ -15,8 +16,10 @@ export default function PerfilPublico() {
   const [treinos, setTreinos] = useState([])
   const [treinosCurtidos, setTreinosCurtidos] = useState([])
   const [postagens, setPostagens] = useState([]) 
+  const [listaSeguidores, setListaSeguidores] = useState([])
+  const [listaSeguindo, setListaSeguindo] = useState([])
   const [loading, setLoading] = useState(true)
-  const [souEu, setSouEu] = useState(false)
+  const [souEu, setSouEu] = useState(false) // Controla a exibição dos botões
   const [stats, setStats] = useState({ seguidores: 0, seguindo: 0 })
   const [seguindoStatus, setSeguindoStatus] = useState(false)
   const [abaAtiva, setAbaAtiva] = useState("treinos")
@@ -32,48 +35,54 @@ export default function PerfilPublico() {
   }
 
   useEffect(() => {
-    carregarPerfil()
+    if (id) carregarPerfil()
   }, [id])
 
   async function carregarPerfil() {
     try {
       setLoading(true)
       const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (authUser?.id === id) setSouEu(true)
       
-      if (authUser && authUser.id !== id) {
-        const { data: followData } = await supabase.from("seguidores").select("*").eq("seguidor_id", authUser.id).eq("seguido_id", id).single()
-        if (followData) setSeguindoStatus(true)
+      // VERIFICAÇÃO CRÍTICA: Compara o ID da URL com o ID logado
+      if (authUser && id) {
+        if (authUser.id === id) {
+          setSouEu(true)
+        } else {
+          setSouEu(false)
+          // Verifica se já segue
+          const { data: followData } = await supabase
+            .from("seguidores")
+            .select("*")
+            .eq("seguidor_id", authUser.id)
+            .eq("seguido_id", id)
+            .single()
+          if (followData) setSeguindoStatus(true)
+        }
       }
 
-      // 1. Dados do Usuário (Dono do Perfil)
+      // Resto do carregamento...
       const { data: userData } = await supabase.from("usuarios").select("*").eq("id", id).single()
       if (userData) {
         setPerfil(userData)
-
-        // 2. Arsenal: Injetamos os dados do perfil em cada treino para o TreinoCard exibir corretamente
         const { data: treinosData } = await supabase.from("treinos").select("*").eq("usuario_id", id).order("created_at", { ascending: false })
         const treinosComPerfil = treinosData?.map(t => ({ ...t, usuarios: userData })) || []
         setTreinos(treinosComPerfil)
 
-        // 3. Registros (Fotos)
         const { data: postsData } = await supabase.from("postagens").select("*").eq("usuario_id", id).order("created_at", { ascending: false })
         setPostagens(postsData || [])
       }
 
-      // 4. Salvos (Treinos que o usuário curtiu)
-      const { data: curtidasData } = await supabase
-        .from("likes")
-        .select("treino_id, treinos(*, usuarios(*))") // Buscamos o treino e o dono original do treino
-        .eq("user_id", id)
-      
+      const { data: curtidasData } = await supabase.from("likes").select("treino_id, treinos(*, usuarios(*))").eq("user_id", id)
       const curtidosFormatados = curtidasData?.map(item => item.treinos).filter(Boolean) || []
       setTreinosCurtidos(curtidosFormatados)
 
-      // 5. Contadores
-      const { count: segCount } = await supabase.from("seguidores").select("*", { count: 'exact', head: true }).eq("seguido_id", id)
-      const { count: followingCount } = await supabase.from("seguidores").select("*", { count: 'exact', head: true }).eq("seguidor_id", id)
-      setStats({ seguidores: segCount || 0, seguindo: followingCount || 0 })
+      const { data: segData } = await supabase.from("seguidores").select("usuarios!seguidores_seguidor_id_fkey(id, username, foto)").eq("seguido_id", id)
+      setListaSeguidores(segData?.map(s => s.usuarios) || [])
+
+      const { data: seguindoData } = await supabase.from("seguidores").select("usuarios!seguidores_seguido_id_fkey(id, username, foto)").eq("seguidor_id", id)
+      setListaSeguindo(seguindoData?.map(s => s.usuarios) || [])
+
+      setStats({ seguidores: segData?.length || 0, seguindo: seguindoData?.length || 0 })
 
     } catch (err) {
       console.error(err)
@@ -97,6 +106,17 @@ export default function PerfilPublico() {
       }
     } catch (err) { console.error(err) }
   }
+
+  const RenderListaUsuarios = ({ lista }) => (
+    <div className="space-y-3">
+      {lista.length > 0 ? lista.map(u => (
+        <Link href={`/perfil/${u.id}`} key={u.id} className="flex items-center gap-3 bg-zinc-900/50 p-3 rounded-2xl border border-zinc-800/50 active:scale-95 transition-all">
+          <img src={u.foto || "https://via.placeholder.com/150"} className="w-10 h-10 rounded-full object-cover border border-green-500/30" />
+          <span className="text-sm font-black uppercase italic text-zinc-200">@{u.username}</span>
+        </Link>
+      )) : <p className="text-center py-10 text-zinc-700 text-[10px] font-black uppercase italic">Vazio.</p>}
+    </div>
+  )
 
   const infoIMC = getInfoIMC()
 
@@ -141,30 +161,47 @@ export default function PerfilPublico() {
              </div>
           </div>
 
+          {/* BOTÕES: SÓ APARECEM SE NÃO FOR O MEU PERFIL */}
           {!souEu && (
-            <button onClick={toggleSeguir} className={`mt-6 w-full py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${seguindoStatus ? 'bg-zinc-800 text-zinc-400' : 'bg-green-500 text-black shadow-lg shadow-green-500/20'}`}>
-              {seguindoStatus ? "Seguindo" : "Seguir +"}
-            </button>
+            <div className="flex gap-2 w-full mt-6">
+              <button 
+                onClick={toggleSeguir} 
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase transition-all shadow-lg ${
+                  seguindoStatus 
+                  ? 'bg-zinc-800 text-zinc-400 border border-zinc-700' 
+                  : 'bg-green-500 text-black shadow-green-500/20'
+                }`}
+              >
+                {seguindoStatus ? "Seguindo" : "Seguir +"}
+              </button>
+              
+              <button 
+                onClick={() => router.push(`/chat/${id}`)}
+                className="px-6 py-3 bg-zinc-800 text-zinc-400 rounded-2xl border border-zinc-700 hover:bg-green-500 hover:text-black transition-all"
+              >
+                💬
+              </button>
+            </div>
           )}
         </div>
 
         {/* STATS */}
         <div className="flex justify-around mb-8 px-4">
-            <div className="text-center">
-                <p className="font-black text-lg leading-none">{stats.seguidores}</p>
+            <button onClick={() => setAbaAtiva("seguidores")} className="text-center">
+                <p className={`font-black text-lg leading-none ${abaAtiva === "seguidores" ? "text-green-500" : "text-white"}`}>{stats.seguidores}</p>
                 <p className="text-[8px] text-zinc-600 uppercase font-bold mt-1">Recrutas</p>
-            </div>
-            <div className="text-center">
-                <p className="font-black text-lg leading-none">{stats.seguindo}</p>
+            </button>
+            <button onClick={() => setAbaAtiva("seguindo")} className="text-center">
+                <p className={`font-black text-lg leading-none ${abaAtiva === "seguindo" ? "text-green-500" : "text-white"}`}>{stats.seguindo}</p>
                 <p className="text-[8px] text-zinc-600 uppercase font-bold mt-1">Seguindo</p>
-            </div>
+            </button>
         </div>
 
-        {/* SELETOR DE 3 ABAS */}
-        <div className="flex bg-zinc-900/50 p-1 rounded-2xl mb-6 border border-zinc-800/50">
-          <button onClick={() => setAbaAtiva("treinos")} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "treinos" ? "bg-green-500 text-black shadow-md" : "text-zinc-500"}`}>Arsenal</button>
-          <button onClick={() => setAbaAtiva("fotos")} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "fotos" ? "bg-green-500 text-black shadow-md" : "text-zinc-500"}`}>Registros</button>
-          <button onClick={() => setAbaAtiva("curtidos")} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "curtidos" ? "bg-green-500 text-black shadow-md" : "text-zinc-500"}`}>Salvos</button>
+        {/* SELETOR DE ABAS */}
+        <div className="flex bg-zinc-900/50 p-1 rounded-2xl mb-6 border border-zinc-800/50 overflow-x-auto no-scrollbar">
+          <button onClick={() => setAbaAtiva("treinos")} className={`flex-1 min-w-[80px] py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "treinos" ? "bg-green-500 text-black shadow-md" : "text-zinc-500"}`}>Arsenal</button>
+          <button onClick={() => setAbaAtiva("fotos")} className={`flex-1 min-w-[80px] py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "fotos" ? "bg-green-500 text-black shadow-md" : "text-zinc-500"}`}>Registros</button>
+          <button onClick={() => setAbaAtiva("curtidos")} className={`flex-1 min-w-[80px] py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "curtidos" ? "bg-green-500 text-black shadow-md" : "text-zinc-500"}`}>Salvos</button>
         </div>
 
         {/* CONTEÚDO */}
@@ -180,7 +217,6 @@ export default function PerfilPublico() {
               <motion.div key="fotos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col space-y-4">
                 {postagens.length > 0 ? postagens.map(p => (
                   <div key={p.id} className="bg-zinc-900/50 rounded-3xl p-4 border border-zinc-800/50">
-                    {/* Header do Post com Foto e Nome do Perfil */}
                     <div className="flex items-center gap-3 mb-4">
                       <img src={perfil?.foto || "https://via.placeholder.com/150"} className="w-8 h-8 rounded-full object-cover border border-green-500" />
                       <span className="text-[10px] font-black uppercase italic tracking-tighter">@{perfil?.username}</span>
@@ -200,11 +236,14 @@ export default function PerfilPublico() {
                 {treinosCurtidos.length > 0 ? treinosCurtidos.map(t => <TreinoCard key={t.id} treino={t} />) : <p className="text-center py-10 text-zinc-700 text-[10px] font-bold uppercase italic">Nenhuma referência salva.</p>}
               </motion.div>
             )}
+
+            {abaAtiva === "seguidores" && <motion.div key="seg" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><RenderListaUsuarios lista={listaSeguidores} /></motion.div>}
+            {abaAtiva === "seguindo" && <motion.div key="segui" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><RenderListaUsuarios lista={listaSeguindo} /></motion.div>}
+            
           </AnimatePresence>
         </div>
       </div>
 
-      {/* MODAL ZOOM */}
       <AnimatePresence>
         {imagemSelecionada && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setImagemSelecionada(null)} className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">

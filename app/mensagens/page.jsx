@@ -19,6 +19,7 @@ export default function ListaMensagens() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // Carregar quem o usuário segue
       const { data: seguindoData } = await supabase
         .from("seguidores")
         .select("usuarios!seguidores_seguido_id_fkey(id, username, foto)")
@@ -26,6 +27,7 @@ export default function ListaMensagens() {
       
       setSeguindo(seguindoData?.map(s => s.usuarios) || [])
 
+      // Carregar histórico de mensagens
       const { data: mensagensData, error } = await supabase
         .from("mensagens")
         .select(`
@@ -44,7 +46,7 @@ export default function ListaMensagens() {
       const chatsAgrupados = {}
       mensagensData.forEach(msg => {
         const outroUser = msg.remetente_id === user.id ? msg.destinatario : msg.remetente
-        if (!chatsAgrupados[outroUser.id]) {
+        if (outroUser && !chatsAgrupados[outroUser.id]) {
           chatsAgrupados[outroUser.id] = {
             id: outroUser.id,
             username: outroUser.username,
@@ -79,7 +81,8 @@ export default function ListaMensagens() {
             </h2>
             <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
               {seguindo.map(u => (
-                <Link href={`/chat/${u.id}`} key={u.id} className="flex flex-col items-center gap-2 shrink-0">
+                // AJUSTADO: Rota para /mensagens/[id]
+                <Link href={`/mensagens/${u.id}`} key={u.id} className="flex flex-col items-center gap-2 shrink-0">
                   <div className="w-16 h-16 rounded-full p-0.5 border-2 border-green-500/30 overflow-hidden bg-zinc-900 shrink-0">
                     <img 
                       src={u.foto || "https://via.placeholder.com/150"} 
@@ -111,7 +114,8 @@ export default function ListaMensagens() {
               </div>
             ) : (
               conversas.map(chat => (
-                <Link href={`/chat/${chat.id}`} key={chat.id} className="block group">
+                // AJUSTADO: Rota para /mensagens/[id]
+                <Link href={`/mensagens/${chat.id}`} key={chat.id} className="block group">
                   <div className="flex items-center gap-4 bg-zinc-900/40 p-4 rounded-[1.5rem] border border-zinc-800/50 group-hover:bg-zinc-900 transition-all active:scale-[0.98]">
                     <div className="relative shrink-0 w-14 h-14">
                       <img 
@@ -136,7 +140,6 @@ export default function ListaMensagens() {
           </div>
         )}
 
-        {/* RODAPÉ DE COPYRIGHT */}
         <footer className="mt-16 mb-8 text-center">
           <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
             © 2026 @eu.efrai - Todos os direitos reservados.

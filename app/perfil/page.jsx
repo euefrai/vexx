@@ -8,7 +8,6 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 
-// Força a página a ser renderizada no servidor apenas no momento da requisição
 export const dynamic = 'force-dynamic';
 
 function ConteudoPerfil() {
@@ -20,6 +19,8 @@ function ConteudoPerfil() {
   const [treinos, setTreinos] = useState([])
   const [treinosCurtidos, setTreinosCurtidos] = useState([])
   const [postagens, setPostagens] = useState([]) 
+  const [listaSeguidores, setListaSeguidores] = useState([])
+  const [listaSeguindo, setListaSeguindo] = useState([])
   const [abaAtiva, setAbaAtiva] = useState("meus_treinos")
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -27,7 +28,6 @@ function ConteudoPerfil() {
   const [isProprioPerfil, setIsProprioPerfil] = useState(false)
   const [imagemSelecionada, setImagemSelecionada] = useState(null)
 
-  // Sistema de Patentes (Rank) baseado no XP
   function getStatusEvolucao(xp = 0) {
     if (xp >= 8000) return { nome: "AURA", cor: "text-red-500", icon: "⚡", min: 8000, max: 20000 }
     if (xp >= 4000) return { nome: "NO ENEMIES", cor: "text-purple-500", icon: "🛡️", min: 4000, max: 8000 }
@@ -69,9 +69,14 @@ function ConteudoPerfil() {
       const { data: curtidosData } = await supabase.from("likes").select("treinos(*, usuarios(*))").eq("user_id", targetId)
       setTreinosCurtidos(curtidosData?.map(item => item.treinos).filter(Boolean) || [])
 
-      const { count: cSeg } = await supabase.from("seguidores").select("*", { count: 'exact', head: true }).eq("seguido_id", targetId)
-      const { count: cSeguindo } = await supabase.from("seguidores").select("*", { count: 'exact', head: true }).eq("seguidor_id", targetId)
-      setStats({ seguidores: cSeg || 0, seguindo: cSeguindo || 0 })
+      // Carregar lista de seguidores e quem segue
+      const { data: segData } = await supabase.from("seguidores").select("usuarios!seguidores_seguidor_id_fkey(id, username, foto)").eq("seguido_id", targetId)
+      setListaSeguidores(segData?.map(s => s.usuarios) || [])
+
+      const { data: seguindoData } = await supabase.from("seguidores").select("usuarios!seguidores_seguido_id_fkey(id, username, foto)").eq("seguidor_id", targetId)
+      setListaSeguindo(seguindoData?.map(s => s.usuarios) || [])
+
+      setStats({ seguidores: segData?.length || 0, seguindo: seguindoData?.length || 0 })
 
     } catch (err) {
       console.error(err)
@@ -86,22 +91,13 @@ function ConteudoPerfil() {
       setUploading(true)
       const file = event.target.files[0]
       if (!file) return
-
       const { data: { user } } = await supabase.auth.getUser()
       const fileExt = file.name.split('.').pop()
       const fileName = `${user.id}/${Math.random()}.${fileExt}`
-
       let { error: uploadError } = await supabase.storage.from('registros').upload(fileName, file)
       if (uploadError) throw uploadError
-
       const { data: { publicUrl } } = supabase.storage.from('registros').getPublicUrl(fileName)
-
-      await supabase.from('postagens').insert([{ 
-        usuario_id: user.id, 
-        imagem_url: publicUrl, 
-        legenda: "" 
-      }])
-
+      await supabase.from('postagens').insert([{ usuario_id: user.id, imagem_url: publicUrl, legenda: "" }])
       carregarDados()
     } catch (error) {
       alert("Erro ao subir imagem: " + error.message)
@@ -113,6 +109,18 @@ function ConteudoPerfil() {
   const infoIMC = getInfoIMC()
   const status = getStatusEvolucao(perfil?.xp || 0)
   const progresso = perfil ? Math.min(Math.max(((perfil.xp - status.min) / (status.max - status.min)) * 100, 0), 100) : 0
+
+  // Componente reutilizável para renderizar listas de usuários (seguidores/seguindo)
+  const RenderListaUsuarios = ({ lista }) => (
+    <div className="space-y-3">
+      {lista.length > 0 ? lista.map(u => (
+        <Link href={`/perfil?id=${u.id}`} key={u.id} className="flex items-center gap-3 bg-zinc-900/50 p-3 rounded-2xl border border-zinc-800/50 active:scale-95 transition-all">
+          <img src={u.foto || "https://via.placeholder.com/150"} className="w-10 h-10 rounded-full object-cover border border-green-500/30" />
+          <span className="text-sm font-black uppercase italic text-zinc-200">@{u.username}</span>
+        </Link>
+      )) : <p className="text-center py-10 text-zinc-700 text-[10px] font-black uppercase italic">Vazio.</p>}
+    </div>
+  )
 
   if (loading) return (
     <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-black italic animate-pulse">
@@ -168,14 +176,14 @@ function ConteudoPerfil() {
           </div>
 
           <div className="flex gap-8 mt-6">
-            <div className="text-center">
-              <p className="text-sm font-black text-white">{stats.seguidores}</p>
+            <button onClick={() => setAbaAtiva("seguidores")} className="text-center active:scale-90 transition-transform">
+              <p className={`text-sm font-black ${abaAtiva === "seguidores" ? "text-green-500" : "text-white"}`}>{stats.seguidores}</p>
               <p className="text-[8px] text-zinc-600 uppercase font-black">Recrutas</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-black text-white">{stats.seguindo}</p>
+            </button>
+            <button onClick={() => setAbaAtiva("seguindo")} className="text-center active:scale-90 transition-transform">
+              <p className={`text-sm font-black ${abaAtiva === "seguindo" ? "text-green-500" : "text-white"}`}>{stats.seguindo}</p>
               <p className="text-[8px] text-zinc-600 uppercase font-black">Seguindo</p>
-            </div>
+            </button>
           </div>
         </motion.div>
         
@@ -235,6 +243,10 @@ function ConteudoPerfil() {
                   {treinosCurtidos.length > 0 ? treinosCurtidos.map(t => <TreinoCard key={t.id} treino={t} />) : <p className="text-center py-10 text-zinc-700 text-[10px] font-bold uppercase italic font-black">Sem referências salvas.</p>}
                 </div>
               )}
+
+              {abaAtiva === "seguidores" && <RenderListaUsuarios lista={listaSeguidores} />}
+              {abaAtiva === "seguindo" && <RenderListaUsuarios lista={listaSeguindo} />}
+
             </motion.div>
           </AnimatePresence>
         </div>
@@ -250,7 +262,6 @@ function ConteudoPerfil() {
   )
 }
 
-// O componente principal exportado envolve tudo em Suspense para evitar erros de Build
 export default function Perfil() {
   return (
     <>
