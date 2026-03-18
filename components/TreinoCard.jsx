@@ -42,7 +42,7 @@ export default function TreinoCard({ treino }) {
           .from("likes")
           .select("*")
           .eq("treino_id", treino.id)
-          .eq("usuario_id", user.id) // CORRIGIDO: de user_id para usuario_id
+          .eq("user_id", user.id) // CORRIGIDO: de user_id para usuario_id
           .maybeSingle()
 
         if (curtidaExistente) setJaCurtiu(true)
@@ -86,7 +86,7 @@ export default function TreinoCard({ treino }) {
         const { error } = await supabase
           .from("likes")
           .delete()
-          .eq("usuario_id", currentUser.id) // CORRIGIDO: usuario_id
+          .eq("user_id", currentUser.id) // CORRIGIDO: usuario_id
           .eq("treino_id", treino.id)
 
         if (error) throw error

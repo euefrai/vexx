@@ -27,8 +27,6 @@ export default function TopicoDetalhes() {
   async function buscarDados() {
     try {
       setLoading(true)
-      
-      // 1. Busca o Tópico e o Autor (Tentativa direta)
       const { data: topicoData } = await supabase
         .from("forum_topicos")
         .select("*, usuarios:usuario_id(username, foto)")
@@ -37,7 +35,6 @@ export default function TopicoDetalhes() {
       
       setTopico(topicoData)
 
-      // 2. Busca as Respostas PURAS (Isolando o erro de relação)
       const { data: respostasData, error: errRes } = await supabase
         .from("forum_respostas")
         .select("*") 
@@ -47,14 +44,12 @@ export default function TopicoDetalhes() {
       if (errRes) throw errRes
 
       if (respostasData && respostasData.length > 0) {
-        // 3. Busca os Usuários das respostas manualmente
         const idsUsuarios = [...new Set(respostasData.map(r => r.usuario_id))]
         const { data: usuariosData } = await supabase
           .from("usuarios")
           .select("id, username, foto")
           .in("id", idsUsuarios)
 
-        // 4. Une os dados (Manual Join)
         const formatadas = respostasData.map(res => ({
           ...res,
           usuarios: usuariosData?.find(u => u.id === res.usuario_id) || { username: "operador", foto: null }
@@ -65,6 +60,7 @@ export default function TopicoDetalhes() {
         setRespostas([])
       }
       
+      // Rola para o fim para ver a última resposta
       setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: "smooth" }), 500)
     } catch (error) {
       console.error("Erro tático na busca:", error)
@@ -109,7 +105,7 @@ export default function TopicoDetalhes() {
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-green-500 font-black uppercase text-[10px] animate-pulse">CARREGANDO BRIEFING...</div>
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans pb-32">
+    <div className="min-h-screen bg-black text-white font-sans pb-40"> {/* Aumentei o PB aqui */}
       <div className="max-w-md mx-auto p-4">
         
         <button onClick={() => router.back()} className="mb-6 flex items-center gap-2 text-zinc-600 hover:text-green-500 transition-colors">
@@ -149,7 +145,7 @@ export default function TopicoDetalhes() {
         </h2>
 
         {/* LISTA DE RESPOSTAS */}
-        <div className="space-y-4 mb-10">
+        <div className="space-y-4 mb-20">
           {respostas.length > 0 ? (
             respostas.map((res) => (
               <div key={res.id} className="bg-zinc-950 border border-zinc-900 p-5 rounded-[1.5rem] animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -173,23 +169,23 @@ export default function TopicoDetalhes() {
                <p className="text-[8px] font-black uppercase tracking-[0.3em]">Aguardando Suporte Tático...</p>
             </div>
           )}
-          <div ref={scrollRef} />
+          <div ref={scrollRef} className="h-10" />
         </div>
 
-        {/* CAMPO FIXO NO RODAPÉ */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-black/80 backdrop-blur-xl border-t border-zinc-900 max-w-md mx-auto z-50">
+        {/* CAMPO FIXO - REPOSICIONADO PARA FICAR ACIMA DA NAVBAR */}
+        <div className="fixed bottom-[72px] left-0 right-0 p-3 bg-black/90 backdrop-blur-xl border-t border-zinc-900 max-w-md mx-auto z-[60] shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
           <form onSubmit={enviarResposta} className="flex gap-2">
             <input 
               ref={inputRef}
               value={novaResposta}
               onChange={(e) => setNovaResposta(e.target.value)}
               placeholder="ENVIE SEU SUPORTE TÁTICO..."
-              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4 text-[11px] font-black uppercase outline-none focus:border-green-500 transition-all placeholder:text-zinc-700"
+              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-[11px] font-black uppercase outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all placeholder:text-zinc-700 text-white"
             />
             <button 
               type="submit" 
               disabled={enviando}
-              className="bg-green-500 text-black px-6 rounded-2xl font-black text-[10px] uppercase italic active:scale-95 disabled:opacity-50"
+              className="bg-green-500 text-black px-4 rounded-xl font-black text-[10px] uppercase italic active:scale-95 disabled:opacity-50"
             >
               OK
             </button>
