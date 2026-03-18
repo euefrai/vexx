@@ -2,7 +2,6 @@
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import Navbar from "@/components/Navbar"
-import OpenAI from "openai"
 
 export default function MacrosPage() {
   const [inputTexto, setInputTexto] = useState("");
@@ -11,17 +10,8 @@ export default function MacrosPage() {
   const [erro, setErro] = useState(null);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
-  
-  // Referência para a instância da OpenAI
-  const openaiRef = useRef(null);
 
   useEffect(() => {
-    // Inicializa a OpenAI apenas no lado do cliente
-    openaiRef.current = new OpenAI({
-      apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
-      dangerouslyAllowBrowser: true 
-    });
-
     const saved = localStorage.getItem("elite_macros_history");
     if (saved) setHistorico(JSON.parse(saved));
   }, []);
@@ -34,12 +24,6 @@ export default function MacrosPage() {
   const analisarConteudo = async (arquivo = null) => {
     if (!arquivo && !inputTexto.trim()) return;
     
-    // Verifica se a IA está pronta
-    if (!openaiRef.current) {
-      setErro("IA não inicializada. Tente recarregar.");
-      return;
-    }
-
     setAnalisando(true);
     setErro(null);
     const textoAtual = inputTexto;
@@ -74,13 +58,16 @@ export default function MacrosPage() {
         });
       }
 
-      const response = await openaiRef.current.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: messages,
-        response_format: { type: "json_object" }
+      // CHAMADA PARA A SUA API LOCAL (Resolve o erro de CORS)
+      const res = await fetch("/api/macros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages })
       });
 
-      const dadosIA = JSON.parse(response.choices[0].message.content);
+      if (!res.ok) throw new Error("Erro na resposta do servidor");
+
+      const dadosIA = await res.json();
 
       setHistorico(prev => [...prev, {
         ...dadosIA,
@@ -90,8 +77,8 @@ export default function MacrosPage() {
       }]);
 
     } catch (err) {
-      console.error("ERRO OPENAI:", err);
-      setErro("FALHA NO PROCESSAMENTO. VERIFIQUE SALDO/CHAVE NO .ENV");
+      console.error("ERRO:", err);
+      setErro("FALHA NO PROCESSAMENTO. VERIFIQUE SALDO/CHAVE NO PAINEL VERCEL.");
     } finally {
       setAnalisando(false);
     }
