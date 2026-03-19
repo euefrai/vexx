@@ -8,7 +8,7 @@ export default function MacrosPage() {
   const [analisando, setAnalisando] = useState(false);
   const [historico, setHistorico] = useState([]);
   const [erro, setErro] = useState(null);
-  const [modoRotulo, setModoRotulo] = useState(false); // NOVO: Estado para alternar modo
+  const [modoRotulo, setModoRotulo] = useState(false);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
 
@@ -43,10 +43,19 @@ export default function MacrosPage() {
         messages.push({
           role: "user",
           content: [
-            { type: "text", text: modoRotulo ? "Analise este RÓTULO e extraia macros e ingredientes." : "Analise esta imagem de comida e extraia os macros." },
-            { type: "image_url", image_url: { url: base64 } }
+            {
+              type: "text",
+              text: modoRotulo
+                ? "Analise este RÓTULO e extraia macros e ingredientes."
+                : "Analise esta imagem de comida e extraia os macros."
+            },
+            {
+              type: "input_image", // ✅ CORRETO
+              image_url: base64
+            }
           ]
         });
+
       } else {
         messages.push({
           role: "user",
@@ -54,28 +63,49 @@ export default function MacrosPage() {
         });
       }
 
-      // CHAMADA PARA A API (Enviando o modo selecionado)
       const res = await fetch("/api/macros", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, modo: modoRotulo ? 'rotulo' : 'comida' }),
-        cache: 'no-store'
+        body: JSON.stringify({
+          messages,
+          modo: modoRotulo ? "rotulo" : "comida"
+        }),
+        cache: "no-store"
       });
 
       if (!res.ok) throw new Error("Erro na resposta do servidor");
 
       const dadosIA = await res.json();
 
-      setHistorico(prev => [...prev, {
+      // ✅ NORMALIZAÇÃO (EVITA BUG)
+      const dadosTratados = {
         ...dadosIA,
-        id: Date.now(),
-        tipo: arquivo ? (modoRotulo ? 'RÓTULO' : 'FOTO') : 'TEXTO',
-        hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
+        proteina: Number(dadosIA.proteina) || 0,
+        carbo: Number(dadosIA.carbo) || 0,
+        gordura: Number(dadosIA.gordura) || 0,
+        calorias: Number(dadosIA.calorias) || 0,
+        nota_pureza:
+          dadosIA.nota_pureza !== undefined
+            ? Number(dadosIA.nota_pureza) || 0
+            : undefined
+      };
+
+      setHistorico(prev => [
+        ...prev,
+        {
+          ...dadosTratados,
+          id: Date.now(),
+          tipo: arquivo ? (modoRotulo ? "RÓTULO" : "FOTO") : "TEXTO",
+          hora: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+          })
+        }
+      ]);
 
     } catch (err) {
       console.error("ERRO:", err);
-      setErro("FALHA NO PROCESSAMENTO. VERIFIQUE SALDO/CHAVE NO PAINEL VERCEL.");
+      setErro("Erro no servidor. Verifique API Key ou saldo da OpenAI.");
     } finally {
       setAnalisando(false);
     }
@@ -83,24 +113,35 @@ export default function MacrosPage() {
 
   return (
     <div className="min-h-screen bg-black text-white p-4 pb-40 font-sans selection:bg-green-500/30">
-      <Link href="/lab" className="text-zinc-600 uppercase font-black text-[10px] tracking-widest hover:text-green-500 transition-all">← Voltar ao Lab</Link>
+      <Link href="/lab" className="text-zinc-600 uppercase font-black text-[10px] tracking-widest hover:text-green-500 transition-all">
+        ← Voltar ao Lab
+      </Link>
       
       <header className="mt-4 mb-6 text-center">
-        <h1 className="text-2xl font-black uppercase italic text-green-500 tracking-tighter">BIO <span className="text-white font-normal">SCANNER</span></h1>
-        <p className="text-zinc-800 text-[8px] font-black uppercase tracking-[0.4em]">Intelligence by OpenAI</p>
+        <h1 className="text-2xl font-black uppercase italic text-green-500 tracking-tighter">
+          BIO <span className="text-white font-normal">SCANNER</span>
+        </h1>
+        <p className="text-zinc-800 text-[8px] font-black uppercase tracking-[0.4em]">
+          Intelligence by OpenAI
+        </p>
       </header>
 
-      {/* SELETOR DE MODO */}
+      {/* SELETOR */}
       <div className="flex justify-center gap-6 mb-8">
         <button 
           onClick={() => setModoRotulo(false)}
-          className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all ${!modoRotulo ? 'text-green-500 border-b border-green-500' : 'text-zinc-700'}`}
+          className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all ${
+            !modoRotulo ? "text-green-500 border-b border-green-500" : "text-zinc-700"
+          }`}
         >
           Scanner Comida
         </button>
+
         <button 
           onClick={() => setModoRotulo(true)}
-          className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all ${modoRotulo ? 'text-blue-500 border-b border-blue-500' : 'text-zinc-700'}`}
+          className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all ${
+            modoRotulo ? "text-blue-500 border-b border-blue-500" : "text-zinc-700"
+          }`}
         >
           Scanner Rótulo
         </button>
@@ -108,40 +149,58 @@ export default function MacrosPage() {
 
       <div className="space-y-4 mb-6 max-w-md mx-auto">
         {historico.length === 0 && !analisando && (
-          <div className="text-center py-24 opacity-10 italic font-black uppercase text-[10px] tracking-[0.5em]">Standby...</div>
+          <div className="text-center py-24 opacity-10 italic font-black uppercase text-[10px] tracking-[0.5em]">
+            Standby...
+          </div>
         )}
 
         {historico.map((item) => (
           <div key={item.id} className="bg-zinc-900/30 border border-zinc-800 p-5 rounded-[2rem] animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="flex justify-between items-center mb-4">
-              <span className="text-[10px] font-black uppercase italic text-green-500">{item.alimento}</span>
-              <span className="text-[7px] text-zinc-600 font-bold uppercase">{item.hora} • {item.tipo}</span>
+              <span className="text-[10px] font-black uppercase italic text-green-500">
+                {item.alimento}
+              </span>
+              <span className="text-[7px] text-zinc-600 font-bold uppercase">
+                {item.hora} • {item.tipo}
+              </span>
             </div>
             
             <div className="grid grid-cols-4 gap-3">
               <MacroBox label="P" value={item.proteina} color="text-blue-400" />
               <MacroBox label="C" value={item.carbo} color="text-yellow-400" />
               <MacroBox label="G" value={item.gordura} color="text-red-400" />
+
               <div className="bg-green-500/10 rounded-xl py-2 border border-green-500/20 text-center">
                 <p className="text-[7px] text-green-700 font-black uppercase">Kcal</p>
                 <p className="text-xs font-black italic text-green-500">{item.calorias}</p>
               </div>
             </div>
 
-            {/* BARRA DE PUREZA (Só aparece se vier da análise de rótulo) */}
             {item.nota_pureza !== undefined && (
               <div className="mt-4 pt-4 border-t border-zinc-800/50">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-[7px] font-black uppercase text-zinc-500 tracking-widest">Pureza dos Ingredientes</span>
-                  <span className={`text-[9px] font-black ${item.nota_pureza > 70 ? 'text-green-500' : 'text-red-500'}`}>{item.nota_pureza}%</span>
+                  <span className="text-[7px] font-black uppercase text-zinc-500 tracking-widest">
+                    Pureza dos Ingredientes
+                  </span>
+                  <span className={`text-[9px] font-black ${item.nota_pureza > 70 ? "text-green-500" : "text-red-500"}`}>
+                    {item.nota_pureza}%
+                  </span>
                 </div>
+
                 <div className="w-full h-[3px] bg-zinc-800 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full transition-all duration-1000 ${item.nota_pureza > 70 ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`}
+                    className={`h-full transition-all duration-1000 ${
+                      item.nota_pureza > 70
+                        ? "bg-green-500 shadow-[0_0_8px_#22c55e]"
+                        : "bg-red-500"
+                    }`}
                     style={{ width: `${item.nota_pureza}%` }}
                   />
                 </div>
-                <p className="text-[8px] mt-3 text-zinc-500 italic leading-relaxed uppercase font-bold">{item.veredito}</p>
+
+                <p className="text-[8px] mt-3 text-zinc-500 italic leading-relaxed uppercase font-bold">
+                  {item.veredito}
+                </p>
               </div>
             )}
           </div>
@@ -149,12 +208,19 @@ export default function MacrosPage() {
 
         {analisando && (
           <div className="flex flex-col items-center gap-2 py-4">
-             <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-             <span className="text-[8px] font-black uppercase text-green-500 tracking-widest">Decodificando {modoRotulo ? 'Rótulo' : 'Nutrientes'}...</span>
+            <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-[8px] font-black uppercase text-green-500 tracking-widest">
+              Escaneando composição molecular...
+            </span>
           </div>
         )}
-        
-        {erro && <p className="text-red-500 text-[8px] font-black uppercase text-center animate-bounce">{erro}</p>}
+
+        {erro && (
+          <p className="text-red-500 text-[8px] font-black uppercase text-center animate-bounce">
+            {erro}
+          </p>
+        )}
+
         <div ref={chatEndRef} />
       </div>
 
@@ -170,7 +236,7 @@ export default function MacrosPage() {
           <input
             value={inputTexto}
             onChange={(e) => setInputTexto(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && analisarConteudo()}
+            onKeyDown={(e) => e.key === "Enter" && analisarConteudo()}
             placeholder={modoRotulo ? "Analise química..." : "Descreva sua refeição..."}
             className="flex-1 bg-transparent border-none outline-none px-2 text-sm font-bold text-white placeholder:text-zinc-800"
           />
@@ -179,7 +245,9 @@ export default function MacrosPage() {
             onClick={() => analisarConteudo()}
             disabled={analisando || (!inputTexto.trim() && !analisando)}
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 ${
-              inputTexto.trim() ? 'bg-green-600 shadow-[0_0_20px_rgba(34,197,94,0.3)]' : 'bg-zinc-800 text-zinc-700'
+              inputTexto.trim()
+                ? "bg-green-600 shadow-[0_0_20px_rgba(34,197,94,0.3)]"
+                : "bg-zinc-800 text-zinc-700"
             }`}
           >
             🚀
@@ -193,21 +261,25 @@ export default function MacrosPage() {
         capture="environment" 
         ref={fileInputRef} 
         className="hidden" 
-        onChange={(e) => e.target.files[0] && analisarConteudo(e.target.files[0])} 
+        onChange={(e) =>
+          e.target.files[0] && analisarConteudo(e.target.files[0])
+        }
       />
       
       <Navbar />
 
       {historico.length > 0 && (
         <button 
-          onClick={() => {if(confirm('Limpar banco de dados?')) setHistorico([])}}
+          onClick={() => {
+            if (confirm("Limpar banco de dados?")) setHistorico([]);
+          }}
           className="fixed top-6 right-6 text-[7px] font-black uppercase text-zinc-800 hover:text-red-500 transition-colors"
         >
           Reset Log
         </button>
       )}
     </div>
-  )
+  );
 }
 
 function MacroBox({ label, value, color }) {
@@ -216,5 +288,5 @@ function MacroBox({ label, value, color }) {
       <p className="text-[7px] text-zinc-600 font-black uppercase">{label}</p>
       <p className={`text-xs font-black italic ${color}`}>{value}g</p>
     </div>
-  )
+  );
 }
