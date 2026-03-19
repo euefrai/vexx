@@ -1,4 +1,4 @@
-const CACHE_NAME = "vexx-v1";
+const CACHE_NAME = "vexx-v2";
 
 // Arquivos mínimos para o PWA ser considerado "instalável"
 const ASSETS = [
