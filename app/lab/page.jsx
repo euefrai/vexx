@@ -27,15 +27,12 @@ export default function LabPage() {
   const progressoCal = Math.min((calorias / META_CALORIAS) * 100, 100)
   const progressoProt = Math.min((proteina / META_PROTEINA) * 100, 100)
 
-  // 🤖 IA OFFLINE
+  // 🤖 IA OFFLINE (AGORA CORRETA)
   function getMensagem() {
-    if (proteina < META_PROTEINA * 0.5)
-      return "⚠️ Proteína muito baixa hoje"
-    if (calorias > META_CALORIAS)
-      return "🔥 Você passou das calorias"
-    if (proteina >= META_PROTEINA)
-      return "💪 Meta de proteína batida!"
-    return "🚀 Continue firme"
+    if (progressoProt >= 100) return "🔥 Shape batido hoje. Monstro."
+    if (progressoProt >= 70) return "💪 Tá no caminho. Continua."
+    if (progressoProt >= 40) return "⚠️ Bora comer melhor."
+    return "💀 Tá fraco hoje..."
   }
 
   const tools = [
@@ -63,42 +60,46 @@ export default function LabPage() {
         </div>
       </header>
 
-      {/* 🔥 DASHBOARD (NOVO) */}
+      {/* 🔥 DASHBOARD */}
       <div className="bg-zinc-900/40 border border-green-500/20 p-4 rounded-3xl mb-8">
 
-        <p className="text-[10px] text-zinc-500 uppercase mb-2">
+        <p className="text-[10px] text-zinc-500 uppercase mb-3">
           Resumo do dia
         </p>
 
         {/* CALORIAS */}
-        <p className="text-xs">
-          🔥 {calorias} / {META_CALORIAS} kcal
-        </p>
-        <div className="w-full h-2 bg-zinc-800 rounded-full mt-1 mb-3">
-          <div
-            className="h-full bg-green-500 rounded-full transition-all"
-            style={{ width: `${progressoCal}%` }}
-          />
+        <div className="mb-4">
+          <p className="text-[10px] text-zinc-500 mb-1">
+            Calorias: {calorias} / {META_CALORIAS}
+          </p>
+          <div className="w-full h-2 bg-zinc-800 rounded-full">
+            <div
+              className="h-full bg-green-500 rounded-full transition-all"
+              style={{ width: `${progressoCal}%` }}
+            />
+          </div>
         </div>
 
         {/* PROTEÍNA */}
-        <p className="text-xs">
-          🍗 {proteina} / {META_PROTEINA}g proteína
-        </p>
-        <div className="w-full h-2 bg-zinc-800 rounded-full mt-1">
-          <div
-            className="h-full bg-blue-500 rounded-full transition-all"
-            style={{ width: `${progressoProt}%` }}
-          />
+        <div className="mb-4">
+          <p className="text-[10px] text-zinc-500 mb-1">
+            Proteína: {proteina.toFixed(1)}g / {META_PROTEINA}g
+          </p>
+          <div className="w-full h-2 bg-zinc-800 rounded-full">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all"
+              style={{ width: `${progressoProt}%` }}
+            />
+          </div>
         </div>
 
         {/* IA */}
-        <p className="text-[10px] text-green-400 mt-3">
+        <p className="text-[10px] text-center text-green-400 italic">
           {getMensagem()}
         </p>
       </div>
 
-      {/* GRID ORIGINAL */}
+      {/* GRID */}
       <div className="grid grid-cols-2 gap-4">
         {tools.map((tool, index) => (
           <motion.div
