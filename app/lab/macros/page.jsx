@@ -1,15 +1,125 @@
 "use client"
 import { useState, useRef, useEffect } from "react"
-import Link from "next/link"
 import Navbar from "@/components/Navbar"
+import { alimentos } from "../../data/alimentos";
+
+// 🔍 AUTOCOMPLETE
+function buscarAlimentos(query) {
+  if (!query) return [];
+  const q = query.toLowerCase();
+
+  return alimentos
+    .filter(a =>
+      a.nome.includes(q) ||
+      q.split(" ").some(p => a.nome.includes(p))
+    )
+    .slice(0, 5);
+}
+
+// 🧠 CALCULO
+function calcularMacros(texto) {
+  const itens = texto.toLowerCase().split(/[,+]/);
+
+  let total = {
+    alimento: texto,
+    proteina: 0,
+    carbo: 0,
+    gordura: 0,
+    calorias: 0
+  };
+
+  let encontrados = 0;
+
+  itens.forEach(item => {
+    item = item.trim();
+
+    let quantidadeGramas = 100;
+    let matchGramas = item.match(/(\d+)\s*g/);
+
+    if (matchGramas) {
+      quantidadeGramas = parseInt(matchGramas[1]);
+    }
+
+    let quantidadeUnidade = 1;
+    let matchUnidade = item.match(/^(\d+)/);
+
+    if (matchUnidade && !matchGramas) {
+      quantidadeUnidade = parseInt(matchUnidade[1]);
+    }
+
+    const alimentoEncontrado = alimentos.find(a =>
+      item.includes(a.nome) ||
+      a.nome.includes(item) ||
+      item.split(" ").some(p => a.nome.includes(p))
+    );
+
+    if (alimentoEncontrado) {
+      let fator = quantidadeGramas / 100;
+
+      if (alimentoEncontrado.unidade && matchUnidade) {
+        fator = quantidadeUnidade;
+      }
+
+      total.proteina += alimentoEncontrado.proteina * fator;
+      total.carbo += alimentoEncontrado.carbo * fator;
+      total.gordura += alimentoEncontrado.gordura * fator;
+      total.calorias += alimentoEncontrado.calorias * fator;
+
+      encontrados++;
+    }
+  });
+
+  if (encontrados === 0) return null;
+
+  total.proteina = Number(total.proteina.toFixed(1));
+  total.carbo = Number(total.carbo.toFixed(1));
+  total.gordura = Number(total.gordura.toFixed(1));
+  total.calorias = Math.round(total.calorias);
+
+  return total;
+}
+
+// 🤖 IA OFFLINE (ANÁLISE)
+function analisarDieta(calorias, proteina, metaCal, metaProt) {
+  let feedback = [];
+
+  if (calorias < metaCal * 0.7) {
+    feedback.push("⚠️ Poucas calorias (pode faltar energia)");
+  } else if (calorias > metaCal * 1.2) {
+    feedback.push("🔥 Calorias altas (cuidado com excesso)");
+  } else {
+    feedback.push("✅ Calorias equilibradas");
+  }
+
+  if (proteina < metaProt * 0.7) {
+    feedback.push("🥩 Proteína baixa (importante pra músculo)");
+  } else if (proteina >= metaProt) {
+    feedback.push("💪 Proteína ideal!");
+  }
+
+  if (calorias > 0 && proteina > 0) {
+    const densidade = proteina / calorias;
+    if (densidade < 0.05) {
+      feedback.push("🍔 Dieta pouco eficiente (baixa proteína)");
+    } else {
+      feedback.push("🥗 Boa qualidade nutricional");
+    }
+  }
+
+  return feedback;
+}
 
 export default function MacrosPage() {
   const [inputTexto, setInputTexto] = useState("");
-  const [analisando, setAnalisando] = useState(false);
   const [historico, setHistorico] = useState([]);
   const [erro, setErro] = useState(null);
-  const [modoRotulo, setModoRotulo] = useState(false);
-  const fileInputRef = useRef(null);
+
+  const [sugestoes, setSugestoes] = useState([]);
+  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+
+  const META_CALORIAS = 2000;
+  const META_PROTEINA = 150; // 🔥 NOVO
+
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -22,271 +132,178 @@ export default function MacrosPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [historico]);
 
-  const analisarConteudo = async (arquivo = null) => {
-    if (!arquivo && !inputTexto.trim()) return;
-    
-    setAnalisando(true);
+  const totalDia = historico.reduce((acc, item) => acc + item.calorias, 0);
+  const proteinaDia = historico.reduce((acc, item) => acc + item.proteina, 0);
+
+  const feedbackIA = analisarDieta(
+    totalDia,
+    proteinaDia,
+    META_CALORIAS,
+    META_PROTEINA
+  );
+
+  const removerItem = (id) => {
+    setHistorico(prev => prev.filter(item => item.id !== id));
+  };
+
+  const analisarConteudo = () => {
+    if (!inputTexto.trim()) return;
+
     setErro(null);
-    const textoAtual = inputTexto;
-    setInputTexto("");
 
-    try {
-      let messages = [];
+    const resultado = calcularMacros(inputTexto);
 
-      if (arquivo) {
-        const base64 = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsDataURL(arquivo);
-        });
-
-        messages.push({
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: modoRotulo
-                ? "Analise este RÓTULO e extraia macros e ingredientes."
-                : "Analise esta imagem de comida e extraia os macros."
-            },
-            {
-              type: "input_image", // ✅ CORRETO
-              image_url: base64
-            }
-          ]
-        });
-
-      } else {
-        messages.push({
-          role: "user",
-          content: `Estime os macros para: ${textoAtual}`
-        });
-      }
-
-      const res = await fetch("/api/macros", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages,
-          modo: modoRotulo ? "rotulo" : "comida"
-        }),
-        cache: "no-store"
-      });
-
-      if (!res.ok) throw new Error("Erro na resposta do servidor");
-
-      const dadosIA = await res.json();
-
-      // ✅ NORMALIZAÇÃO (EVITA BUG)
-      const dadosTratados = {
-        ...dadosIA,
-        proteina: Number(dadosIA.proteina) || 0,
-        carbo: Number(dadosIA.carbo) || 0,
-        gordura: Number(dadosIA.gordura) || 0,
-        calorias: Number(dadosIA.calorias) || 0,
-        nota_pureza:
-          dadosIA.nota_pureza !== undefined
-            ? Number(dadosIA.nota_pureza) || 0
-            : undefined
-      };
-
-      setHistorico(prev => [
-        ...prev,
-        {
-          ...dadosTratados,
-          id: Date.now(),
-          tipo: arquivo ? (modoRotulo ? "RÓTULO" : "FOTO") : "TEXTO",
-          hora: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit"
-          })
-        }
-      ]);
-
-    } catch (err) {
-      console.error("ERRO:", err);
-      setErro("Erro no servidor. Verifique API Key ou saldo da OpenAI.");
-    } finally {
-      setAnalisando(false);
+    if (!resultado) {
+      setErro("Alimento não encontrado.");
+      return;
     }
+
+    setHistorico(prev => [
+      ...prev,
+      {
+        ...resultado,
+        id: Date.now(),
+        hora: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        })
+      }
+    ]);
+
+    setInputTexto("");
   };
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 pb-40 font-sans selection:bg-green-500/30">
-      <Link href="/lab" className="text-zinc-600 uppercase font-black text-[10px] tracking-widest hover:text-green-500 transition-all">
-        ← Voltar ao Lab
-      </Link>
-      
-      <header className="mt-4 mb-6 text-center">
-        <h1 className="text-2xl font-black uppercase italic text-green-500 tracking-tighter">
-          BIO <span className="text-white font-normal">SCANNER</span>
+    <div className="min-h-screen bg-black text-white p-4 pb-40">
+
+      <header className="text-center mb-6">
+        <h1 className="text-2xl font-black text-green-500">
+          BIO SCANNER
         </h1>
-        <p className="text-zinc-800 text-[8px] font-black uppercase tracking-[0.4em]">
-          Intelligence by OpenAI
-        </p>
       </header>
 
-      {/* SELETOR */}
-      <div className="flex justify-center gap-6 mb-8">
-        <button 
-          onClick={() => setModoRotulo(false)}
-          className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all ${
-            !modoRotulo ? "text-green-500 border-b border-green-500" : "text-zinc-700"
-          }`}
-        >
-          Scanner Comida
-        </button>
+      {/* 🔥 CALORIAS */}
+      <div className="max-w-md mx-auto mb-4">
+        <p className="text-xs text-zinc-500">
+          {totalDia} / {META_CALORIAS} kcal
+        </p>
 
-        <button 
-          onClick={() => setModoRotulo(true)}
-          className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all ${
-            modoRotulo ? "text-blue-500 border-b border-blue-500" : "text-zinc-700"
-          }`}
-        >
-          Scanner Rótulo
-        </button>
-      </div>
-
-      <div className="space-y-4 mb-6 max-w-md mx-auto">
-        {historico.length === 0 && !analisando && (
-          <div className="text-center py-24 opacity-10 italic font-black uppercase text-[10px] tracking-[0.5em]">
-            Standby...
-          </div>
-        )}
-
-        {historico.map((item) => (
-          <div key={item.id} className="bg-zinc-900/30 border border-zinc-800 p-5 rounded-[2rem] animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-[10px] font-black uppercase italic text-green-500">
-                {item.alimento}
-              </span>
-              <span className="text-[7px] text-zinc-600 font-bold uppercase">
-                {item.hora} • {item.tipo}
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-4 gap-3">
-              <MacroBox label="P" value={item.proteina} color="text-blue-400" />
-              <MacroBox label="C" value={item.carbo} color="text-yellow-400" />
-              <MacroBox label="G" value={item.gordura} color="text-red-400" />
-
-              <div className="bg-green-500/10 rounded-xl py-2 border border-green-500/20 text-center">
-                <p className="text-[7px] text-green-700 font-black uppercase">Kcal</p>
-                <p className="text-xs font-black italic text-green-500">{item.calorias}</p>
-              </div>
-            </div>
-
-            {item.nota_pureza !== undefined && (
-              <div className="mt-4 pt-4 border-t border-zinc-800/50">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[7px] font-black uppercase text-zinc-500 tracking-widest">
-                    Pureza dos Ingredientes
-                  </span>
-                  <span className={`text-[9px] font-black ${item.nota_pureza > 70 ? "text-green-500" : "text-red-500"}`}>
-                    {item.nota_pureza}%
-                  </span>
-                </div>
-
-                <div className="w-full h-[3px] bg-zinc-800 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-1000 ${
-                      item.nota_pureza > 70
-                        ? "bg-green-500 shadow-[0_0_8px_#22c55e]"
-                        : "bg-red-500"
-                    }`}
-                    style={{ width: `${item.nota_pureza}%` }}
-                  />
-                </div>
-
-                <p className="text-[8px] mt-3 text-zinc-500 italic leading-relaxed uppercase font-bold">
-                  {item.veredito}
-                </p>
-              </div>
-            )}
-          </div>
-        ))}
-
-        {analisando && (
-          <div className="flex flex-col items-center gap-2 py-4">
-            <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-[8px] font-black uppercase text-green-500 tracking-widest">
-              Escaneando composição molecular...
-            </span>
-          </div>
-        )}
-
-        {erro && (
-          <p className="text-red-500 text-[8px] font-black uppercase text-center animate-bounce">
-            {erro}
-          </p>
-        )}
-
-        <div ref={chatEndRef} />
-      </div>
-
-      <div className="fixed bottom-24 left-0 right-0 px-4">
-        <div className="max-w-md mx-auto bg-zinc-900/90 backdrop-blur-md border border-zinc-800 p-2 rounded-[2.5rem] flex items-center gap-2 shadow-2xl">
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center hover:bg-green-600 transition-all border border-zinc-700 active:scale-90"
-          >
-            📸
-          </button>
-          
-          <input
-            value={inputTexto}
-            onChange={(e) => setInputTexto(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && analisarConteudo()}
-            placeholder={modoRotulo ? "Analise química..." : "Descreva sua refeição..."}
-            className="flex-1 bg-transparent border-none outline-none px-2 text-sm font-bold text-white placeholder:text-zinc-800"
+        <div className="w-full h-2 bg-zinc-800 rounded-full">
+          <div
+            className="h-full bg-green-500 rounded-full"
+            style={{
+              width: `${Math.min((totalDia / META_CALORIAS) * 100, 100)}%`
+            }}
           />
-
-          <button 
-            onClick={() => analisarConteudo()}
-            disabled={analisando || (!inputTexto.trim() && !analisando)}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 ${
-              inputTexto.trim()
-                ? "bg-green-600 shadow-[0_0_20px_rgba(34,197,94,0.3)]"
-                : "bg-zinc-800 text-zinc-700"
-            }`}
-          >
-            🚀
-          </button>
         </div>
       </div>
 
-      <input 
-        type="file" 
-        accept="image/*" 
-        capture="environment" 
-        ref={fileInputRef} 
-        className="hidden" 
-        onChange={(e) =>
-          e.target.files[0] && analisarConteudo(e.target.files[0])
-        }
-      />
-      
-      <Navbar />
+      {/* 💪 PROTEÍNA */}
+      <div className="max-w-md mx-auto mb-6">
+        <p className="text-xs text-blue-400">
+          {proteinaDia} / {META_PROTEINA}g proteína
+        </p>
 
-      {historico.length > 0 && (
-        <button 
-          onClick={() => {
-            if (confirm("Limpar banco de dados?")) setHistorico([]);
-          }}
-          className="fixed top-6 right-6 text-[7px] font-black uppercase text-zinc-800 hover:text-red-500 transition-colors"
-        >
-          Reset Log
-        </button>
-      )}
+        <div className="w-full h-2 bg-zinc-800 rounded-full">
+          <div
+            className="h-full bg-blue-500 rounded-full"
+            style={{
+              width: `${Math.min((proteinaDia / META_PROTEINA) * 100, 100)}%`
+            }}
+          />
+        </div>
+      </div>
+
+      {/* 🤖 IA FEEDBACK */}
+      <div className="max-w-md mx-auto mb-6 text-xs space-y-1">
+        {feedbackIA.map((msg, i) => (
+          <p key={i} className="text-zinc-400">{msg}</p>
+        ))}
+      </div>
+
+      {/* HISTÓRICO */}
+      <div className="space-y-4 max-w-md mx-auto">
+        {historico.map(item => (
+          <div key={item.id} className="bg-zinc-900 p-4 rounded-xl relative group">
+
+            <button
+              onClick={() => removerItem(item.id)}
+              className="absolute top-2 right-2 text-red-500 opacity-0 group-hover:opacity-100"
+            >
+              ✖
+            </button>
+
+            <p className="text-green-500 text-sm">{item.alimento}</p>
+            <p className="text-xs text-zinc-500">{item.hora}</p>
+
+            <div className="grid grid-cols-4 text-center mt-2">
+              <MacroBox label="P" value={item.proteina} />
+              <MacroBox label="C" value={item.carbo} />
+              <MacroBox label="G" value={item.gordura} />
+              <MacroBox label="Kcal" value={item.calorias} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* INPUT */}
+      <div className="fixed bottom-20 left-0 right-0 px-4">
+        <div className="max-w-md mx-auto bg-zinc-900 p-2 rounded-xl relative">
+
+          <input
+            value={inputTexto}
+            onChange={(e) => {
+              const valor = e.target.value;
+              setInputTexto(valor);
+
+              const ultima = valor.split(/[,+]/).pop().trim();
+              const res = buscarAlimentos(ultima);
+
+              setSugestoes(res);
+              setMostrarSugestoes(true);
+            }}
+            onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
+            onFocus={() => setMostrarSugestoes(true)}
+            onKeyDown={(e) => e.key === "Enter" && analisarConteudo()}
+            className="w-full bg-transparent outline-none text-white px-2"
+            placeholder="Ex: 200g frango + arroz"
+          />
+
+          {mostrarSugestoes && sugestoes.length > 0 && (
+            <div className="absolute bottom-12 left-0 right-0 bg-zinc-800 rounded-lg">
+              {sugestoes.map((item, i) => (
+                <div
+                  key={i}
+                  onClick={() => {
+                    const partes = inputTexto.split(/[,+]/);
+                    partes[partes.length - 1] = item.nome;
+
+                    setInputTexto(partes.join(" + "));
+                    setMostrarSugestoes(false);
+                  }}
+                  className="p-2 hover:bg-green-500/20 cursor-pointer text-sm"
+                >
+                  {item.nome}
+                </div>
+              ))}
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {erro && <p className="text-red-500 text-center">{erro}</p>}
+
+      <Navbar />
     </div>
   );
 }
 
-function MacroBox({ label, value, color }) {
+function MacroBox({ label, value }) {
   return (
-    <div className="bg-zinc-950 rounded-xl py-2 border border-zinc-800 text-center">
-      <p className="text-[7px] text-zinc-600 font-black uppercase">{label}</p>
-      <p className={`text-xs font-black italic ${color}`}>{value}g</p>
+    <div>
+      <p className="text-xs text-zinc-500">{label}</p>
+      <p className="font-bold">{value}</p>
     </div>
   );
 }
