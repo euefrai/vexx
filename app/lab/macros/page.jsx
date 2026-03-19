@@ -58,7 +58,8 @@ export default function MacrosPage() {
       const res = await fetch("/api/macros", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, modo: modoRotulo ? 'rotulo' : 'comida' })
+        body: JSON.stringify({ messages, modo: modoRotulo ? 'rotulo' : 'comida' }),
+        cache: 'no-store'
       });
 
       if (!res.ok) throw new Error("Erro na resposta do servidor");
