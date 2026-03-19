@@ -7,7 +7,11 @@ import { motion, AnimatePresence } from "framer-motion"
 export default function ChatPrivado() {
   const { id: destinatarioId } = useParams()
   const router = useRouter()
-  
+
+  const [msgSelecionada, setMsgSelecionada] = useState(null)
+  const [modoEdicao, setModoEdicao] = useState(false)
+  const [textoEditando, setTextoEditando] = useState("")
+    
   // Interface
   const [abaAtiva, setAbaAtiva] = useState("chat")
   const [showComandos, setShowComandos] = useState(false)
@@ -73,6 +77,8 @@ export default function ChatPrivado() {
   useEffect(() => {
     if (abaAtiva === "chat") setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: "smooth" }), 100)
   }, [mensagens, abaAtiva])
+
+  
 
   async function atualizarMensagens() {
     const { data: msgs } = await supabase.from("mensagens").select("*")
@@ -196,6 +202,91 @@ export default function ChatPrivado() {
     }
   }
 
+  async function editarMensagem() {
+    if (!textoEditando.trim()) return
+
+    await supabase
+      .from("mensagens")
+      .update({ texto: textoEditando })
+      .eq("id", msgSelecionada.id)
+
+    setModoEdicao(false)
+    setMsgSelecionada(null)
+    setTextoEditando("")
+    atualizarMensagens()
+  }
+
+  function handleSegurarMensagem(msg) {
+    if (msg.remetente_id !== meuId) return
+    setMsgSelecionada(msg)
+  }
+
+  <AnimatePresence>
+  {msgSelecionada && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center"
+    >
+      <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 w-72 space-y-4">
+
+        {!modoEdicao ? (
+          <>
+            <button
+              onClick={() => {
+                setModoEdicao(true)
+                setTextoEditando(msgSelecionada.texto)
+              }}
+              className="w-full bg-zinc-800 p-3 rounded-xl text-sm font-black"
+            >
+              ✏️ EDITAR
+            </button>
+
+            <button
+              onClick={() => {
+                excluirMensagem(msgSelecionada.id)
+                setMsgSelecionada(null)
+              }}
+              className="w-full bg-red-500/20 text-red-500 p-3 rounded-xl text-sm font-black"
+            >
+              🗑 EXCLUIR
+            </button>
+
+            <button
+              onClick={() => setMsgSelecionada(null)}
+              className="w-full text-zinc-500 text-xs"
+            >
+              CANCELAR
+            </button>
+          </>
+        ) : (
+          <>
+            <input
+              value={textoEditando}
+              onChange={(e) => setTextoEditando(e.target.value)}
+              className="w-full bg-black border border-zinc-800 p-3 rounded-xl text-sm"
+            />
+
+            <button
+              onClick={editarMensagem}
+              className="w-full bg-green-500 text-black p-3 rounded-xl font-black"
+            >
+              SALVAR
+            </button>
+
+            <button
+              onClick={() => setModoEdicao(false)}
+              className="w-full text-zinc-500 text-xs"
+            >
+              CANCELAR
+            </button>
+          </>
+        )}
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
   return (
     <div className="flex flex-col h-screen bg-black text-white font-sans overflow-hidden">
       
@@ -248,13 +339,22 @@ export default function ChatPrivado() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
               {mensagens.map((msg, i) => (
-                <div key={i} className={`flex ${msg.remetente_id === meuId ? "justify-end" : "justify-start"} group relative`}>
-                  {msg.remetente_id === meuId && (
-                    <button onClick={() => excluirMensagem(msg.id)} className="opacity-0 group-hover:opacity-100 mr-2 text-zinc-700 hover:text-red-500 transition-all text-[10px]">✕</button>
-                  )}
-                  <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-[11px] font-bold ${
-                    msg.remetente_id === meuId ? "bg-green-500 text-black rounded-br-none" : "bg-zinc-900 text-zinc-200 rounded-bl-none border border-zinc-800"
-                  }`}>
+                <div
+                  key={i}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    handleSegurarMensagem(msg)
+                  }}
+                  onTouchStart={() => handleSegurarMensagem(msg)}
+                  className={`flex ${msg.remetente_id === meuId ? "justify-end" : "justify-start"} relative`}
+                >
+                  <div
+                    className={`max-w-[85%] px-4 py-3 rounded-2xl text-[11px] font-bold ${
+                      msg.remetente_id === meuId
+                        ? "bg-green-500 text-black rounded-br-none"
+                        : "bg-zinc-900 text-zinc-200 rounded-bl-none border border-zinc-800"
+                    }`}
+                  >
                     {msg.texto}
                   </div>
                 </div>
