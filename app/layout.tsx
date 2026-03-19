@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/InstallPrompt";
 import UpdatePrompt from "@/components/UpdatePrompt";
+import RegisterSW from "@/components/RegisterSW"; // Criaremos este componente abaixo
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,7 +15,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Metadados unificados para a Elite Squad
 export const metadata: Metadata = {
   title: "VEXX SQUAD",
   description: "Elite Training Log & Community",
@@ -30,15 +30,16 @@ export default function RootLayout({
   return (
     <html lang="pt-br">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
         suppressHydrationWarning={true}
       >
-        {/* Banner de Atualização (Topo) */}
+        {/* Componente invisível que registra o Service Worker no lado do cliente */}
+        <RegisterSW />
+
         <UpdatePrompt />
         
-        {children}
+        <main>{children}</main>
         
-        {/* Alerta de Instalação (Rodapé) */}
         <InstallPrompt />
       </body>
     </html>
