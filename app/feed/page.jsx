@@ -17,6 +17,16 @@ export default function Feed() {
   const [busca, setBusca] = useState("")
   const { adicionarXP } = useGamificacao()
 
+  // Função de suporte para determinar o Rank visual com base no XP
+  function getStatusEvolucao(xp = 0) {
+    if (xp >= 8000) return { nome: "AURA", cor: "text-red-500", bg: "bg-red-500", border: "border-red-500" }
+    if (xp >= 4000) return { nome: "NO ENEMIES", cor: "text-purple-500", bg: "bg-purple-500", border: "border-purple-500" }
+    if (xp >= 2000) return { nome: "HIGH CORTISOL", cor: "text-blue-500", bg: "bg-blue-500", border: "border-blue-500" }
+    if (xp >= 1000) return { nome: "BETA", cor: "text-yellow-500", bg: "bg-yellow-500", border: "border-yellow-500" }
+    if (xp >= 500) return { nome: "FRANGO", cor: "text-green-500", bg: "bg-green-500", border: "border-green-500" }
+    return { nome: "RECRUTA", cor: "text-zinc-500", bg: "bg-zinc-500", border: "border-zinc-500" }
+  }
+
   useEffect(() => {
     carregar()
     verificarCheckinEStrike()
@@ -113,9 +123,10 @@ export default function Feed() {
   async function carregar() {
     try {
       setLoading(true)
+      // 🔥 Agora buscando XP e Nivel para exibir nos cards
       const { data, error } = await supabase
         .from("treinos")
-        .select(`*, usuarios (username, foto)`)
+        .select(`*, usuarios (username, foto, xp, nivel)`)
         .order("created_at", { ascending: false })
       if (!error) setTreinos(data || []) 
     } finally {
@@ -143,7 +154,7 @@ export default function Feed() {
           </Link>
         </div>
 
-        {/* CARD DE CHECK-IN ESTILO "ORDEM DE MISSÃO" */}
+        {/* CARD DE CHECK-IN */}
         <div className={`mb-8 p-6 rounded-[2.5rem] border transition-all duration-500 relative overflow-hidden ${
           checkinFeito 
           ? 'bg-zinc-900/40 border-zinc-800' 
@@ -193,7 +204,7 @@ export default function Feed() {
           />
         </div>
 
-        {/* LISTA DE TREINOS */}
+        {/* LISTA DE TREINOS COM GAMIFICAÇÃO EXIBIDA */}
         <div className="space-y-6">
           <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] ml-2">Relatórios de Campo</p>
           {loading ? (
@@ -204,7 +215,44 @@ export default function Feed() {
           ) : (
             <div className="space-y-4">
               {treinosFiltrados.length > 0 ? (
-                treinosFiltrados.map(t => <TreinoCard key={t.id} treino={t}/>)
+                treinosFiltrados.map(t => {
+                  const autor = t.usuarios;
+                  const status = getStatusEvolucao(autor?.xp || 0);
+
+                  return (
+                    <div key={t.id} className="bg-zinc-900/40 border border-zinc-800 p-4 rounded-[2rem] hover:border-zinc-700 transition-all">
+                      {/* HEADER DO CARD PERSONALIZADO */}
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="relative">
+                          <img 
+                            src={autor?.foto || "https://via.placeholder.com/150"} 
+                            className={`w-11 h-11 rounded-full object-cover border-2 ${status.border}`}
+                          />
+                          {/* NIVEL 🔥 */}
+                          <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 text-black text-[8px] font-black px-2 py-0.5 rounded-full ${status.bg} shadow-lg`}>
+                            LVL {autor?.nivel || 1}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-black text-white uppercase italic leading-none">
+                            @{autor?.username || "Guerreiro"}
+                          </span>
+                          {/* RANK 🔥 */}
+                          <span className={`text-[9px] font-black uppercase mt-0.5 ${status.cor}`}>
+                            {status.nome}
+                          </span>
+                          <span className="text-[8px] text-zinc-500 uppercase mt-1">
+                            {t.grupo}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* COMPONENTE ORIGINAL DO CARD */}
+                      <TreinoCard treino={t} hideHeader={true} /> 
+                    </div>
+                  )
+                })
               ) : (
                 <div className="text-center py-10 border border-dashed border-zinc-900 rounded-[2rem]">
                   <p className="text-zinc-700 font-bold text-xs uppercase">Nenhuma operação encontrada</p>
