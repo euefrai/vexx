@@ -7,7 +7,7 @@ export async function POST(req) {
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "API Key não configurada no servidor." },
+        { error: "API Key não configurada." },
         { status: 500 }
       );
     }
@@ -16,46 +16,72 @@ export async function POST(req) {
 
     const { messages, modo } = await req.json();
 
-    // 🔥 PROMPT DINÂMICO BASEADO NO MODO
+    // 🔥 PROMPT
     const systemPrompt =
       modo === "rotulo"
-        ? `
-Analise rótulos alimentícios.
-
-Retorne APENAS um JSON válido com:
+        ? `Analise rótulos alimentícios e retorne JSON com:
 {
-  "alimento": "nome do produto",
+  "alimento": "nome",
   "proteina": number,
   "carbo": number,
   "gordura": number,
   "calorias": number,
-  "nota_pureza": number (0 a 100),
-  "veredito": "texto curto explicando qualidade dos ingredientes"
-}
-`
-        : `
-Analise alimentos.
-
-Retorne APENAS um JSON válido com:
+  "nota_pureza": number,
+  "veredito": "texto curto"
+}`
+        : `Analise alimentos e retorne JSON com:
 {
-  "alimento": "nome da comida",
+  "alimento": "nome",
   "proteina": number,
   "carbo": number,
   "gordura": number,
   "calorias": number
-}
-`;
+}`;
 
-    // 🔥 NOVA API (CORRETA)
+    // 🔥 CONVERSÃO SEGURA DAS MENSAGENS
+    const input = [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+    ];
+
+    for (const msg of messages) {
+      if (Array.isArray(msg.content)) {
+        const parts = [];
+
+        for (const item of msg.content) {
+          if (item.type === "text") {
+            parts.push({
+              type: "input_text",
+              text: item.text,
+            });
+          }
+
+          if (item.type === "input_image") {
+            parts.push({
+              type: "input_image",
+              image_url: item.image_url,
+            });
+          }
+        }
+
+        input.push({
+          role: msg.role,
+          content: parts,
+        });
+      } else {
+        input.push({
+          role: msg.role,
+          content: msg.content,
+        });
+      }
+    }
+
+    // 🔥 CHAMADA CORRETA
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
-      input: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        ...messages,
-      ],
+      input,
       response_format: { type: "json_object" },
     });
 
@@ -66,22 +92,22 @@ Retorne APENAS um JSON válido com:
     try {
       parsed = JSON.parse(content);
     } catch (err) {
+      console.error("JSON inválido:", content);
+
       return NextResponse.json(
-        {
-          error: "IA retornou JSON inválido",
-          raw: content,
-        },
+        { error: "Resposta inválida da IA", raw: content },
         { status: 500 }
       );
     }
 
     return NextResponse.json(parsed);
+
   } catch (error) {
-    console.error("ERRO API:", error);
+    console.error("ERRO BACKEND:", error);
 
     return NextResponse.json(
       {
-        error: "Erro no servidor. Verifique API Key ou saldo da OpenAI.",
+        error: error.message || "Erro interno no servidor",
       },
       { status: 500 }
     );
