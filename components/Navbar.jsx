@@ -33,7 +33,8 @@ export default function Navbar() {
     carregarDados()
   }, [])
 
-  const isActive = (path: string) =>
+  // Remova o ": string" que estava causando o erro de compilação
+  const isActive = (path) =>
     pathname.startsWith(path) 
       ? "text-green-400 scale-110"
       : "text-zinc-500"

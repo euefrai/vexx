@@ -3,22 +3,24 @@ import withPWAInit from 'next-pwa';
 const withPWA = withPWAInit({
   dest: 'public',
   register: true,
-  skipWaiting: true, // Importante para o SKIP_WAITING funcionar
-  clientsClaim: true, // Faz o novo SW assumir as abas abertas imediatamente
+  skipWaiting: true,
+  clientsClaim: true,
   disable: process.env.NODE_ENV === 'development',
 });
 
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Isso silencia o erro do Turbopack e força o Next a usar Webpack
-  // permitindo que o next-pwa funcione corretamente
-  experimental: {
-    turbo: {
-      // Configurações vazias aqui ajudam a evitar o erro de conflito
-    },
+  // Removido 'turbo' e 'eslint' da raiz para evitar erros de chaves inválidas
+  typescript: { 
+    ignoreBuildErrors: true 
   },
-  // Opcional: Se o build continuar falhando por memória, adicione isso:
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  eslint: { 
+    ignoreDuringBuilds: true 
+  },
+  // Se precisar de chaves experimentais, elas devem ser suportadas pela sua versão atual
+  experimental: {
+    // Removido o bloco 'turbo' que causava erro no seu log
+  },
 };
 
 export default withPWA(nextConfig);
