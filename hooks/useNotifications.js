@@ -1,19 +1,19 @@
 "use client"
 import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase" // Ajuste o caminho conforme seu projeto
+import { supabase } from "@/lib/supabase"
 
-export function useNotifications(userId: string) {
-  const [notifications, setNotifications] = useState<any[]>([])
+export function useNotifications(userId) {
+  const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // 1. Carregar notificações iniciais
   useEffect(() => {
     if (!userId) return
 
     const fetchNotifications = async () => {
-      const { data, error } = await supabase
+      // Ajustado para buscar da sua tabela 'usuarios' e coluna 'foto'
+      const { data } = await supabase
         .from("notifications")
-        .select("*, from_user:profiles(username, avatar_url)")
+        .select("*, from_user:usuarios(username, foto)")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(20)
@@ -26,7 +26,6 @@ export function useNotifications(userId: string) {
 
     fetchNotifications()
 
-    // 2. Escutar em Realtime
     const channel = supabase
       .channel(`user-notifications-${userId}`)
       .on(
@@ -38,7 +37,6 @@ export function useNotifications(userId: string) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          // Adiciona a nova notificação no topo da lista
           setNotifications((prev) => [payload.new, ...prev])
           setUnreadCount((prev) => prev + 1)
         }

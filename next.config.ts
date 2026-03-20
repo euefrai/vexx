@@ -8,18 +8,13 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === 'development',
 });
 
-/** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Removido 'turbo' e 'eslint' da raiz para evitar erros de chaves inválidas
+  // Removidas as chaves 'eslint' e 'turbo' que causavam o erro de 'Unrecognized key'
   typescript: { 
     ignoreBuildErrors: true 
   },
-  eslint: { 
-    ignoreDuringBuilds: true 
-  },
-  // Se precisar de chaves experimentais, elas devem ser suportadas pela sua versão atual
   experimental: {
-    // Removido o bloco 'turbo' que causava erro no seu log
+    // Mantido vazio para evitar conflitos na versão 16
   },
 };
 
