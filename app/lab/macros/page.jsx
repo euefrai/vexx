@@ -3,8 +3,9 @@ import { useState, useRef, useEffect } from "react"
 import Navbar from "@/components/Navbar"
 import { alimentos } from "../../data/alimentos"
 
-// --- FUNÇÕES AUXILIARES (FORA DO COMPONENTE) ---
+// 
 
+// --- FUNÇÕES AUXILIARES ---
 function buscarAlimentos(query) {
   if (!query) return [];
   const q = query.toLowerCase();
@@ -24,18 +25,12 @@ function calcularMacros(texto) {
     let matchGramas = item.match(/(\d+)\s*g/);
     if (matchGramas) quantidadeGramas = parseInt(matchGramas[1]);
 
-    let quantidadeUnidade = 1;
-    let matchUnidade = item.match(/^(\d+)/);
-    if (matchUnidade && !matchGramas) quantidadeUnidade = parseInt(matchUnidade[1]);
-
     const alimentoEncontrado = alimentos.find(a =>
       item.includes(a.nome) || a.nome.includes(item) || item.split(" ").some(p => a.nome.includes(p))
     );
 
     if (alimentoEncontrado) {
       let fator = quantidadeGramas / 100;
-      if (alimentoEncontrado.unidade && matchUnidade) fator = quantidadeUnidade;
-
       total.proteina += alimentoEncontrado.proteina * fator;
       total.carbo += alimentoEncontrado.carbo * fator;
       total.gordura += alimentoEncontrado.gordura * fator;
@@ -44,8 +39,7 @@ function calcularMacros(texto) {
     }
   });
 
-  if (encontrados === 0) return null;
-  return {
+  return encontrados === 0 ? null : {
     ...total,
     proteina: Number(total.proteina.toFixed(1)),
     carbo: Number(total.carbo.toFixed(1)),
@@ -54,221 +48,178 @@ function calcularMacros(texto) {
   };
 }
 
-function analisarDieta(calorias, proteina, metaCal, metaProt) {
-  let feedback = [];
-  if (calorias === 0) return ["🚀 Aguardando primeiro registro..."];
-  
-  if (calorias < metaCal * 0.7) feedback.push("⚠️ Poucas calorias (pode faltar energia)");
-  else if (calorias > metaCal * 1.2) feedback.push("🔥 Calorias altas (cuidado com excesso)");
-  else feedback.push("✅ Calorias equilibradas");
-
-  if (proteina < metaProt * 0.7) feedback.push("🥩 Proteína baixa (importante pra músculo)");
-  else if (proteina >= metaProt) feedback.push("💪 Proteína ideal!");
-
-  const densidade = proteina / calorias;
-  if (densidade < 0.05) feedback.push("🍔 Dieta pouco eficiente (baixa proteína)");
-  else feedback.push("🥗 Boa qualidade nutricional");
-
-  return feedback;
-}
-
 function MacroBox({ label, value }) {
   return (
     <div>
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className="font-bold">{value}</p>
+      <p className="text-[8px] text-zinc-500 uppercase">{label}</p>
+      <p className="font-black text-xs">{value}</p>
     </div>
   );
 }
 
-// --- COMPONENTE PRINCIPAL ---
-
 export default function MacrosPage() {
   const [inputTexto, setInputTexto] = useState("");
   const [historico, setHistorico] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState(null);
   const [sugestoes, setSugestoes] = useState([]);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+  
+  const fileInputRef = useRef(null);
+  const [scanType, setScanType] = useState("comida"); // "comida" ou "rotulo"
 
   const META_CALORIAS = 2000;
   const META_PROTEINA = 150;
-  const chatEndRef = useRef(null);
 
-  // 1. CARREGAR E VALIDAR DATA (Executa uma vez ao abrir)
   useEffect(() => {
     const saved = localStorage.getItem("elite_macros_history");
-    const lastDate = localStorage.getItem("elite_macros_date");
-    const hoje = new Date().toLocaleDateString();
-
-    if (lastDate !== hoje) {
-      localStorage.removeItem("elite_macros_history");
-      localStorage.setItem("elite_macros_date", hoje);
-      setHistorico([]);
-    } else if (saved) {
-      setHistorico(JSON.parse(saved));
-    }
+    if (saved) setHistorico(JSON.parse(saved));
   }, []);
 
-  // 2. SALVAR E SCROLL (Executa sempre que o histórico muda)
   useEffect(() => {
     localStorage.setItem("elite_macros_history", JSON.stringify(historico));
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [historico]);
 
-  // Cálculos de Totais
   const totalDia = historico.reduce((acc, item) => acc + item.calorias, 0);
   const proteinaDia = historico.reduce((acc, item) => acc + item.proteina, 0);
-  const feedbackIA = analisarDieta(totalDia, proteinaDia, META_CALORIAS, META_PROTEINA);
 
-  const analisarConteudo = () => {
-    if (!inputTexto.trim()) return;
-    setErro(null);
-    const resultado = calcularMacros(inputTexto);
-
-    if (!resultado) {
-      setErro("Alimento não encontrado.");
-      return;
-    }
-
-    setHistorico(prev => [
-      ...prev,
-      {
-        ...resultado,
-        id: Date.now(),
-        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-      }
-    ]);
-    setInputTexto("");
-    setMostrarSugestoes(false);
+  // --- LÓGICA DE CÂMERA E IA ---
+  const handleCameraClick = (type) => {
+    setScanType(type);
+    fileInputRef.current.click();
   };
 
-  const removerItem = (id) => {
-    setHistorico(prev => prev.filter(item => item.id !== id));
+  const processarImagem = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    setErro(null);
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async () => {
+      const base64 = reader.result;
+
+      try {
+        const res = await fetch("/api/analisar-imagem", {
+          method: "POST",
+          body: JSON.stringify({ image: base64, tipo: scanType })
+        });
+        const data = await res.json();
+
+        if (scanType === "comida") {
+          setInputTexto(data.resultado); // A IA retorna algo como "200g Frango + Arroz"
+          // O usuário clica no botão OK para confirmar o que a IA viu
+        } else {
+          // No caso de rótulo, a IA já dá os macros, então injetamos direto
+          const mockResultado = {
+            alimento: "Scanner Rótulo",
+            proteina: parseFloat(data.resultado.match(/Proteína: ([\d.]+)g/)?.[1] || 0),
+            carbo: parseFloat(data.resultado.match(/Carboidratos: ([\d.]+)g/)?.[1] || 0),
+            gordura: parseFloat(data.resultado.match(/Gorduras: ([\d.]+)g/)?.[1] || 0),
+            calorias: parseInt(data.resultado.match(/Calorias: (\d+)kcal/)?.[1] || 0),
+          };
+          registrarNoHistorico(mockResultado);
+        }
+      } catch (err) {
+        setErro("Erro ao processar imagem.");
+      } finally {
+        setLoading(false);
+      }
+    };
+  };
+
+  const registrarNoHistorico = (dados) => {
+    setHistorico(prev => [...prev, { ...dados, id: Date.now(), hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }]);
+    setInputTexto("");
+  };
+
+  const analisarConteudo = () => {
+    const res = calcularMacros(inputTexto);
+    if (res) registrarNoHistorico(res);
+    else setErro("Alimento não catalogado.");
   };
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 pb-40">
+    <div className="min-h-screen bg-black text-white p-4 pb-48">
       <header className="text-center mb-6">
-        <h1 className="text-2xl font-black text-green-500 italic uppercase">BIO SCANNER</h1>
+        <h1 className="text-2xl font-black text-green-500 italic uppercase">BIO SCANNER 3.0</h1>
       </header>
 
-      {/* PROGRESSO CALORIAS */}
-      <div className="max-w-md mx-auto mb-4">
-        <div className="flex justify-between items-end mb-1">
-          <p className="text-[10px] font-black uppercase text-zinc-500">Energia Diária</p>
-          <p className="text-xs font-bold text-green-500">{totalDia} / {META_CALORIAS} kcal</p>
-        </div>
-        <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden border border-white/5">
-          <div 
-            className="h-full bg-green-500 transition-all duration-500" 
-            style={{ width: `${Math.min((totalDia / META_CALORIAS) * 100, 100)}%` }} 
-          />
-        </div>
+      {/* METAS */}
+      <div className="max-w-md mx-auto space-y-4 mb-8">
+         <div className="bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800">
+            <div className="flex justify-between mb-2 uppercase text-[10px] font-black italic">
+                <span>Energia: {totalDia}kcal</span>
+                <span className="text-zinc-500">Meta: {META_CALORIAS}</span>
+            </div>
+            <div className="w-full h-1.5 bg-black rounded-full overflow-hidden">
+                <div className="h-full bg-green-500 transition-all" style={{width: `${(totalDia/META_CALORIAS)*100}%`}}/>
+            </div>
+         </div>
       </div>
 
-      {/* PROGRESSO PROTEÍNA */}
-      <div className="max-w-md mx-auto mb-6">
-        <div className="flex justify-between items-end mb-1">
-          <p className="text-[10px] font-black uppercase text-zinc-500">Construção Muscular</p>
-          <p className="text-xs font-bold text-blue-400">{proteinaDia} / {META_PROTEINA}g</p>
-        </div>
-        <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden border border-white/5">
-          <div 
-            className="h-full bg-blue-500 transition-all duration-500" 
-            style={{ width: `${Math.min((proteinaDia / META_PROTEINA) * 100, 100)}%` }} 
-          />
-        </div>
-      </div>
-
-      {/* IA FEEDBACK BOX */}
-      <div className="max-w-md mx-auto mb-8 bg-zinc-900/30 p-3 rounded-2xl border border-zinc-800/50">
-        <p className="text-[8px] font-black text-zinc-600 uppercase mb-2 tracking-widest">Análise de Campo</p>
-        <div className="space-y-1">
-          {feedbackIA.map((msg, i) => (
-            <p key={i} className="text-[10px] font-bold text-zinc-400 uppercase italic">› {msg}</p>
-          ))}
-        </div>
-      </div>
-
-      {/* LISTA DE HISTÓRICO */}
-      <div className="space-y-4 max-w-md mx-auto">
-        {historico.length > 0 ? (
-          historico.map(item => (
-            <div key={item.id} className="bg-zinc-900/80 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 relative group animate-in fade-in slide-in-from-bottom-2">
-              <button 
-                onClick={() => removerItem(item.id)} 
-                className="absolute top-3 right-3 text-zinc-700 hover:text-red-500 transition-colors"
-              >
-                ✕
-              </button>
-              <p className="text-green-500 font-black uppercase italic text-xs">{item.alimento}</p>
-              <p className="text-[8px] text-zinc-600 font-bold mb-3">{item.hora}</p>
-              <div className="grid grid-cols-4 text-center border-t border-white/5 pt-3">
-                <MacroBox label="PROT" value={`${item.proteina}g`} />
-                <MacroBox label="CARB" value={`${item.carbo}g`} />
-                <MacroBox label="GORD" value={`${item.gordura}g`} />
-                <MacroBox label="KCAL" value={item.calorias} />
+      {/* HISTÓRICO */}
+      <div className="max-w-md mx-auto space-y-3">
+        {historico.map(item => (
+          <div key={item.id} className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex justify-between items-center">
+            <div>
+              <p className="text-xs font-black uppercase text-green-500">{item.alimento}</p>
+              <div className="flex gap-4 mt-1">
+                <MacroBox label="P" value={item.proteina} />
+                <MacroBox label="C" value={item.carbo} />
+                <MacroBox label="G" value={item.gordura} />
+                <MacroBox label="K" value={item.calorias} />
               </div>
             </div>
-          ))
-        ) : (
-          <div className="text-center py-20 opacity-20">
-            <p className="text-[10px] font-black uppercase italic tracking-widest">Nenhum dado escaneado hoje</p>
+            <button onClick={() => setHistorico(prev => prev.filter(i => i.id !== item.id))} className="text-zinc-700">✕</button>
           </div>
-        )}
-        <div ref={chatEndRef} />
+        ))}
       </div>
 
-      {/* INPUT FLUTUANTE COM AUTOCOMPLETE */}
-      <div className="fixed bottom-24 left-0 right-0 px-4 z-50">
-        <div className="max-w-md mx-auto relative">
-          {mostrarSugestoes && sugestoes.length > 0 && (
-            <div className="absolute bottom-full mb-2 left-0 right-0 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl">
-              {sugestoes.map((item, i) => (
-                <div 
-                  key={i} 
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    const partes = inputTexto.split(/[,+]/);
-                    partes[partes.length - 1] = item.nome;
-                    setInputTexto(partes.join(" + ") + " ");
-                    setMostrarSugestoes(false);
-                  }}
-                  className="p-3 hover:bg-green-500/10 cursor-pointer text-xs font-bold uppercase border-b border-white/5 last:border-0"
-                >
-                  <span className="text-green-500">＋</span> {item.nome}
-                </div>
-              ))}
-            </div>
-          )}
+      {/* CONTROLES FLUTUANTES */}
+      <div className="fixed bottom-24 left-0 right-0 px-4">
+        <div className="max-w-md mx-auto space-y-3">
+          
+          {/* BOTÕES DE CÂMERA */}
+          <div className="grid grid-cols-2 gap-2">
+            <button 
+              onClick={() => handleCameraClick("comida")}
+              className="bg-zinc-900 border border-zinc-800 p-3 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:border-green-500"
+            >
+              📷 Scan Comida
+            </button>
+            <button 
+              onClick={() => handleCameraClick("rotulo")}
+              className="bg-zinc-900 border border-zinc-800 p-3 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:border-blue-500"
+            >
+              🔍 Scan Rótulo
+            </button>
+          </div>
 
-          <div className="bg-zinc-900 p-2 rounded-2xl border border-green-500/30 shadow-2xl flex items-center gap-2">
+          {/* INPUT MANUAL / RESULTADO IA */}
+          <div className="bg-zinc-900 p-2 rounded-2xl border border-green-500/50 flex gap-2">
+            <input 
+              hidden type="file" accept="image/*" capture="environment"
+              ref={fileInputRef} onChange={processarImagem} 
+            />
             <input
               value={inputTexto}
-              onChange={(e) => {
-                const valor = e.target.value;
-                setInputTexto(valor);
-                const ultima = valor.split(/[,+]/).pop().trim();
-                setSugestoes(buscarAlimentos(ultima));
-                setMostrarSugestoes(true);
-              }}
-              onFocus={() => setMostrarSugestoes(true)}
-              onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
-              onKeyDown={(e) => e.key === "Enter" && analisarConteudo()}
-              className="flex-1 bg-transparent outline-none text-white px-3 font-bold text-sm"
-              placeholder="Ex: 200g frango + arroz"
+              onChange={(e) => setInputTexto(e.target.value)}
+              placeholder={loading ? "IA ANALISANDO..." : "Digite ou use a câmera..."}
+              className="flex-1 bg-transparent px-3 font-bold text-sm outline-none"
             />
             <button 
               onClick={analisarConteudo}
-              className="bg-green-500 text-black w-10 h-10 rounded-xl flex items-center justify-center font-black active:scale-90 transition-transform"
+              className="bg-green-500 text-black px-4 py-2 rounded-xl font-black"
             >
-              ✓
+              {loading ? "..." : "OK"}
             </button>
           </div>
-          {erro && <p className="text-red-500 text-[10px] font-black uppercase mt-2 text-center animate-bounce">{erro}</p>}
+          {erro && <p className="text-red-500 text-center text-[10px] font-bold">{erro}</p>}
         </div>
       </div>
-
       <Navbar />
     </div>
   );

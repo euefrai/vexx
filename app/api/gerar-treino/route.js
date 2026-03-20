@@ -4,72 +4,53 @@ export async function POST(req) {
   try {
     const { prompt } = await req.json();
 
-    // 🔥 DEBUG (importantíssimo)
     if (!process.env.OPENAI_API_KEY) {
-      console.error("❌ API KEY não encontrada");
       return NextResponse.json(
         { error: "API KEY não configurada" },
         { status: 500 }
       );
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini", // 🔥 se der erro troca pra gpt-4o
-        messages: [
-          {
-            role: "system",
-            content: `Você é um treinador de elite.
+        model: "gpt-4.1-mini", // 🔥 MAIS ESTÁVEL
+        input: `
+Você é um treinador profissional.
 
-Responda EXATAMENTE assim:
+Crie um treino baseado nisso:
+${prompt}
+
+Responda exatamente assim:
 
 Nome do Treino
 Exercício: séries
 
-Exemplo:
-Supino: 4x10
-Agachamento: 3x12
-
-Sem explicações.`
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
+Sem explicações extras.
+        `,
       }),
     });
 
-    // 🔥 TRATAMENTO REAL DE ERRO
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Erro HTTP:", errorText);
+      const erro = await response.text();
+      console.error("❌ ERRO OPENAI:", erro);
 
       return NextResponse.json(
-        { error: "Erro na OpenAI", details: errorText },
+        { error: "Erro na OpenAI", details: erro },
         { status: 500 }
       );
     }
 
     const data = await response.json();
 
-    if (!data.choices || !data.choices[0]) {
-      console.error("❌ Resposta inválida:", data);
-      return NextResponse.json(
-        { error: "Resposta inválida da IA" },
-        { status: 500 }
-      );
-    }
+    const texto =
+      data.output?.[0]?.content?.[0]?.text || "Erro ao gerar treino";
 
-    return NextResponse.json({
-      treino: data.choices[0].message.content,
-    });
+    return NextResponse.json({ treino: texto });
 
   } catch (error) {
     console.error("🔥 ERRO GERAL:", error);

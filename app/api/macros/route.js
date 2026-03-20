@@ -1,114 +1,79 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 export async function POST(req) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const { image, tipo } = await req.json(); // image: base64, tipo: 'comida' ou 'rotulo'
 
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "API Key não configurada." },
-        { status: 500 }
-      );
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: "API Key não configurada no servidor." }, { status: 500 });
     }
 
-    const openai = new OpenAI({ apiKey });
-
-    const { messages, modo } = await req.json();
-
-    // 🔥 PROMPT
+    // 1. Definição do Prompt de Sistema baseado no modo
     const systemPrompt =
-      modo === "rotulo"
-        ? `Analise rótulos alimentícios e retorne JSON com:
-{
-  "alimento": "nome",
-  "proteina": number,
-  "carbo": number,
-  "gordura": number,
-  "calorias": number,
-  "nota_pureza": number,
-  "veredito": "texto curto"
-}`
-        : `Analise alimentos e retorne JSON com:
-{
-  "alimento": "nome",
-  "proteina": number,
-  "carbo": number,
-  "gordura": number,
-  "calorias": number
-}`;
+      tipo === "rotulo"
+        ? `Você é um scanner de rótulos de elite do VEXX SQUAD. 
+           Analise a imagem e extraia os valores nutricionais da porção principal.
+           Retorne APENAS um JSON no formato:
+           {
+             "alimento": "Nome do Produto",
+             "proteina": number,
+             "carbo": number,
+             "gordura": number,
+             "calorias": number,
+             "nota_pureza": number,
+             "veredito": "texto curto e motivador"
+           }`
+        : `Você é um scanner de alimentos do VEXX SQUAD. 
+           Identifique os alimentos na foto e estime o peso.
+           Retorne APENAS um JSON no formato:
+           {
+             "alimento": "Descrição rápida do prato",
+             "proteina": number,
+             "carbo": number,
+             "gordura": number,
+             "calorias": number
+           }`;
 
-    // 🔥 CONVERSÃO SEGURA DAS MENSAGENS
-    const input = [
-      {
-        role: "system",
-        content: systemPrompt,
-      },
-    ];
-
-    for (const msg of messages) {
-      if (Array.isArray(msg.content)) {
-        const parts = [];
-
-        for (const item of msg.content) {
-          if (item.type === "text") {
-            parts.push({
-              type: "input_text",
-              text: item.text,
-            });
-          }
-
-          if (item.type === "input_image") {
-            parts.push({
-              type: "input_image",
-              image_url: item.image_url,
-            });
-          }
-        }
-
-        input.push({
-          role: msg.role,
-          content: parts,
-        });
-      } else {
-        input.push({
-          role: msg.role,
-          content: msg.content,
-        });
-      }
-    }
-
-    // 🔥 CHAMADA CORRETA
-    const response = await openai.responses.create({
-      model: "gpt-4.1-mini",
-      input,
-      response_format: { type: "json_object" },
+    // 2. Chamada para a API (Vision)
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini", // Modelo que suporta visão e é barato
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Analise esta imagem:" },
+            {
+              type: "image_url",
+              image_url: {
+                url: image, // A imagem base64 vinda do frontend
+              },
+            },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" }, // Garante que a resposta seja um JSON válido
     });
 
-    const content = response.output[0].content[0].text;
-
-    let parsed;
+    const content = response.choices[0].message.content;
 
     try {
-      parsed = JSON.parse(content);
+      const parsed = JSON.parse(content);
+      return NextResponse.json(parsed);
     } catch (err) {
-      console.error("JSON inválido:", content);
-
-      return NextResponse.json(
-        { error: "Resposta inválida da IA", raw: content },
-        { status: 500 }
-      );
+      console.error("Erro ao parsear JSON da IA:", content);
+      return NextResponse.json({ error: "IA falhou ao gerar dados estruturados" }, { status: 500 });
     }
 
-    return NextResponse.json(parsed);
-
   } catch (error) {
-    console.error("ERRO BACKEND:", error);
-
+    console.error("ERRO NO SCANNER:", error);
     return NextResponse.json(
-      {
-        error: error.message || "Erro interno no servidor",
-      },
+      { error: error.message || "Erro interno no servidor" },
       { status: 500 }
     );
   }
