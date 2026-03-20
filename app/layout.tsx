@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/InstallPrompt";
 import UpdatePrompt from "@/components/UpdatePrompt";
-import RegisterSW from "@/components/RegisterSW"; // Criaremos este componente abaixo
+import RegisterSW from "@/components/RegisterSW";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,11 +15,21 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// 1. Mova o themeColor para cá para sumir os avisos do terminal
+export const viewport: Viewport = {
+  themeColor: "#22c55e",
+};
+
+// 2. Unifiquei os dois blocos de metadata em um só
 export const metadata: Metadata = {
   title: "VEXX SQUAD",
   description: "Elite Training Log & Community",
   manifest: "/manifest.json",
-  themeColor: "#22c55e",
+  openGraph: {
+    title: 'VEXX SQUAD',
+    description: 'Treine como um soldado de elite.',
+    images: ['/logo-compartilhamento.png'], 
+  },
 };
 
 export default function RootLayout({
@@ -33,13 +43,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
         suppressHydrationWarning={true}
       >
-        {/* Componente invisível que registra o Service Worker no lado do cliente */}
         <RegisterSW />
-
         <UpdatePrompt />
-        
         <main>{children}</main>
-        
         <InstallPrompt />
       </body>
     </html>

@@ -28,6 +28,26 @@ function ConteudoPerfil() {
   const [isProprioPerfil, setIsProprioPerfil] = useState(false)
   const [imagemSelecionada, setImagemSelecionada] = useState(null)
 
+  // FUNÇÃO DE COMPARTILHAR AJUSTADA
+  const compartilharApp = async () => {
+    const shareData = {
+      title: 'VEXX SQUAD',
+      text: `Confira o perfil de @${perfil?.username || 'um soldado'} no VEXX SQUAD!`,
+      url: window.location.href, // Compartilha o link específico do perfil atual
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert("Link do perfil copiado! ⚡");
+      }
+    } catch (err) {
+      console.log('Erro ao compartilhar', err);
+    }
+  };
+
   function getStatusEvolucao(xp = 0) {
     if (xp >= 8000) return { nome: "AURA", cor: "text-red-500", icon: "⚡", min: 8000, max: 20000 }
     if (xp >= 4000) return { nome: "NO ENEMIES", cor: "text-purple-500", icon: "🛡️", min: 4000, max: 8000 }
@@ -46,7 +66,7 @@ function ConteudoPerfil() {
     return { cor: "text-zinc-500", bg: "bg-zinc-500", border: "border-zinc-500", shadow: "shadow-zinc-500/30" }
   }
 
-  const getInfoIMC = () => {
+  function getInfoIMC() {
     if (!perfil?.peso || !perfil?.altura) return { valor: "--", cor: "text-zinc-500" }
     const imc = (perfil.peso / (perfil.altura * perfil.altura)).toFixed(1)
     if (imc < 18.5) return { valor: imc, cor: "text-blue-400" }
@@ -136,7 +156,7 @@ function ConteudoPerfil() {
     <div className="space-y-3">
       {lista.length > 0 ? lista.map(u => (
         <Link href={`/perfil?id=${u.id}`} key={u.id} className="flex items-center gap-3 bg-zinc-900/50 p-3 rounded-2xl border border-zinc-800/50 active:scale-95 transition-all">
-          <img src={u.foto || "https://via.placeholder.com/150"} className={`w-10 h-10 rounded-full object-cover border ${corNivel.border}/30`} />
+          <img src={u.foto || "https://via.placeholder.com/150"} className={`w-10 h-10 rounded-full object-cover border ${corNivel.border}/30`} alt="" />
           <span className="text-sm font-black uppercase italic text-zinc-200">@{u.username}</span>
         </Link>
       )) : <p className="text-center py-10 text-zinc-700 text-[10px] font-black uppercase italic">Vazio.</p>}
@@ -155,12 +175,23 @@ function ConteudoPerfil() {
           <h1 className="text-xl font-black uppercase italic tracking-tighter text-green-500">
             {isProprioPerfil ? "Elite Squad / Perfil" : `Dossiê / ${perfil?.username}`}
           </h1>
-          {isProprioPerfil && (
-            <Link href="/configuracoes" className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800 active:scale-90 transition-transform">⚙️</Link>
-          )}
+          
+          {/* BOTÕES DE AÇÃO: Compartilhar e Configurações */}
+          <div className="flex gap-2">
+            <button 
+              onClick={compartilharApp}
+              className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800 active:scale-90 transition-transform flex items-center justify-center"
+              title="Compartilhar Perfil"
+            >
+              📤
+            </button>
+            {isProprioPerfil && (
+              <Link href="/configuracoes" className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800 active:scale-90 transition-transform">⚙️</Link>
+            )}
+          </div>
         </div>
 
-        {/* HEADER DO PERFIL DINÂMICO POR NÍVEL */}
+        {/* ... (Todo o restante do seu código permanece igual) ... */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -196,6 +227,7 @@ function ConteudoPerfil() {
             <img 
               src={perfil?.foto || "https://via.placeholder.com/150"} 
               className={`w-28 h-28 rounded-full object-cover border-4 p-1 shadow-xl transition-all duration-500 ${corNivel.border} ${corNivel.shadow}`}
+              alt=""
             />
             <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 text-black text-[10px] font-black px-4 py-1 rounded-full uppercase italic shadow-lg transition-colors duration-500 ${corNivel.bg}`}>
               LVL {perfil?.nivel || 1}
@@ -241,7 +273,6 @@ function ConteudoPerfil() {
           </div>
         </motion.div>
         
-        {/* BARRA DE PROGRESSO XP DINÂMICA */}
         <div className="mb-8 px-2">
             <div className="flex justify-between items-end mb-1.5 px-1">
                 <span className={`text-[9px] font-black uppercase italic ${corNivel.cor}`}>Evolução de Rank</span>
@@ -256,14 +287,12 @@ function ConteudoPerfil() {
             </div>
         </div>
 
-        {/* NAVEGAÇÃO DE ABAS */}
         <div className="flex bg-zinc-900/50 p-1 rounded-2xl mb-8 border border-zinc-800/50">
           <button onClick={() => setAbaAtiva("meus_treinos")} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "meus_treinos" ? `${corNivel.bg} text-black shadow-lg` : "text-zinc-500"}`}>Arsenal</button>
           <button onClick={() => setAbaAtiva("registros")} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "registros" ? `${corNivel.bg} text-black shadow-lg` : "text-zinc-500"}`}>Registros</button>
           <button onClick={() => setAbaAtiva("salvos")} className={`flex-1 py-3 rounded-xl text-[8px] font-black uppercase italic transition-all ${abaAtiva === "salvos" ? `${corNivel.bg} text-black shadow-lg` : "text-zinc-500"}`}>Salvos</button>
         </div>
 
-        {/* CONTEÚDO DAS ABAS */}
         <div className="min-h-[300px]">
           <AnimatePresence mode="wait">
             <motion.div key={abaAtiva} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
@@ -297,7 +326,7 @@ function ConteudoPerfil() {
                   <div className="grid grid-cols-3 gap-2">
                     {postagens.map((post) => (
                       <div key={post.id} className="relative group overflow-hidden rounded-2xl aspect-square border border-zinc-800">
-                        <img src={post.imagem_url} onClick={() => setImagemSelecionada(post.imagem_url)} className="w-full h-full object-cover cursor-pointer active:scale-95 transition-transform" />
+                        <img src={post.imagem_url} onClick={() => setImagemSelecionada(post.imagem_url)} className="w-full h-full object-cover cursor-pointer active:scale-95 transition-transform" alt="" />
                         {isProprioPerfil && (
                           <button onClick={(e) => { e.stopPropagation(); excluirPostagem(post.id); }} className="absolute top-1 right-1 bg-black/60 backdrop-blur-md text-red-500 p-2 rounded-lg border border-zinc-700 z-10 active:scale-90 transition-all md:opacity-0 md:group-hover:opacity-100">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79" /></svg>
@@ -321,11 +350,10 @@ function ConteudoPerfil() {
           </AnimatePresence>
         </div>
 
-        {/* MODAL DE IMAGEM */}
         <AnimatePresence>
           {imagemSelecionada && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setImagemSelecionada(null)} className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
-              <img src={imagemSelecionada} className={`max-w-full max-h-[85vh] rounded-3xl border shadow-2xl ${corNivel.border}`} />
+              <img src={imagemSelecionada} className={`max-w-full max-h-[85vh] rounded-3xl border shadow-2xl ${corNivel.border}`} alt="" />
             </motion.div>
           )}
         </AnimatePresence>
