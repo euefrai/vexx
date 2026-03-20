@@ -1,20 +1,19 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react" // 🔥 Adicionado Suspense
+import { useState, useEffect, Suspense } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter, useSearchParams } from "next/navigation"
 import Navbar from "@/components/Navbar"
 import { useGamificacao } from "@/hooks/useGamificacao"
 import { motion, AnimatePresence } from "framer-motion"
 
-// 🔥 Força o Next.js a não tentar gerar essa página de forma estática no build
 export const dynamic = 'force-dynamic';
 
-// 1. Criamos um componente interno para o conteúdo
 function ConteudoNovoTreino() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const treinoId = searchParams.get("id")
+  const iaTreino = searchParams.get("ia") // 🔥 CAPTURA O TREINO DA IA
 
   const { adicionarXP } = useGamificacao()
 
@@ -43,6 +42,29 @@ function ConteudoNovoTreino() {
 
       if (data?.username) setAutor(data.username)
 
+      // 🧠 LÓGICA DE PREENCHIMENTO AUTOMÁTICO VIA IA
+      if (iaTreino) {
+        const texto = decodeURIComponent(iaTreino)
+        const linhas = texto.split("\n")
+        
+        const exerciciosFormatados = linhas
+          .filter(l => l.includes(":"))
+          .map(l => {
+            const [nome, series] = l.split(":")
+            return {
+              nome: nome.trim(),
+              series: series.trim()
+            }
+          })
+
+        if (exerciciosFormatados.length > 0) {
+          setTitulo(linhas[0] || "Treino IA")
+          setExercicios(exerciciosFormatados)
+          return // Sai do init para não sobrepor com edição
+        }
+      }
+
+      // LÓGICA DE EDIÇÃO (EXISTENTE)
       if (treinoId) {
         setModoEdicao(true)
         const { data: treino } = await supabase
@@ -66,7 +88,7 @@ function ConteudoNovoTreino() {
       }
     }
     init()
-  }, [treinoId])
+  }, [treinoId, iaTreino]) // 🔥 Adicionado iaTreino como dependência
 
   function adicionarDescricao() {
     setExercicios(prev => [...prev, { nome: "", series: "" }])
@@ -148,6 +170,16 @@ function ConteudoNovoTreino() {
       </header>
 
       <div className="space-y-6">
+        {/* 🔥 BOTÃO GERADOR IA */}
+        {!modoEdicao && (
+          <button
+            onClick={() => router.push("/criar-treino-ia")}
+            className="w-full mb-4 border border-green-500/50 text-green-500 py-4 rounded-[2rem] font-black hover:bg-green-500/10 transition-all uppercase italic text-xs tracking-widest flex items-center justify-center gap-2"
+          >
+            <span>🤖</span> CRIAR TREINO COM IA
+          </button>
+        )}
+
         <div className="bg-zinc-900/40 p-5 rounded-[2.5rem] border border-zinc-800 space-y-4">
           <input
             placeholder="Nome da operação"
@@ -216,7 +248,6 @@ function ConteudoNovoTreino() {
   )
 }
 
-// 2. Exportamos a página principal envolvida em Suspense
 export default function NovoTreino() {
   return (
     <>
