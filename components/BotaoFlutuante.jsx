@@ -7,12 +7,25 @@ export default function BotaoFlutuante() {
   const [aberto, setAberto] = useState(false)
   const router = useRouter()
 
+  // Aqui você pode colocar o caminho "bagunçado" que a função vai limpar
   const acoes = [
-    { label: "Missão IA", icon: "🤖", rota: "/criar-treino-ia", color: "bg-green-500" },
-    { label: "Bio Scanner", icon: "📷", rota: "/macros", color: "bg-blue-500" },
-    { label: "Inteligência", icon: "💀", rota: "/unidade-comando", color: "bg-red-600" },
+    { label: "Missão IA", icon: "🤖", rota: "criar-treino-ia", color: "bg-green-500" },
+    { label: "Bio Scanner", icon: "📷", rota: "/lab/macros/", color: "bg-blue-500" },
+    { label: "Inteligência", icon: "💀", rota: "//unidade-comando", color: "bg-red-600" },
     { label: "Nova Missão", icon: "📝", rota: "/novo-treino", color: "bg-zinc-700" },
   ]
+
+  // 🔥 FUNÇÃO CORINGA: Limpa as rotas automaticamente
+  const navegarPara = (caminhoSujo) => {
+    // 1. Pega apenas a última parte da rota (o slug real) caso você tenha movido de pasta
+    // Ex: "/lab/macros/" vira "macros"
+    const partes = caminhoSujo.split('/').filter(Boolean);
+    const slugReal = partes[partes.length - 1];
+
+    // 2. Navega para a raiz do slug, ignorando caminhos intermediários errados
+    router.push(`/${slugReal}`);
+    setAberto(false);
+  }
 
   return (
     <div className="fixed bottom-24 right-6 flex flex-col items-end gap-3 z-[100]">
@@ -32,10 +45,7 @@ export default function BotaoFlutuante() {
                   {acao.label}
                 </span>
                 <button
-                  onClick={() => {
-                    router.push(acao.rota)
-                    setAberto(false)
-                  }}
+                  onClick={() => navegarPara(acao.rota)} // Chamada da função inteligente
                   className={`${acao.color} w-12 h-12 rounded-full shadow-2xl flex items-center justify-center text-xl border border-white/20`}
                 >
                   {acao.icon}
