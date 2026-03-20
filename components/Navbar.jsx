@@ -4,19 +4,19 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import NotificationBell from "@/components/notifications/NotificationBell" // Importando o sino
+import NotificationBell from "@/components/notifications/NotificationBell"
 
 export default function Navbar() {
   const pathname = usePathname()
   const [fotoPerfil, setFotoPerfil] = useState(null)
-  const [userId, setUserId] = useState<string | null>(null) // Estado para o ID do usuário
+  const [userId, setUserId] = useState(null) // Corrigido: removido <string>
 
   useEffect(() => {
     async function carregarDados() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-          setUserId(user.id) // Guarda o ID para o NotificationBell
+          setUserId(user.id)
           
           const { data } = await supabase
             .from("usuarios")
@@ -33,7 +33,7 @@ export default function Navbar() {
     carregarDados()
   }, [])
 
-  // Remova o ": string" que estava causando o erro de compilação
+  // Corrigido: removido ": string"
   const isActive = (path) =>
     pathname.startsWith(path) 
       ? "text-green-400 scale-110"
@@ -74,10 +74,10 @@ export default function Navbar() {
             <span className="text-[9px] font-black uppercase tracking-tighter text-inherit">Treino</span>
           </Link>
 
-          {/* NOTIFICAÇÕES - Adicionado Aqui */}
+          {/* NOTIFICAÇÕES */}
           <div className="flex flex-col items-center justify-center">
              {userId && <NotificationBell userId={userId} />}
-             <span className={`text-[9px] font-black uppercase tracking-tighter ${unreadCount > 0 ? 'text-green-400' : 'text-zinc-500'}`}>Squad</span>
+             <span className="text-[9px] font-black uppercase tracking-tighter text-zinc-500">Squad</span>
           </div>
 
           {/* Perfil */}
