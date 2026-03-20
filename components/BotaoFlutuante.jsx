@@ -10,7 +10,7 @@ export default function BotaoFlutuante() {
   const acoes = [
     { label: "Missão IA", icon: "🤖", rota: "/criar-treino-ia", color: "bg-green-500" },
     { label: "Bio Scanner", icon: "📷", rota: "/lab/macros", color: "bg-blue-500" },
-    { label: "Inteligência", icon: "💀", rota: "//unidade-comando", color: "bg-red-600" },
+    { label: "Inteligência", icon: "💀", rota: "/unidade-comando", color: "bg-red-600" },
     { label: "Nova Missão", icon: "📝", rota: "/novo-treino", color: "bg-zinc-700" },
   ]
 
