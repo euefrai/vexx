@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -13,253 +13,236 @@ export default function TreinoCard({ treino }) {
   const [likes, setLikes] = useState(0)
   const [jaCurtiu, setJaCurtiu] = useState(false)
   const [loadingLike, setLoadingLike] = useState(false)
-
   const [comentarios, setComentarios] = useState([])
   const [novoComentario, setNovoComentario] = useState("")
   const [enviandoComentario, setEnviandoComentario] = useState(false)
   const [mostrarComentarios, setMostrarComentarios] = useState(false)
-
   const [userId, setUserId] = useState(null)
 
   const autor = treino.usuarios
 
   useEffect(() => {
-    pegarUsuario()
-    carregarLikes()
-    carregarComentarios()
+    const inicializar = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserId(user.id)
+        checkSeCurtiu(user.id)
+      }
+      carregarTotalLikes()
+      carregarComentarios()
+    }
+    inicializar()
   }, [treino.id])
 
-  // 🔹 PEGAR USER
-  async function pegarUsuario() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) setUserId(user.id)
+  async function carregarTotalLikes() {
+    const { count } = await supabase
+      .from("likes")
+      .select("*", { count: "exact", head: true })
+      .eq("treino_id", treino.id)
+    setLikes(count || 0)
   }
 
-  // 🔹 LIKES
-  async function carregarLikes() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-
-      const { count } = await supabase
-        .from("likes")
-        .select("*", { count: "exact", head: true })
-        .eq("treino_id", treino.id)
-
-      setLikes(count || 0)
-
-      if (user) {
-        const { data } = await supabase
-          .from("likes")
-          .select("*")
-          .eq("treino_id", treino.id)
-          .eq("user_id", user.id)
-          .maybeSingle()
-
-        setJaCurtiu(!!data)
-      }
-    } catch (err) {
-      console.error("Erro ao carregar likes:", err)
-    }
+  async function checkSeCurtiu(uid) {
+    const { data } = await supabase
+      .from("likes")
+      .select("id")
+      .eq("treino_id", treino.id)
+      .eq("user_id", uid)
+      .maybeSingle()
+    setJaCurtiu(!!data)
   }
 
-  // 🔹 LIKE / UNLIKE
+  // 🔹 LIKE / UNLIKE BLINDADO (MESCLADO)
   async function handleLike() {
+    if (!userId) return router.push("/login")
     if (loadingLike) return
 
+    setLoadingLike(true)
+    const estavaCurtido = jaCurtiu 
+
     try {
-      setLoadingLike(true)
+      // UI Otimista
+      setJaCurtiu(!estavaCurtido)
+      setLikes(prev => estavaCurtido ? prev - 1 : prev + 1)
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return router.push("/login")
-
-      if (jaCurtiu) {
+      if (estavaCurtido) {
         const { error } = await supabase
           .from("likes")
           .delete()
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .eq("treino_id", treino.id)
-
         if (error) throw error
-
-        setJaCurtiu(false)
-        setLikes(prev => Math.max(0, prev - 1))
       } else {
         const { error } = await supabase
           .from("likes")
-          .insert({
-            treino_id: treino.id,
-            user_id: user.id
+          .insert({ 
+            user_id: userId, 
+            treino_id: treino.id 
           })
 
         if (error && error.code !== "23505") throw error
 
-        setJaCurtiu(true)
-        setLikes(prev => prev + 1)
-
-        // 🔥 XP só se não for o próprio treino
-        if (treino.usuario_id !== user.id) {
+        if (treino.usuario_id !== userId) {
           await adicionarXP(treino.usuario_id, 10)
         }
       }
     } catch (err) {
-      console.error("Erro no like:", err)
+      console.error("Erro na operação de Like:", err)
+      setJaCurtiu(estavaCurtido)
+      setLikes(prev => estavaCurtido ? prev + 1 : prev - 1)
+      alert("Falha na sincronização. Tente novamente.")
     } finally {
       setLoadingLike(false)
     }
   }
 
-  // 🔹 COMENTÁRIOS
   async function carregarComentarios() {
-    try {
-      const { data, error } = await supabase
-        .from("comentarios")
-        .select("*, usuarios(username, foto)")
-        .eq("treino_id", treino.id)
-        .order("created_at", { ascending: true })
-
-      if (error) throw error
-
-      setComentarios(data || [])
-    } catch (err) {
-      console.error("Erro comentários:", err)
-    }
+    const { data } = await supabase
+      .from("comentarios")
+      .select("*, usuarios(username, foto)")
+      .eq("treino_id", treino.id)
+      .order("created_at", { ascending: true })
+    setComentarios(data || [])
   }
 
   async function enviarComentario() {
     if (!novoComentario.trim() || enviandoComentario) return
+    if (!userId) return router.push("/login")
 
     try {
       setEnviandoComentario(true)
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return router.push("/login")
-
-      const { error } = await supabase
-        .from("comentarios")
-        .insert({
-          treino_id: treino.id,
-          usuario_id: user.id,
-          texto: novoComentario.trim()
-        })
-
-      if (error) throw error
-
+      await supabase.from("comentarios").insert({
+        treino_id: treino.id,
+        usuario_id: userId,
+        texto: novoComentario.trim()
+      })
       setNovoComentario("")
-      await carregarComentarios()
-      await adicionarXP(user.id, 5)
-
-    } catch (err) {
-      alert("Erro ao comentar: " + err.message)
+      carregarComentarios()
+      adicionarXP(userId, 5)
     } finally {
       setEnviandoComentario(false)
     }
   }
 
-  // 🔹 EDITAR
-  function editarTreino() {
-    router.push(`/novo-treino?id=${treino.id}`)
-  }
-
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="bg-zinc-900/50 rounded-[2.5rem] border border-zinc-800 p-6 mb-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-zinc-900 border-l-4 border-green-500 overflow-hidden mb-8 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]"
     >
-
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-
-        <div className="flex items-center gap-3">
-          <img 
-            src={autor?.foto || "https://via.placeholder.com/150"} 
-            className="w-10 h-10 rounded-full border border-green-500/20"
-          />
+      {/* HEADER BRUTAL */}
+      <div className="p-5 flex justify-between items-start border-b border-zinc-800">
+        <div className="flex gap-4">
+          <div className="relative">
+            <img 
+              src={autor?.foto || "https://via.placeholder.com/150"} 
+              className="w-12 h-12 rounded-none grayscale border-2 border-zinc-700 object-cover"
+            />
+            <div className="absolute -bottom-2 -right-2 bg-green-500 text-black text-[8px] font-black px-1 uppercase italic">
+              Active
+            </div>
+          </div>
           <div>
-            <p className="text-xs font-black">@{autor?.username || "user"}</p>
-            <p className="text-[9px] text-green-500 uppercase">{treino.grupo}</p>
+            <p className="text-sm font-black italic tracking-tighter uppercase text-zinc-100">
+              {autor?.username || "OPERADOR"}
+            </p>
+            <span className="inline-block bg-zinc-800 text-green-400 text-[10px] font-black px-2 py-0.5 mt-1 uppercase border border-green-500/30">
+              {treino.grupo}
+            </span>
           </div>
         </div>
 
-        {/* 🔥 AÇÕES */}
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-col items-end gap-2">
+           <div className="flex gap-3">
+              {userId === treino.usuario_id && (
+                <button onClick={() => router.push(`/novo-treino?id=${treino.id}`)} className="text-zinc-500 hover:text-white transition uppercase text-[10px] font-bold">
+                  [Editar]
+                </button>
+              )}
+              <button onClick={() => setMostrarComentarios(!mostrarComentarios)} className="text-zinc-100 font-black text-xs">
+                MSG: {comentarios.length}
+              </button>
+           </div>
+        </div>
+      </div>
 
-          {/* EDITAR */}
-          {userId === treino.usuario_id && (
-            <button
-              onClick={editarTreino}
-              className="bg-zinc-800/50 w-9 h-9 rounded-xl text-xs active:scale-90 hover:bg-green-500/20 transition"
-            >
-              ✏️
-            </button>
-          )}
+      {/* CORPO DO CARD */}
+      <div className="p-5 bg-gradient-to-b from-transparent to-black/20">
+        <h2 className="text-2xl font-black mb-4 uppercase italic tracking-tighter leading-none text-white">
+          {treino.titulo}
+        </h2>
 
-          {/* COMENT */}
-          <button
-            onClick={() => setMostrarComentarios(!mostrarComentarios)}
-            className="text-xs"
-          >
-            💬 {comentarios.length}
-          </button>
+        <div className="bg-zinc-950 p-4 border border-zinc-800 space-y-2">
+          {treino.descricao?.split("\n").map((ex, i) => (
+            ex.trim() && (
+              <div key={i} className="flex items-start gap-2 group">
+                <span className="text-green-500 font-black text-xs mt-1">/&gt;</span>
+                <p className="text-sm text-zinc-400 font-medium group-hover:text-white transition-colors">
+                  {ex.trim().toUpperCase()}
+                </p>
+              </div>
+            )
+          ))}
+        </div>
+      </div>
 
-          {/* LIKE */}
-          <button
+      {/* FOOTER AÇÕES */}
+      <div className="p-0 bg-zinc-800/30 flex justify-between items-stretch border-t border-zinc-800 h-14">
+          <button 
             onClick={handleLike}
             disabled={loadingLike}
-            className="text-xs"
+            className={`flex-1 flex items-center justify-center gap-2 transition-all active:scale-110 ${jaCurtiu ? 'text-red-600 bg-red-600/5' : 'text-zinc-500 hover:text-white'}`}
           >
-            {jaCurtiu ? "❤️" : "🤍"} {likes}
+            <span className="text-xl">{jaCurtiu ? '☣️' : '🔘'}</span>
+            <span className="font-black italic text-sm">{likes}</span>
           </button>
 
-        </div>
+          <button 
+            onClick={() => setMostrarComentarios(!mostrarComentarios)}
+            className="flex-1 bg-green-500 text-black font-black text-[10px] uppercase italic tracking-widest hover:bg-white transition"
+          >
+            {mostrarComentarios ? "Fechar Relatório" : "Acessar Protocolo"}
+          </button>
       </div>
 
-      {/* TITULO */}
-      <h2 className="text-xl font-black mb-3">{treino.titulo}</h2>
+      {/* SEÇÃO DE COMENTÁRIOS ESTILO TERMINAL */}
+      <AnimatePresence>
+        {mostrarComentarios && (
+          <motion.div 
+            initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
+            className="overflow-hidden bg-black border-t border-zinc-800"
+          >
+            <div className="p-5 space-y-4">
+              <div className="max-h-40 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                {comentarios.map(c => (
+                  <div key={c.id} className="border-l-2 border-zinc-800 pl-3">
+                    <p className="text-[10px] text-green-500 font-black uppercase tracking-widest">
+                      @{c.usuarios?.username}
+                    </p>
+                    <p className="text-xs text-zinc-300 font-medium">{c.texto}</p>
+                  </div>
+                ))}
+              </div>
 
-      {/* DESCRIÇÃO */}
-      <div className="bg-black/40 p-4 rounded-xl mb-4">
-        {treino.descricao?.split("\n").map((ex, i) => (
-          ex.trim() && (
-            <p key={i} className="text-sm text-zinc-300">
-              • {ex.trim()}
-            </p>
-          )
-        ))}
-      </div>
-
-      {/* COMENTÁRIOS */}
-      {mostrarComentarios && (
-        <div className="space-y-3">
-
-          {comentarios.map(c => (
-            <p key={c.id} className="text-xs">
-              <span className="text-green-500 font-bold">
-                @{c.usuarios?.username}
-              </span>{" "}
-              {c.texto}
-            </p>
-          ))}
-
-          <div className="flex gap-2">
-            <input
-              value={novoComentario}
-              onChange={(e) => setNovoComentario(e.target.value)}
-              placeholder="Comentar..."
-              className="flex-1 bg-black border border-zinc-800 p-2 rounded text-xs"
-            />
-            <button
-              onClick={enviarComentario}
-              disabled={enviandoComentario}
-              className="text-xs bg-green-500 text-black px-3 rounded"
-            >
-              {enviandoComentario ? "..." : "OK"}
-            </button>
-          </div>
-
-        </div>
-      )}
-
+              <div className="flex gap-2 mt-4">
+                <input
+                  value={novoComentario}
+                  onChange={(e) => setNovoComentario(e.target.value)}
+                  placeholder="DIGITE SUA MENSAGEM..."
+                  className="flex-1 bg-zinc-900 border border-zinc-800 p-3 text-[10px] font-bold text-white uppercase outline-none focus:border-green-500"
+                />
+                <button
+                  onClick={enviarComentario}
+                  disabled={enviandoComentario}
+                  className="bg-zinc-100 text-black px-4 font-black text-[10px] uppercase hover:bg-green-500 transition-colors"
+                >
+                  {enviandoComentario ? "..." : "SEND"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
