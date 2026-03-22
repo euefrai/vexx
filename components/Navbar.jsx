@@ -9,7 +9,8 @@ import NotificationBell from "@/components/notifications/NotificationBell"
 export default function Navbar() {
   const pathname = usePathname()
   const [fotoPerfil, setFotoPerfil] = useState(null)
-  const [userId, setUserId] = useState(null) // Corrigido: removido <string>
+  const [userId, setUserId] = useState(null)
+  const [isAdmin, setIsAdmin] = useState(false) // Novo estado para controlar o acesso ao QG
 
   useEffect(() => {
     async function carregarDados() {
@@ -20,11 +21,14 @@ export default function Navbar() {
           
           const { data } = await supabase
             .from("usuarios")
-            .select("foto")
+            .select("foto, is_admin") // Buscamos a foto e o status de admin
             .eq("id", user.id)
             .single()
           
-          if (data?.foto) setFotoPerfil(data.foto)
+          if (data) {
+            if (data.foto) setFotoPerfil(data.foto)
+            if (data.is_admin) setIsAdmin(true) // Define se o botão de QG aparece
+          }
         }
       } catch (err) {
         console.error("Erro ao carregar dados:", err)
@@ -33,7 +37,6 @@ export default function Navbar() {
     carregarDados()
   }, [])
 
-  // Corrigido: removido ": string"
   const isActive = (path) =>
     pathname.startsWith(path) 
       ? "text-green-400 scale-110"
@@ -74,17 +77,19 @@ export default function Navbar() {
             <span className="text-[9px] font-black uppercase tracking-tighter text-inherit">Treino</span>
           </Link>
 
-          {/* NOTIFICAÇÕES */}
-          <div className="flex flex-col items-center justify-center">
+          {/* NOTIFICAÇÕES & ADMIN */}
+          <div className="flex flex-col items-center justify-center gap-1">
              {userId && <NotificationBell userId={userId} />}
              <span className="text-[9px] font-black uppercase tracking-tighter text-zinc-500">Squad</span>
-             {userProfile?.is_admin && (
+             
+             {/* BOTÃO DO QG - Só aparece se isAdmin for true */}
+             {isAdmin && (
                 <Link href="/admin">
-                  <button className="bg-red-600/20 border border-red-600/50 text-red-500 text-[8px] font-black px-2 py-1 rounded">
-                    ACESSAR QG
+                  <button className="bg-red-600/20 border border-red-600/50 text-red-500 text-[7px] font-black px-1.5 py-0.5 rounded animate-pulse">
+                    QG
                   </button>
                 </Link>
-              )}
+             )}
           </div>
 
           {/* Perfil */}

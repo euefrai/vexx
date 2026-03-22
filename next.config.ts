@@ -13,7 +13,7 @@ const withPWA = withPWAInit({
 const nextConfig = {
   reactStrictMode: true,
   // Usa o compilador SWC do Rust (muito mais rápido que o antigo)
-  swcMinify: true,
+
   
   // Mantemos isso apenas para o deploy na Vercel não barrar por tipagem
   typescript: { 
