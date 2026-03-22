@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar"
 import BotaoFlutuante from "@/components/BotaoFlutuante"
 import Link from "next/link"
 import { useGamificacao } from "@/hooks/useGamificacao"
+import { useRanks } from "@/hooks/useRanks" // Novo Hook
 import { motion, AnimatePresence } from "framer-motion"
 
 export default function Feed() {
@@ -14,23 +15,32 @@ export default function Feed() {
   const [loading, setLoading] = useState(true)
   const [checkinFeito, setCheckinFeito] = useState(false)
   const [loadingCheckin, setLoadingCheckin] = useState(false)
-  const [strike, setStrike] = useState(0) 
+  const [strike, setStrike] = useState(0)
   const [busca, setBusca] = useState("")
+  const [listaDeRanks, setListaDeRanks] = useState([]) // Estado para títulos do banco
+  
   const { adicionarXP } = useGamificacao()
+  const { getRanks, calcularRank } = useRanks()
 
-  // Função de suporte para determinar o Rank visual com base no XP
-  function getStatusEvolucao(xp = 0) {
-    if (xp >= 8000) return { nome: "AURA", cor: "text-red-500", bg: "bg-red-500", border: "border-red-500" }
-    if (xp >= 4000) return { nome: "NO ENEMIES", cor: "text-purple-500", bg: "bg-purple-500", border: "border-purple-500" }
-    if (xp >= 2000) return { nome: "HIGH CORTISOL", cor: "text-blue-500", bg: "bg-blue-500", border: "border-blue-500" }
-    if (xp >= 1000) return { nome: "BETA", cor: "text-yellow-500", bg: "bg-yellow-500", border: "border-yellow-500" }
-    if (xp >= 500) return { nome: "FRANGO", cor: "text-green-500", bg: "bg-green-500", border: "border-green-500" }
-    return { nome: "RECRUTA", cor: "text-zinc-500", bg: "bg-zinc-500", border: "border-zinc-500" }
-  }
-
+  // Inicialização unificada
   useEffect(() => {
-    carregar()
-    verificarCheckinEStrike()
+    async function inicializarSistema() {
+      try {
+        setLoading(true)
+        // Busca os títulos dinâmicos primeiro
+        const ranksBuscados = await getRanks()
+        setListaDeRanks(ranksBuscados)
+        
+        // Carrega o resto em paralelo
+        await Promise.all([
+          carregarTreinos(),
+          verificarCheckinEStrike()
+        ])
+      } finally {
+        setLoading(false)
+      }
+    }
+    inicializarSistema()
   }, [])
 
   const treinosFiltrados = treinos.filter(treino => 
@@ -45,6 +55,7 @@ export default function Feed() {
 
       const hoje = new Date()
       hoje.setHours(0, 0, 0, 0)
+      
       const { data: hojeData } = await supabase
         .from("registros_treino")
         .select("id")
@@ -62,7 +73,6 @@ export default function Feed() {
 
       if (historico && historico.length > 0) {
         const datasSet = new Set(historico.map(r => r.created_at.split('T')[0]))
-        
         let contador = 0
         let dataVerificar = new Date()
         dataVerificar.setHours(0, 0, 0, 0)
@@ -121,24 +131,19 @@ export default function Feed() {
     }
   }
 
-  async function carregar() {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from("treinos")
-        .select(`*, usuarios (username, foto, xp, nivel)`)
-        .order("created_at", { ascending: false })
-      if (!error) setTreinos(data || []) 
-    } finally {
-      setLoading(false)
-    }
+  async function carregarTreinos() {
+    const { data, error } = await supabase
+      .from("treinos")
+      .select(`*, usuarios (username, foto, xp, nivel)`)
+      .order("created_at", { ascending: false })
+    if (!error) setTreinos(data || []) 
   }
 
   return (
     <>
       <div className="max-w-md mx-auto p-4 pb-24 min-h-screen bg-black font-sans text-white">
         
-        {/* HEADER REFINADO */}
+        {/* HEADER */}
         <div className="flex justify-between items-center mb-8 mt-4">
           <div>
             <h1 className="text-green-500 text-3xl font-black italic uppercase tracking-tighter leading-none">
@@ -154,7 +159,7 @@ export default function Feed() {
           </Link>
         </div>
 
-        {/* CARD DE CHECK-IN - UNIFICADO E ANIMADO */}
+        {/* CARD DE CHECK-IN */}
         <div className={`mb-8 p-6 rounded-[2.5rem] border transition-all duration-500 relative overflow-hidden ${
           checkinFeito 
           ? 'bg-zinc-900/40 border-zinc-800' 
@@ -244,7 +249,8 @@ export default function Feed() {
               {treinosFiltrados.length > 0 ? (
                 treinosFiltrados.map(t => {
                   const autor = t.usuarios;
-                  const status = getStatusEvolucao(autor?.xp || 0);
+                  // AQUI A MÁGICA: Calcula o rank usando os dados do banco
+                  const status = calcularRank(autor?.xp || 0, listaDeRanks);
 
                   return (
                     <div key={t.id} className="bg-zinc-900/40 border border-zinc-800 p-4 rounded-[2rem] hover:border-zinc-700 transition-all">
@@ -252,9 +258,9 @@ export default function Feed() {
                         <div className="relative">
                           <img 
                             src={autor?.foto || "https://via.placeholder.com/150"} 
-                            className={`w-11 h-11 rounded-full object-cover border-2 ${status.border}`}
+                            className={`w-11 h-11 rounded-full object-cover border-2 ${status.cor_border}`}
                           />
-                          <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 text-black text-[8px] font-black px-2 py-0.5 rounded-full ${status.bg} shadow-lg`}>
+                          <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 text-black text-[8px] font-black px-2 py-0.5 rounded-full ${status.cor_bg} shadow-lg whitespace-nowrap`}>
                             LVL {autor?.nivel || 1}
                           </div>
                         </div>
@@ -263,7 +269,7 @@ export default function Feed() {
                           <span className="text-[11px] font-black text-white uppercase italic leading-none">
                             @{autor?.username || "Guerreiro"}
                           </span>
-                          <span className={`text-[9px] font-black uppercase mt-0.5 ${status.cor}`}>
+                          <span className={`text-[9px] font-black uppercase mt-0.5 ${status.cor_texto}`}>
                             {status.nome}
                           </span>
                           <span className="text-[8px] text-zinc-500 uppercase mt-1">

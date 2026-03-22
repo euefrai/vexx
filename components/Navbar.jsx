@@ -78,6 +78,13 @@ export default function Navbar() {
           <div className="flex flex-col items-center justify-center">
              {userId && <NotificationBell userId={userId} />}
              <span className="text-[9px] font-black uppercase tracking-tighter text-zinc-500">Squad</span>
+             {userProfile?.is_admin && (
+                <Link href="/admin">
+                  <button className="bg-red-600/20 border border-red-600/50 text-red-500 text-[8px] font-black px-2 py-1 rounded">
+                    ACESSAR QG
+                  </button>
+                </Link>
+              )}
           </div>
 
           {/* Perfil */}
