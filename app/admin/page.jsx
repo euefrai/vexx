@@ -11,6 +11,7 @@ export default function AdminPage() {
   const [loadingRanks, setLoadingRanks] = useState(true)
   const [novoRank, setNovoRank] = useState({ 
     nome: "", 
+    icone: "⭐", // Novo campo para o Emoji
     xp_minimo: 0, 
     trofeus_min: 0, 
     trofeus_max: 9999,
@@ -41,12 +42,24 @@ export default function AdminPage() {
 
   async function salvarRank() {
     if (!novoRank.nome) return alert("Dê um nome ao título, Comandante!")
+    
     const { error } = await supabase.from("ranks_custom").insert([novoRank])
+    
     if (error) {
       alert("Erro ao forjar título: " + error.message)
     } else {
       alert("Novo título forjado! 🔥")
-      setNovoRank({ nome: "", xp_minimo: 0, trofeus_min: 0, trofeus_max: 9999, cor_texto: "#ffffff", cor_bg: "#27272a", cor_border: "#3f3f46" })
+      // Reseta o formulário
+      setNovoRank({ 
+        nome: "", 
+        icone: "⭐", 
+        xp_minimo: 0, 
+        trofeus_min: 0, 
+        trofeus_max: 9999, 
+        cor_texto: "#ffffff", 
+        cor_bg: "#27272a", 
+        cor_border: "#3f3f46" 
+      })
       carregarDados()
     }
   }
@@ -87,7 +100,7 @@ export default function AdminPage() {
           </p>
         </div>
 
-        {/* 1. GESTÃO DE USUÁRIOS */}
+        {/* 1. GESTÃO DE USUÁRIOS (Inalterado) */}
         <section className="bg-zinc-900/50 p-6 rounded-[2rem] border border-zinc-800 mb-8 shadow-xl">
           <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
             <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -101,7 +114,7 @@ export default function AdminPage() {
               onChange={e => setBuscaUser(e.target.value)}
             />
             <button onClick={buscarUsuarios} className="bg-white text-black px-4 rounded-xl font-black text-[10px] uppercase italic">
-              Buscar
+              {loadingUsers ? "..." : "Buscar"}
             </button>
           </div>
 
@@ -109,15 +122,11 @@ export default function AdminPage() {
             {usuarios.map(u => (
               <div key={u.id} className="p-4 bg-black/40 border border-zinc-800 rounded-2xl">
                 <p className="font-black text-green-500 mb-3 italic">@{u.username}</p>
-                
                 <div className="flex flex-col gap-3">
-                  {/* Dar XP */}
                   <div className="flex gap-2">
                     <button onClick={() => atualizarUsuario(u.id, { xp: (u.xp || 0) + 100 })} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-[9px] font-black p-2 rounded-lg transition-all">+100 XP</button>
                     <button onClick={() => atualizarUsuario(u.id, { xp: (u.xp || 0) + 1000 })} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-[9px] font-black p-2 rounded-lg transition-all">+1000 XP</button>
                   </div>
-
-                  {/* Título Manual */}
                   <div className="space-y-1">
                     <label className="text-[8px] font-black text-zinc-600 uppercase ml-1">Atribuir Título Especial</label>
                     <select 
@@ -135,7 +144,7 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* 2. FORJAR TÍTULOS */}
+        {/* 2. FORJAR TÍTULOS - ATUALIZADO COM ÍCONE */}
         <section className="bg-zinc-900/50 p-6 rounded-[2rem] border border-zinc-800 mb-8 shadow-xl">
           <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -143,12 +152,20 @@ export default function AdminPage() {
           </h2>
           
           <div className="space-y-4">
-            <input 
-              placeholder="NOME DO TÍTULO" 
-              value={novoRank.nome}
-              className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-bold uppercase outline-none focus:border-green-500/50"
-              onChange={e => setNovoRank({...novoRank, nome: e.target.value.toUpperCase()})}
-            />
+            <div className="flex gap-2">
+              <input 
+                placeholder="NOME" 
+                value={novoRank.nome}
+                className="flex-[3] bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-bold uppercase outline-none focus:border-green-500/50"
+                onChange={e => setNovoRank({...novoRank, nome: e.target.value.toUpperCase()})}
+              />
+              <input 
+                placeholder="ICON" 
+                value={novoRank.icone}
+                className="flex-1 bg-black border border-zinc-800 p-4 rounded-2xl text-center text-lg outline-none focus:border-green-500/50"
+                onChange={e => setNovoRank({...novoRank, icone: e.target.value})}
+              />
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -184,15 +201,18 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* LISTA DE TÍTULOS */}
+        {/* LISTA DE TÍTULOS - ATUALIZADO PARA EXIBIR ÍCONE */}
         <section className="space-y-4">
           <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Títulos em Operação</h2>
           <div className="space-y-2">
             {loadingRanks ? <p className="text-center text-[10px] animate-pulse">CARREGANDO...</p> : ranks.map(r => (
               <div key={r.id} style={{ borderColor: r.cor_border, backgroundColor: r.cor_bg }} className="p-4 rounded-2xl border flex justify-between items-center">
-                <div>
-                  <span style={{ color: r.cor_texto }} className="font-black italic text-sm">{r.nome}</span>
-                  <p className="text-[7px] font-bold text-zinc-500 uppercase mt-1">XP: {r.xp_minimo}+ | 🏆: {r.trofeus_min}-{r.trofeus_max}</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">{r.icone || "🎖️"}</span>
+                  <div>
+                    <span style={{ color: r.cor_texto }} className="font-black italic text-sm">{r.nome}</span>
+                    <p className="text-[7px] font-bold text-zinc-500 uppercase mt-1">XP: {r.xp_minimo}+ | 🏆: {r.trofeus_min}-{r.trofeus_max}</p>
+                  </div>
                 </div>
               </div>
             ))}
