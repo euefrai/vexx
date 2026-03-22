@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { useGamificacao } from "@/hooks/useGamificacao"
+import { registrarAtividade } from "@/lib/logger" // Importe unificado
 
 export default function TreinoCard({ treino }) {
   const router = useRouter()
@@ -64,6 +65,7 @@ export default function TreinoCard({ treino }) {
     const estavaCurtido = jaCurtiu 
 
     try {
+      // Otimismo na UI
       setJaCurtiu(!estavaCurtido)
       setLikes(prev => estavaCurtido ? prev - 1 : prev + 1)
 
@@ -71,11 +73,20 @@ export default function TreinoCard({ treino }) {
         await supabase.from("likes").delete().eq("user_id", userId).eq("treino_id", treino.id)
       } else {
         await supabase.from("likes").insert({ user_id: userId, treino_id: treino.id })
+        
+        // Log de Atividade e XP apenas se for um novo Like
         if (treino.usuario_id !== userId) {
           await adicionarXP(treino.usuario_id, 10)
         }
+        await registrarAtividade(
+          userId, 
+          "LIKE_GIVEN", 
+          `Deu um salve no treino: ${treino.titulo}`, 
+          treino.id
+        )
       }
     } catch (err) {
+      // Reverte em caso de erro
       setJaCurtiu(estavaCurtido)
       setLikes(prev => estavaCurtido ? prev + 1 : prev - 1)
     } finally {
@@ -98,14 +109,23 @@ export default function TreinoCard({ treino }) {
 
     try {
       setEnviandoComentario(true)
-      await supabase.from("comentarios").insert({
+      const { error } = await supabase.from("comentarios").insert({
         treino_id: treino.id,
         usuario_id: userId,
         texto: novoComentario.trim()
       })
-      setNovoComentario("")
-      carregarComentarios()
-      adicionarXP(userId, 5)
+
+      if (!error) {
+        setNovoComentario("")
+        await carregarComentarios()
+        await adicionarXP(userId, 5)
+        await registrarAtividade(
+          userId, 
+          "COMENTARIO_POSTADO", 
+          `Enviou uma mensagem no protocolo: ${treino.titulo}`, 
+          treino.id
+        )
+      }
     } finally {
       setEnviandoComentario(false)
     }
@@ -113,7 +133,7 @@ export default function TreinoCard({ treino }) {
 
   return (
     <div className="relative mb-8 group">
-      {/* AURA DINÂMICA (O BRILHO ATRÁS) */}
+      {/* AURA DINÂMICA */}
       <AnimatePresence>
         {possuiAura && (
           <motion.div
@@ -138,12 +158,13 @@ export default function TreinoCard({ treino }) {
         }}
         className="relative z-10 bg-zinc-900 overflow-hidden border-l-4"
       >
-        {/* HEADER BRUTAL */}
+        {/* HEADER */}
         <div className="p-5 flex justify-between items-start border-b border-zinc-800">
           <div className="flex gap-4">
             <div className="relative">
               <img 
                 src={autor?.foto || "https://via.placeholder.com/150"} 
+                alt="Avatar"
                 className="w-12 h-12 rounded-none grayscale border-2 object-cover"
                 style={{ borderColor: corAura }}
               />
@@ -176,7 +197,7 @@ export default function TreinoCard({ treino }) {
           </div>
         </div>
 
-        {/* CORPO DO CARD */}
+        {/* CORPO */}
         <div className="p-5 bg-gradient-to-b from-transparent to-black/20">
           <h2 className="text-2xl font-black mb-4 uppercase italic tracking-tighter leading-none text-white">
             {treino.titulo}
