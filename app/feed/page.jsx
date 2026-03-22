@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar"
 import BotaoFlutuante from "@/components/BotaoFlutuante"
 import Link from "next/link"
 import { useGamificacao } from "@/hooks/useGamificacao"
+import { motion, AnimatePresence } from "framer-motion"
 
 export default function Feed() {
   const [treinos, setTreinos] = useState([])
@@ -123,7 +124,6 @@ export default function Feed() {
   async function carregar() {
     try {
       setLoading(true)
-      // 🔥 Agora buscando XP e Nivel para exibir nos cards
       const { data, error } = await supabase
         .from("treinos")
         .select(`*, usuarios (username, foto, xp, nivel)`)
@@ -154,7 +154,7 @@ export default function Feed() {
           </Link>
         </div>
 
-        {/* CARD DE CHECK-IN */}
+        {/* CARD DE CHECK-IN - UNIFICADO E ANIMADO */}
         <div className={`mb-8 p-6 rounded-[2.5rem] border transition-all duration-500 relative overflow-hidden ${
           checkinFeito 
           ? 'bg-zinc-900/40 border-zinc-800' 
@@ -166,11 +166,30 @@ export default function Feed() {
                 <h3 className={`font-black uppercase italic text-sm tracking-tighter ${checkinFeito ? 'text-zinc-500' : 'text-green-500'}`}>
                   {checkinFeito ? "Treino Confirmado" : "Missão do Dia"}
                 </h3>
-                {strike > 0 && (
-                  <span className="bg-orange-500 text-black text-[9px] font-black px-2 py-0.5 rounded italic">
-                    {strike}D STREAK
-                  </span>
-                )}
+                
+                <AnimatePresence>
+                  {strike > 0 && (
+                    <motion.div 
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="flex items-center gap-1 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full"
+                    >
+                      <motion.span
+                        animate={{ 
+                          scale: [1, 1.2, 1],
+                          filter: ["drop-shadow(0 0 2px #f97316)", "drop-shadow(0 0 8px #f97316)", "drop-shadow(0 0 2px #f97316)"]
+                        }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="text-[12px]"
+                      >
+                        🔥
+                      </motion.span>
+                      <span className="text-orange-500 text-[9px] font-black italic">
+                        {strike}D STREAK
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
               <p className="text-white text-[10px] font-black uppercase tracking-widest mt-1 opacity-80">
                 {checkinFeito ? "PAGAMENTO RECEBIDO" : "PAGUE O PREÇO HOJE"}
@@ -182,12 +201,20 @@ export default function Feed() {
               className={`px-6 py-3 rounded-2xl font-black text-[11px] uppercase italic transition-all active:scale-95 ${
                 checkinFeito 
                 ? "bg-zinc-800 text-zinc-500 border border-zinc-700" 
-                : "bg-green-500 text-black shadow-[0_0_20px_rgba(34,197,94,0.3)]"
+                : "bg-green-500 text-black shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:bg-white hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]"
               }`}
             >
               {loadingCheckin ? "..." : checkinFeito ? "CANCELAR" : "MARCAR CHECK-IN"}
             </button>
           </div>
+
+          {!checkinFeito && (
+            <motion.div 
+              animate={{ opacity: [0.05, 0.15, 0.05] }}
+              transition={{ duration: 3, repeat: Infinity }}
+              className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-transparent pointer-events-none"
+            />
+          )}
         </div>
 
         {/* BUSCA TÁTICA */}
@@ -204,7 +231,7 @@ export default function Feed() {
           />
         </div>
 
-        {/* LISTA DE TREINOS COM GAMIFICAÇÃO EXIBIDA */}
+        {/* LISTA DE TREINOS */}
         <div className="space-y-6">
           <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] ml-2">Relatórios de Campo</p>
           {loading ? (
@@ -221,14 +248,12 @@ export default function Feed() {
 
                   return (
                     <div key={t.id} className="bg-zinc-900/40 border border-zinc-800 p-4 rounded-[2rem] hover:border-zinc-700 transition-all">
-                      {/* HEADER DO CARD PERSONALIZADO */}
                       <div className="flex items-center gap-3 mb-4">
                         <div className="relative">
                           <img 
                             src={autor?.foto || "https://via.placeholder.com/150"} 
                             className={`w-11 h-11 rounded-full object-cover border-2 ${status.border}`}
                           />
-                          {/* NIVEL 🔥 */}
                           <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 text-black text-[8px] font-black px-2 py-0.5 rounded-full ${status.bg} shadow-lg`}>
                             LVL {autor?.nivel || 1}
                           </div>
@@ -238,7 +263,6 @@ export default function Feed() {
                           <span className="text-[11px] font-black text-white uppercase italic leading-none">
                             @{autor?.username || "Guerreiro"}
                           </span>
-                          {/* RANK 🔥 */}
                           <span className={`text-[9px] font-black uppercase mt-0.5 ${status.cor}`}>
                             {status.nome}
                           </span>
@@ -247,8 +271,6 @@ export default function Feed() {
                           </span>
                         </div>
                       </div>
-
-                      {/* COMPONENTE ORIGINAL DO CARD */}
                       <TreinoCard treino={t} hideHeader={true} /> 
                     </div>
                   )
@@ -262,7 +284,6 @@ export default function Feed() {
           )}
         </div>
 
-        {/* RODAPÉ */}
         <footer className="mt-20 mb-8 text-center">
           <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-[0.2em]">
             SQUAD SYSTEM v2.0 // @eu.efrai
