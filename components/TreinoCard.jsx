@@ -19,7 +19,11 @@ export default function TreinoCard({ treino }) {
   const [mostrarComentarios, setMostrarComentarios] = useState(false)
   const [userId, setUserId] = useState(null)
 
+  // Dados do Autor e Rank
   const autor = treino.usuarios
+  const rankDoAutor = autor?.ranks_custom 
+  const corAura = rankDoAutor?.cor_texto || "#22c55e" 
+  const possuiAura = (autor?.xp || 0) > 500 
 
   useEffect(() => {
     const inicializar = async () => {
@@ -52,7 +56,6 @@ export default function TreinoCard({ treino }) {
     setJaCurtiu(!!data)
   }
 
-  // 🔹 LIKE / UNLIKE BLINDADO (MESCLADO)
   async function handleLike() {
     if (!userId) return router.push("/login")
     if (loadingLike) return
@@ -61,36 +64,20 @@ export default function TreinoCard({ treino }) {
     const estavaCurtido = jaCurtiu 
 
     try {
-      // UI Otimista
       setJaCurtiu(!estavaCurtido)
       setLikes(prev => estavaCurtido ? prev - 1 : prev + 1)
 
       if (estavaCurtido) {
-        const { error } = await supabase
-          .from("likes")
-          .delete()
-          .eq("user_id", userId)
-          .eq("treino_id", treino.id)
-        if (error) throw error
+        await supabase.from("likes").delete().eq("user_id", userId).eq("treino_id", treino.id)
       } else {
-        const { error } = await supabase
-          .from("likes")
-          .insert({ 
-            user_id: userId, 
-            treino_id: treino.id 
-          })
-
-        if (error && error.code !== "23505") throw error
-
+        await supabase.from("likes").insert({ user_id: userId, treino_id: treino.id })
         if (treino.usuario_id !== userId) {
           await adicionarXP(treino.usuario_id, 10)
         }
       }
     } catch (err) {
-      console.error("Erro na operação de Like:", err)
       setJaCurtiu(estavaCurtido)
       setLikes(prev => estavaCurtido ? prev + 1 : prev - 1)
-      alert("Falha na sincronização. Tente novamente.")
     } finally {
       setLoadingLike(false)
     }
@@ -125,69 +112,92 @@ export default function TreinoCard({ treino }) {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-zinc-900 border-l-4 border-green-500 overflow-hidden mb-8 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]"
-    >
-      {/* HEADER BRUTAL */}
-      <div className="p-5 flex justify-between items-start border-b border-zinc-800">
-        <div className="flex gap-4">
-          <div className="relative">
-            <img 
-              src={autor?.foto || "https://via.placeholder.com/150"} 
-              className="w-12 h-12 rounded-none grayscale border-2 border-zinc-700 object-cover"
-            />
-            <div className="absolute -bottom-2 -right-2 bg-green-500 text-black text-[8px] font-black px-1 uppercase italic">
-              Active
+    <div className="relative mb-8 group">
+      {/* AURA DINÂMICA (O BRILHO ATRÁS) */}
+      <AnimatePresence>
+        {possuiAura && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ 
+              opacity: [0.15, 0.35, 0.15],
+              scale: [1, 1.02, 1],
+            }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            style={{ backgroundColor: corAura }}
+            className="absolute -inset-1 rounded-xl blur-2xl z-0 pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ 
+          borderLeftColor: corAura,
+          boxShadow: possuiAura ? `0 0 25px ${corAura}22` : '10px 10px 0px 0px rgba(0,0,0,1)' 
+        }}
+        className="relative z-10 bg-zinc-900 overflow-hidden border-l-4"
+      >
+        {/* HEADER BRUTAL */}
+        <div className="p-5 flex justify-between items-start border-b border-zinc-800">
+          <div className="flex gap-4">
+            <div className="relative">
+              <img 
+                src={autor?.foto || "https://via.placeholder.com/150"} 
+                className="w-12 h-12 rounded-none grayscale border-2 object-cover"
+                style={{ borderColor: corAura }}
+              />
+              <div 
+                style={{ backgroundColor: corAura }}
+                className="absolute -bottom-2 -right-2 text-black text-[10px] font-black px-1 uppercase italic"
+              >
+                {rankDoAutor?.icone || "🎖️"}
+              </div>
+            </div>
+            <div>
+              <p style={{ color: corAura }} className="text-sm font-black italic tracking-tighter uppercase">
+                {autor?.username || "OPERADOR"}
+              </p>
+              <span className="inline-block bg-zinc-800 text-zinc-400 text-[9px] font-black px-2 py-0.5 mt-1 uppercase border border-zinc-700">
+                {rankDoAutor?.nome || "RECRUTA"} • {treino.grupo}
+              </span>
             </div>
           </div>
-          <div>
-            <p className="text-sm font-black italic tracking-tighter uppercase text-zinc-100">
-              {autor?.username || "OPERADOR"}
-            </p>
-            <span className="inline-block bg-zinc-800 text-green-400 text-[10px] font-black px-2 py-0.5 mt-1 uppercase border border-green-500/30">
-              {treino.grupo}
-            </span>
+
+          <div className="flex gap-3">
+            {userId === treino.usuario_id && (
+              <button onClick={() => router.push(`/novo-treino?id=${treino.id}`)} className="text-zinc-500 hover:text-white transition uppercase text-[10px] font-bold">
+                [Editar]
+              </button>
+            )}
+            <button onClick={() => setMostrarComentarios(!mostrarComentarios)} className="text-zinc-100 font-black text-xs">
+              MSG: {comentarios.length}
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-col items-end gap-2">
-           <div className="flex gap-3">
-              {userId === treino.usuario_id && (
-                <button onClick={() => router.push(`/novo-treino?id=${treino.id}`)} className="text-zinc-500 hover:text-white transition uppercase text-[10px] font-bold">
-                  [Editar]
-                </button>
-              )}
-              <button onClick={() => setMostrarComentarios(!mostrarComentarios)} className="text-zinc-100 font-black text-xs">
-                MSG: {comentarios.length}
-              </button>
-           </div>
+        {/* CORPO DO CARD */}
+        <div className="p-5 bg-gradient-to-b from-transparent to-black/20">
+          <h2 className="text-2xl font-black mb-4 uppercase italic tracking-tighter leading-none text-white">
+            {treino.titulo}
+          </h2>
+
+          <div className="bg-zinc-950 p-4 border border-zinc-800 space-y-2">
+            {treino.descricao?.split("\n").map((ex, i) => (
+              ex.trim() && (
+                <div key={i} className="flex items-start gap-2 group/item">
+                  <span className="text-green-500 font-black text-xs mt-1">/&gt;</span>
+                  <p className="text-sm text-zinc-400 font-medium group-hover/item:text-white transition-colors">
+                    {ex.trim().toUpperCase()}
+                  </p>
+                </div>
+              )
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* CORPO DO CARD */}
-      <div className="p-5 bg-gradient-to-b from-transparent to-black/20">
-        <h2 className="text-2xl font-black mb-4 uppercase italic tracking-tighter leading-none text-white">
-          {treino.titulo}
-        </h2>
-
-        <div className="bg-zinc-950 p-4 border border-zinc-800 space-y-2">
-          {treino.descricao?.split("\n").map((ex, i) => (
-            ex.trim() && (
-              <div key={i} className="flex items-start gap-2 group">
-                <span className="text-green-500 font-black text-xs mt-1">/&gt;</span>
-                <p className="text-sm text-zinc-400 font-medium group-hover:text-white transition-colors">
-                  {ex.trim().toUpperCase()}
-                </p>
-              </div>
-            )
-          ))}
-        </div>
-      </div>
-
-      {/* FOOTER AÇÕES */}
-      <div className="p-0 bg-zinc-800/30 flex justify-between items-stretch border-t border-zinc-800 h-14">
+        {/* FOOTER AÇÕES */}
+        <div className="p-0 bg-zinc-800/30 flex justify-between items-stretch border-t border-zinc-800 h-14">
           <button 
             onClick={handleLike}
             disabled={loadingLike}
@@ -203,46 +213,47 @@ export default function TreinoCard({ treino }) {
           >
             {mostrarComentarios ? "Fechar Relatório" : "Acessar Protocolo"}
           </button>
-      </div>
+        </div>
 
-      {/* SEÇÃO DE COMENTÁRIOS ESTILO TERMINAL */}
-      <AnimatePresence>
-        {mostrarComentarios && (
-          <motion.div 
-            initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-            className="overflow-hidden bg-black border-t border-zinc-800"
-          >
-            <div className="p-5 space-y-4">
-              <div className="max-h-40 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
-                {comentarios.map(c => (
-                  <div key={c.id} className="border-l-2 border-zinc-800 pl-3">
-                    <p className="text-[10px] text-green-500 font-black uppercase tracking-widest">
-                      @{c.usuarios?.username}
-                    </p>
-                    <p className="text-xs text-zinc-300 font-medium">{c.texto}</p>
-                  </div>
-                ))}
-              </div>
+        {/* SEÇÃO DE COMENTÁRIOS */}
+        <AnimatePresence>
+          {mostrarComentarios && (
+            <motion.div 
+              initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
+              className="overflow-hidden bg-black border-t border-zinc-800"
+            >
+              <div className="p-5 space-y-4">
+                <div className="max-h-40 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                  {comentarios.map(c => (
+                    <div key={c.id} className="border-l-2 border-zinc-800 pl-3">
+                      <p className="text-[10px] text-green-500 font-black uppercase tracking-widest">
+                        @{c.usuarios?.username}
+                      </p>
+                      <p className="text-xs text-zinc-300 font-medium">{c.texto}</p>
+                    </div>
+                  ))}
+                </div>
 
-              <div className="flex gap-2 mt-4">
-                <input
-                  value={novoComentario}
-                  onChange={(e) => setNovoComentario(e.target.value)}
-                  placeholder="DIGITE SUA MENSAGEM..."
-                  className="flex-1 bg-zinc-900 border border-zinc-800 p-3 text-[10px] font-bold text-white uppercase outline-none focus:border-green-500"
-                />
-                <button
-                  onClick={enviarComentario}
-                  disabled={enviandoComentario}
-                  className="bg-zinc-100 text-black px-4 font-black text-[10px] uppercase hover:bg-green-500 transition-colors"
-                >
-                  {enviandoComentario ? "..." : "SEND"}
-                </button>
+                <div className="flex gap-2 mt-4">
+                  <input
+                    value={novoComentario}
+                    onChange={(e) => setNovoComentario(e.target.value)}
+                    placeholder="DIGITE SUA MENSAGEM..."
+                    className="flex-1 bg-zinc-900 border border-zinc-800 p-3 text-[10px] font-bold text-white uppercase outline-none focus:border-green-500"
+                  />
+                  <button
+                    onClick={enviarComentario}
+                    disabled={enviandoComentario}
+                    className="bg-zinc-100 text-black px-4 font-black text-[10px] uppercase hover:bg-green-500 transition-colors"
+                  >
+                    {enviandoComentario ? "..." : "SEND"}
+                  </button>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
   )
 }
