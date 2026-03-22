@@ -49,8 +49,11 @@ function ConteudoPerfil() {
   };
 
   function getStatusEvolucao(xp = 0) {
-    if (xp >= 8000) return { nome: "AURA", cor: "text-red-500", icon: "⚡", min: 8000, max: 20000 }
-    if (xp >= 4000) return { nome: "NO ENEMIES", cor: "text-purple-500", icon: "🛡️", min: 4000, max: 8000 }
+    if (xp >= 60000) return { nome: "AURA", cor: "text-red-500", icon: "⚡", min: 60000, max: 100000 }
+    if (xp >= 32000) return { nome: "AURA", cor: "text-red-500", icon: "⚡", min: 32000, max: 60000 }
+    if (xp >= 16000) return { nome: "AURA", cor: "text-red-500", icon: "⚡", min: 16000, max: 32000 }
+    if (xp >= 8000) return { nome: "NO ENEMIES", cor: "text-red-500", icon: "༄", min: 8000, max: 16000 }
+    if (xp >= 4000) return { nome: "br", cor: "text-purple-500", icon: "🛡️", min: 4000, max: 8000 }
     if (xp >= 2000) return { nome: "HIGH CORTISOL", cor: "text-blue-500", icon: "🦅", min: 2000, max: 4000 }
     if (xp >= 1000) return { nome: "BETA", cor: "text-yellow-500", icon: "⚔️", min: 1000, max: 2000 }
     if (xp >= 500) return { nome: "FRANGO", cor: "text-green-500", icon: "🎖️", min: 500, max: 1000 }
