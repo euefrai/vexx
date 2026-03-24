@@ -1,24 +1,19 @@
+"use client";
+
 import { useState, useRef, useEffect, useCallback } from "react";
 import { getDistance } from "@/utils/haversine";
-
-interface Position {
-  lat: number;
-  lng: number;
-  timestamp: number;
-}
 
 export function useTracker() {
   const [isActive, setIsActive] = useState(false);
   const [distance, setDistance] = useState(0); 
   const [time, setTime] = useState(0); 
   
-  // 💡 Use Ref para o que não precisa disparar re-render imediato (histórico de rotas)
-  // Isso evita lentidão conforme a corrida fica longa
-  const positionsRef = useRef<Position[]>([]);
-  const watchId = useRef<number | null>(null);
-  const timerId = useRef<NodeJS.Timeout | null>(null);
+  // No JS puro, iniciamos o useRef apenas com o valor inicial (null ou array vazio)
+  const positionsRef = useRef([]);
+  const watchId = useRef(null);
+  const timerId = useRef(null);
 
-  // ⏱️ Lógica do Cronômetro (Otimizada)
+  // ⏱️ Lógica do Cronômetro
   useEffect(() => {
     if (isActive) {
       timerId.current = setInterval(() => {
@@ -36,7 +31,7 @@ export function useTracker() {
   // 📍 Lógica do GPS
   const startTracking = useCallback(() => {
     if (!("geolocation" in navigator)) {
-      alert("Geolocalização não suportada.");
+      alert("Geolocalização não suportada no seu navegador.");
       return;
     }
 
@@ -53,7 +48,6 @@ export function useTracker() {
           const newDist = getDistance(lastPos.lat, lastPos.lng, latitude, longitude);
           
           // Anti-ruído: só conta se houver deslocamento real (> 3 metros)
-          // GPS mobile costuma oscilar muito parado.
           if (newDist > 0.003) { 
             setDistance((prev) => prev + newDist);
             positionsRef.current.push(newPos);
@@ -65,8 +59,8 @@ export function useTracker() {
       },
       (error) => console.error("Erro no GPS:", error),
       { 
-        enableHighAccuracy: true, // Força o uso de GPS por satélite
-        maximumAge: 1000,         // Não aceita posições em cache muito velhas
+        enableHighAccuracy: true, 
+        maximumAge: 1000,         
         timeout: 5000 
       }
     );
@@ -87,15 +81,14 @@ export function useTracker() {
     positionsRef.current = [];
   }, [pauseTracking]);
 
-  // ⚡ Ritmo (Pace) calculado via Memo para evitar cálculos inúteis no render
+  // ⚡ Ritmo (Pace) em min/km
   const getPace = () => {
     if (distance <= 0 || time <= 0) return "0:00";
     
-    const paceDecimal = (time / 60) / distance; // minutos por km
+    const paceDecimal = (time / 60) / distance; 
     const minutes = Math.floor(paceDecimal);
     const seconds = Math.round((paceDecimal - minutes) * 60);
     
-    // Evita mostrar ritmos bizarros (como 99:99) caso o GPS dê um salto
     if (minutes > 59) return "--:--"; 
     
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
