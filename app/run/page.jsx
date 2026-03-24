@@ -10,10 +10,17 @@ import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 
 // Importação dinâmica do Mapa para evitar erro de "window is not defined"
-const MapContainer = dynamicNext(() => import('@/components/Map'), {
-  ssr: false,
-  loading: () => <div className="w-full h-full bg-slate-900 animate-pulse flex items-center justify-center text-slate-500">Carregando Mapa...</div>
-});
+const MapContainer = dynamicNext(
+  () => import('@/components/Map').then((mod) => mod.default),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full bg-slate-900 animate-pulse flex items-center justify-center text-slate-500">
+        Carregando Mapa...
+      </div>
+    ),
+  }
+);
 
 export default function RunPage() {
   const trackerProps = useTracker();
