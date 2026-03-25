@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, RotateCcw } from "lucide-react";
+import { Play, Pause, RotateCcw, Zap, Timer, MapPin, Gauge } from "lucide-react";
 
 function formatTime(seconds) {
   const hrs = Math.floor(seconds / 3600);
@@ -22,69 +22,96 @@ export default function RunTracker({
   distance,
   time,
   pace,
+  positions = [], // Garantindo que inicie como array vazio
   startTracking,
   pauseTracking,
   resetTracking,
 }) {
+  
+  // 🏎️ Calcula velocidade atual a partir do último ponto registrado
+  const currentSpeed =
+    positions.length > 0
+      ? positions[positions.length - 1].speed || 0
+      : 0;
+
   return (
-    <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700 rounded-2xl p-5 shadow-2xl">
+    <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-6 shadow-2xl w-full max-w-2xl mx-auto">
       
-      {/* 📊 MÉTRICAS */}
-      <div className="grid grid-cols-3 gap-4 text-center mb-6">
+      {/* 📊 MÉTRICAS - Grid de 4 Colunas */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center mb-8">
         
         {/* Distância */}
-        <div>
-          <p className="text-xs text-slate-400 uppercase">Distância</p>
-          <h2 className="text-xl font-bold">
-            {distance.toFixed(2)} <span className="text-sm">km</span>
+        <div className="flex flex-col items-center">
+          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1 flex items-center gap-1">
+            <MapPin size={12} /> Distância
+          </p>
+          <h2 className="text-2xl font-black text-white">
+            {distance.toFixed(2)} <span className="text-xs font-normal text-slate-400">km</span>
           </h2>
         </div>
 
         {/* Tempo */}
-        <div>
-          <p className="text-xs text-slate-400 uppercase">Tempo</p>
-          <h2 className="text-xl font-bold">{formatTime(time)}</h2>
+        <div className="flex flex-col items-center">
+          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1 flex items-center gap-1">
+            <Timer size={12} /> Tempo
+          </p>
+          <h2 className="text-2xl font-black text-white">{formatTime(time)}</h2>
         </div>
 
         {/* Pace */}
-        <div>
-          <p className="text-xs text-slate-400 uppercase">Ritmo</p>
-          <h2 className="text-xl font-bold">
-            {pace} <span className="text-sm">/km</span>
+        <div className="flex flex-col items-center">
+          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1 flex items-center gap-1">
+            <Zap size={12} /> Ritmo
+          </p>
+          <h2 className="text-2xl font-black text-white">
+            {pace} <span className="text-xs font-normal text-slate-400">/km</span>
+          </h2>
+        </div>
+
+        {/* Velocidade (NOVO) */}
+        <div className="flex flex-col items-center">
+          <p className="text-[10px] text-emerald-500 uppercase font-bold tracking-widest mb-1 flex items-center gap-1">
+            <Gauge size={12} /> Velocidade
+          </p>
+          <h2 className="text-2xl font-black text-emerald-400">
+            {currentSpeed.toFixed(1)} <span className="text-xs font-normal text-emerald-600">km/h</span>
           </h2>
         </div>
       </div>
 
       {/* 🎮 CONTROLES */}
-      <div className="flex justify-center gap-4">
+      <div className="flex justify-center items-center gap-6">
         
-        {/* Start / Pause */}
+        {/* Reset */}
+        <button
+          onClick={resetTracking}
+          className="p-4 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-500 transition-all rounded-full border border-slate-700"
+          title="Reiniciar"
+        >
+          <RotateCcw size={20} />
+        </button>
+
+        {/* Start / Pause principal */}
         {!isActive ? (
           <button
             onClick={startTracking}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 transition px-6 py-3 rounded-full font-semibold shadow-lg"
+            className="flex items-center gap-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all px-10 py-4 rounded-2xl font-black shadow-[0_0_20px_rgba(16,185,129,0.4)] uppercase tracking-tighter"
           >
-            <Play size={18} />
+            <Play size={24} fill="currentColor" />
             Iniciar
           </button>
         ) : (
           <button
             onClick={pauseTracking}
-            className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 transition px-6 py-3 rounded-full font-semibold shadow-lg"
+            className="flex items-center gap-3 bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all px-10 py-4 rounded-2xl font-black shadow-[0_0_20px_rgba(245,158,11,0.4)] uppercase tracking-tighter"
           >
-            <Pause size={18} />
+            <Pause size={24} fill="currentColor" />
             Pausar
           </button>
         )}
 
-        {/* Reset */}
-        <button
-          onClick={resetTracking}
-          className="flex items-center gap-2 bg-red-500 hover:bg-red-600 transition px-5 py-3 rounded-full font-semibold shadow-lg"
-        >
-          <RotateCcw size={18} />
-          Reset
-        </button>
+        {/* Espaço vazio para equilibrar o layout ou botão de settings futuro */}
+        <div className="w-[52px]" /> 
       </div>
     </div>
   );

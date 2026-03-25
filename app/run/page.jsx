@@ -22,13 +22,18 @@ export default function RunPage() {
   }, [tracker.positions]);
 
   return (
-    <div className="h-screen w-full relative">
-      <MapContainer
-        positions={tracker.positions}
-        currentPosition={currentPosition}
-      />
+    <div className="h-screen w-full relative bg-black">
 
-      <div className="absolute bottom-10 left-0 right-0 px-4">
+      {/* 🗺️ MAPA */}
+      <div className="absolute inset-0 z-0">
+        <MapContainer
+          positions={tracker.positions}
+          currentPosition={currentPosition}
+        />
+      </div>
+
+      {/* 🎮 UI FIXA */}
+      <div className="absolute bottom-6 left-0 right-0 px-4 z-20">
         <RunTracker {...tracker} />
       </div>
     </div>

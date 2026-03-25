@@ -10,71 +10,105 @@ export default function MapContainer({ positions, currentPosition }) {
   const polylineRef = useRef(null);
   const mapContainerRef = useRef(null);
 
-  // 🧭 Ícone dinâmico (seta girando)
+  // 🧭 Ícone de Seta customizado com transição CSS
   const createIcon = (rotation = 0) =>
     L.divIcon({
       html: `
         <div style="
           transform: rotate(${rotation}deg);
-          transition: transform 0.2s linear;
+          transition: transform 0.3s ease-out;
+          display: flex;
+          justify-content: center;
+          align-items: center;
         ">
           <div style="
             width: 0;
             height: 0;
             border-left: 10px solid transparent;
             border-right: 10px solid transparent;
-            border-bottom: 20px solid #10b981;
+            border-bottom: 20px solid #00ff9f;
+            filter: drop-shadow(0 0 5px rgba(0, 255, 159, 0.5));
           "></div>
         </div>
       `,
       className: "",
       iconSize: [20, 20],
+      iconAnchor: [10, 10], // Centraliza o ícone no ponto exato
     });
 
-  // 🗺️ INIT MAP
+  // 🗺️ Inicializa o Mapa (Rodado apenas uma vez)
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current || !currentPosition) return;
+    if (!mapContainerRef.current || mapRef.current) return;
 
+    // Configuração inicial do mapa
     mapRef.current = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: false,
-    }).setView([currentPosition.lat, currentPosition.lng], 17);
+    }).setView([-15.78, -47.92], 13);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(mapRef.current);
-
-    polylineRef.current = L.polyline([], {
-      color: "#10b981",
-      weight: 5,
-    }).addTo(mapRef.current);
-
-    markerRef.current = L.marker(
-      [currentPosition.lat, currentPosition.lng],
-      { icon: createIcon(0) }
+    // 🌙 TileLayer Dark (CartoDB é excelente para apps escuros)
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      { maxZoom: 20 }
     ).addTo(mapRef.current);
 
-  }, [currentPosition]);
+    // Inicializa a linha do trajeto (vazia)
+    polylineRef.current = L.polyline([], {
+      color: "#00ff9f",
+      weight: 5,
+      opacity: 0.8,
+      lineJoin: "round",
+    }).addTo(mapRef.current);
 
-  // 📍 ATUALIZA POSIÇÃO + ROTAÇÃO
+    // Cleanup ao desmontar o componente
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  // 📍 Atualiza Posição e Câmera (Efeito Suave)
   useEffect(() => {
     if (!mapRef.current || !currentPosition) return;
 
     const { lat, lng, heading = 0 } = currentPosition;
+    const latlng = [lat, lng];
 
-    const newLatLng = [lat, lng];
-
-    mapRef.current.panTo(newLatLng, {
-      animate: true,
-      duration: 1,
+    // 🔍 Movimentação suave da câmera
+    mapRef.current.flyTo(latlng, 17, {
+      duration: 1.5,
+      easeLinearity: 0.25,
     });
 
-    if (markerRef.current) {
-      markerRef.current.setLatLng(newLatLng);
-      markerRef.current.setIcon(createIcon(heading));
-    }
+    if (!markerRef.current) {
+      // Cria o marcador se não existir
+      markerRef.current = L.marker(latlng, {
+        icon: createIcon(heading),
+      }).addTo(mapRef.current);
+      // Armazena a rotação atual para suavização futura
+      markerRef.current.options.currentHeading = heading;
+    } else {
+      // Atualiza posição do marcador
+      markerRef.current.setLatLng(latlng);
 
+      // 🧭 Lógica de rotação suave do ícone
+      const prevRotation = markerRef.current.options.currentHeading || 0;
+      
+      // Filtro simples para evitar que a seta gire 360 graus loucamente
+      let diff = heading - prevRotation;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      
+      const smoothRotation = prevRotation + diff;
+
+      markerRef.current.setIcon(createIcon(smoothRotation));
+      markerRef.current.options.currentHeading = smoothRotation;
+    }
   }, [currentPosition]);
 
-  // 📏 LINHA DO TRAJETO
+  // 📏 Atualiza o Trajeto (Polyline)
   useEffect(() => {
     if (!polylineRef.current || !positions?.length) return;
 
@@ -83,8 +117,11 @@ export default function MapContainer({ positions, currentPosition }) {
   }, [positions]);
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative z-0 bg-slate-900">
       <div ref={mapContainerRef} className="w-full h-full" />
+      
+      {/* Overlay opcional para garantir que o mapa pareça integrado ao app */}
+      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] z-[400]" />
     </div>
   );
 }
