@@ -1,85 +1,90 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-const icon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
-
-const MapContainer = ({ positions, currentPosition }) => {
-  const mapContainerRef = useRef(null);
+export default function MapContainer({ positions, currentPosition }) {
   const mapRef = useRef(null);
-  const polylineRef = useRef(null);
   const markerRef = useRef(null);
+  const polylineRef = useRef(null);
+  const mapContainerRef = useRef(null);
 
+  // 🧭 Ícone dinâmico (seta girando)
+  const createIcon = (rotation = 0) =>
+    L.divIcon({
+      html: `
+        <div style="
+          transform: rotate(${rotation}deg);
+          transition: transform 0.2s linear;
+        ">
+          <div style="
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid #10b981;
+          "></div>
+        </div>
+      `,
+      className: "",
+      iconSize: [20, 20],
+    });
+
+  // 🗺️ INIT MAP
   useEffect(() => {
-    if (mapContainerRef.current && !mapRef.current) {
-      const startPoint = currentPosition || { lat: -15.7801, lng: -47.9292 };
+    if (!mapContainerRef.current || mapRef.current || !currentPosition) return;
 
-      mapRef.current = L.map(mapContainerRef.current, {
-        zoomControl: false,
-        attributionControl: false,
-      }).setView([startPoint.lat, startPoint.lng], 16);
+    mapRef.current = L.map(mapContainerRef.current, {
+      zoomControl: false,
+      attributionControl: false,
+    }).setView([currentPosition.lat, currentPosition.lng], 17);
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        crossOrigin: true
-      }).addTo(mapRef.current);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(mapRef.current);
 
-      L.control.zoom({ position: 'bottomright' }).addTo(mapRef.current);
+    polylineRef.current = L.polyline([], {
+      color: "#10b981",
+      weight: 5,
+    }).addTo(mapRef.current);
 
-      polylineRef.current = L.polyline([], { 
-        color: "#10b981", 
-        weight: 5, 
-        opacity: 0.8,
-        smoothFactor: 1 
-      }).addTo(mapRef.current);
+    markerRef.current = L.marker(
+      [currentPosition.lat, currentPosition.lng],
+      { icon: createIcon(0) }
+    ).addTo(mapRef.current);
 
-      if (currentPosition) {
-        markerRef.current = L.marker([currentPosition.lat, currentPosition.lng], { icon })
-          .addTo(mapRef.current);
-      }
-    }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (mapRef.current && polylineRef.current && positions.length > 0) {
-      const latLngs = positions.map(pos => [pos.lat, pos.lng]);
-      polylineRef.current.setLatLngs(latLngs);
-    }
-  }, [positions]);
-
-  useEffect(() => {
-    if (mapRef.current && currentPosition) {
-      const newLatLng = [currentPosition.lat, currentPosition.lng];
-      mapRef.current.panTo(newLatLng, { animate: true, duration: 1.5 });
-
-      if (markerRef.current) {
-        markerRef.current.setLatLng(newLatLng);
-      } else {
-        markerRef.current = L.marker(newLatLng, { icon }).addTo(mapRef.current);
-      }
-    }
   }, [currentPosition]);
 
+  // 📍 ATUALIZA POSIÇÃO + ROTAÇÃO
+  useEffect(() => {
+    if (!mapRef.current || !currentPosition) return;
+
+    const { lat, lng, heading = 0 } = currentPosition;
+
+    const newLatLng = [lat, lng];
+
+    mapRef.current.panTo(newLatLng, {
+      animate: true,
+      duration: 1,
+    });
+
+    if (markerRef.current) {
+      markerRef.current.setLatLng(newLatLng);
+      markerRef.current.setIcon(createIcon(heading));
+    }
+
+  }, [currentPosition]);
+
+  // 📏 LINHA DO TRAJETO
+  useEffect(() => {
+    if (!polylineRef.current || !positions?.length) return;
+
+    const latLngs = positions.map((p) => [p.lat, p.lng]);
+    polylineRef.current.setLatLngs(latLngs);
+  }, [positions]);
+
   return (
-    <div className="w-full h-full relative rounded-2xl overflow-hidden border border-slate-700 shadow-inner bg-slate-800">
-      <div ref={mapContainerRef} className="w-full h-full z-0" />
-      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/80 to-transparent z-10 pointer-events-none" />
+    <div className="w-full h-full">
+      <div ref={mapContainerRef} className="w-full h-full" />
     </div>
   );
-};
-
-export default MapContainer;
+}

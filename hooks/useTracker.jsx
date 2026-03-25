@@ -5,15 +5,35 @@ import { getDistance } from "@/utils/haversine";
 
 export function useTracker() {
   const [isActive, setIsActive] = useState(false);
-  const [distance, setDistance] = useState(0); 
-  const [time, setTime] = useState(0); 
-  
-  // No JS puro, iniciamos o useRef apenas com o valor inicial (null ou array vazio)
+  const [distance, setDistance] = useState(0);
+  const [time, setTime] = useState(0);
+
   const positionsRef = useRef([]);
   const watchId = useRef(null);
   const timerId = useRef(null);
 
-  // ⏱️ Lógica do Cronômetro
+  // 📍 PEGA LOCALIZAÇÃO INICIAL AUTOMÁTICA
+  useEffect(() => {
+    if (!("geolocation" in navigator)) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+
+        positionsRef.current = [
+          {
+            lat: latitude,
+            lng: longitude,
+            timestamp: Date.now(),
+          },
+        ];
+      },
+      (err) => console.log(err),
+      { enableHighAccuracy: true }
+    );
+  }, []);
+
+  // ⏱️ TIMER
   useEffect(() => {
     if (isActive) {
       timerId.current = setInterval(() => {
@@ -23,54 +43,88 @@ export function useTracker() {
       if (timerId.current) clearInterval(timerId.current);
     }
 
-    return () => {
-      if (timerId.current) clearInterval(timerId.current);
-    };
+    return () => clearInterval(timerId.current);
   }, [isActive]);
 
-  // 📍 Lógica do GPS
+  // 🧭 CALCULAR DIREÇÃO (bearing)
+  const getBearing = (lat1, lng1, lat2, lng2) => {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const toDeg = (rad) => (rad * 180) / Math.PI;
+
+    const dLng = toRad(lng2 - lng1);
+
+    const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+    const x =
+      Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+      Math.sin(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.cos(dLng);
+
+    const brng = Math.atan2(y, x);
+    return (toDeg(brng) + 360) % 360;
+  };
+
+  // 📍 TRACKING
   const startTracking = useCallback(() => {
-    if (!("geolocation" in navigator)) {
-      alert("Geolocalização não suportada no seu navegador.");
-      return;
-    }
+    if (!("geolocation" in navigator)) return;
 
     setIsActive(true);
 
     watchId.current = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        const newPos = { lat: latitude, lng: longitude, timestamp: Date.now() };
 
-        const lastPos = positionsRef.current[positionsRef.current.length - 1];
+        const lastPos =
+          positionsRef.current[positionsRef.current.length - 1];
+
+        let heading = 0;
 
         if (lastPos) {
-          const newDist = getDistance(lastPos.lat, lastPos.lng, latitude, longitude);
-          
-          // Anti-ruído: só conta se houver deslocamento real (> 3 metros)
-          if (newDist > 0.003) { 
-            setDistance((prev) => prev + newDist);
-            positionsRef.current.push(newPos);
+          heading = getBearing(
+            lastPos.lat,
+            lastPos.lng,
+            latitude,
+            longitude
+          );
+
+          const dist = getDistance(
+            lastPos.lat,
+            lastPos.lng,
+            latitude,
+            longitude
+          );
+
+          if (dist > 0.003) {
+            setDistance((prev) => prev + dist);
+            positionsRef.current.push({
+              lat: latitude,
+              lng: longitude,
+              timestamp: Date.now(),
+              heading,
+            });
           }
         } else {
-          // Primeira posição registrada
-          positionsRef.current.push(newPos);
+          positionsRef.current.push({
+            lat: latitude,
+            lng: longitude,
+            timestamp: Date.now(),
+            heading,
+          });
         }
       },
-      (error) => console.error("Erro no GPS:", error),
-      { 
-        enableHighAccuracy: true, 
-        maximumAge: 1000,         
-        timeout: 5000 
+      (err) => console.log(err),
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 5000,
       }
     );
   }, []);
 
   const pauseTracking = useCallback(() => {
     setIsActive(false);
-    if (watchId.current !== null) {
+    if (watchId.current) {
       navigator.geolocation.clearWatch(watchId.current);
-      watchId.current = null;
     }
   }, []);
 
@@ -81,17 +135,14 @@ export function useTracker() {
     positionsRef.current = [];
   }, [pauseTracking]);
 
-  // ⚡ Ritmo (Pace) em min/km
   const getPace = () => {
     if (distance <= 0 || time <= 0) return "0:00";
-    
-    const paceDecimal = (time / 60) / distance; 
-    const minutes = Math.floor(paceDecimal);
-    const seconds = Math.round((paceDecimal - minutes) * 60);
-    
-    if (minutes > 59) return "--:--"; 
-    
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    const pace = (time / 60) / distance;
+    const min = Math.floor(pace);
+    const sec = Math.round((pace - min) * 60);
+
+    return `${min}:${sec.toString().padStart(2, "0")}`;
   };
 
   return {
@@ -102,6 +153,6 @@ export function useTracker() {
     pauseTracking,
     resetTracking,
     pace: getPace(),
-    positions: positionsRef.current
+    positions: positionsRef.current,
   };
 }
