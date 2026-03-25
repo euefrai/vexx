@@ -27,7 +27,6 @@ export default function LabPage() {
   const progressoCal = Math.min((calorias / META_CALORIAS) * 100, 100)
   const progressoProt = Math.min((proteina / META_PROTEINA) * 100, 100)
 
-  // 🤖 IA OFFLINE (AGORA CORRETA)
   function getMensagem() {
     if (progressoProt >= 100) return "🔥 Shape batido hoje. Monstro."
     if (progressoProt >= 70) return "💪 Tá no caminho. Continua."
@@ -35,7 +34,16 @@ export default function LabPage() {
     return "💀 Tá fraco hoje..."
   }
 
+  // 🚀 RUN ADICIONADO NO TOPO
   const tools = [
+    {
+      nome: "RUN",
+      desc: "Corrida em tempo real (GPS)",
+      icon: "🏃‍♂️",
+      link: "/run",
+      cor: "border-emerald-500/40"
+    },
+
     { nome: "CRONÔMETRO", desc: "Tempo Total de Treino", icon: "⏱️", link: "/lab/cronometro", cor: "border-blue-500/30" },
     { nome: "DESCANSO", desc: "Timer de Intervalo", icon: "⏳", link: "/lab/descanso", cor: "border-orange-500/30" },
     { nome: "MEDIR IMC", desc: "Índice de Massa Corporal", icon: "⚖️", link: "/lab/imc", cor: "border-green-500/30" },
@@ -111,6 +119,13 @@ export default function LabPage() {
             <Link href={tool.link}>
               <div className={`group relative bg-zinc-900/40 border ${tool.cor} p-5 rounded-[2.5rem] hover:bg-zinc-800/60 transition-all active:scale-95 h-full flex flex-col justify-between overflow-hidden`}>
                 
+                {/* 🔥 BADGE LIVE NO RUN */}
+                {tool.nome === "RUN" && (
+                  <span className="absolute top-2 right-3 text-[8px] bg-emerald-500 text-black px-2 py-[2px] rounded-full font-black animate-pulse">
+                    LIVE
+                  </span>
+                )}
+
                 <div className="absolute -right-4 -top-4 w-12 h-12 bg-white/5 blur-2xl group-hover:bg-green-500/10 transition-colors"></div>
                 
                 <div>
