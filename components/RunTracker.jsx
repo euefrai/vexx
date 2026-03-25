@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Play, Pause, RotateCcw, Zap, Timer, MapPin, Gauge } from "lucide-react";
+import RunChart from "./RunChart"; // 🧩 Importando o gráfico
 
 function formatTime(seconds) {
   const hrs = Math.floor(seconds / 3600);
@@ -22,7 +23,7 @@ export default function RunTracker({
   distance,
   time,
   pace,
-  positions = [], // Garantindo que inicie como array vazio
+  positions = [],
   startTracking,
   pauseTracking,
   resetTracking,
@@ -35,10 +36,10 @@ export default function RunTracker({
       : 0;
 
   return (
-    <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-6 shadow-2xl w-full max-w-2xl mx-auto">
+    <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-6 shadow-2xl w-full max-w-2xl mx-auto space-y-8">
       
       {/* 📊 MÉTRICAS - Grid de 4 Colunas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
         
         {/* Distância */}
         <div className="flex flex-col items-center">
@@ -68,7 +69,7 @@ export default function RunTracker({
           </h2>
         </div>
 
-        {/* Velocidade (NOVO) */}
+        {/* Velocidade */}
         <div className="flex flex-col items-center">
           <p className="text-[10px] text-emerald-500 uppercase font-bold tracking-widest mb-1 flex items-center gap-1">
             <Gauge size={12} /> Velocidade
@@ -79,8 +80,13 @@ export default function RunTracker({
         </div>
       </div>
 
+      {/* 🧩 GRÁFICO DE PERFORMANCE (Aparece quando há dados) */}
+      <div className="pt-2">
+        <RunChart positions={positions} />
+      </div>
+
       {/* 🎮 CONTROLES */}
-      <div className="flex justify-center items-center gap-6">
+      <div className="flex justify-center items-center gap-6 pt-2">
         
         {/* Reset */}
         <button
@@ -110,7 +116,7 @@ export default function RunTracker({
           </button>
         )}
 
-        {/* Espaço vazio para equilibrar o layout ou botão de settings futuro */}
+        {/* Espaço para simetria */}
         <div className="w-[52px]" /> 
       </div>
     </div>

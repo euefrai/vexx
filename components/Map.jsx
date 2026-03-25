@@ -9,8 +9,11 @@ export default function MapContainer({ positions, currentPosition }) {
   const markerRef = useRef(null);
   const polylineRef = useRef(null);
   const mapContainerRef = useRef(null);
+  
+  const animatedPathRef = useRef([]);
+  const animationFrameRef = useRef(null);
 
-  // 🧭 Ícone de Seta customizado com transição CSS
+  // 🧭 Ícone de Seta customizado
   const createIcon = (rotation = 0) =>
     L.divIcon({
       html: `
@@ -27,101 +30,118 @@ export default function MapContainer({ positions, currentPosition }) {
             border-left: 10px solid transparent;
             border-right: 10px solid transparent;
             border-bottom: 20px solid #00ff9f;
-            filter: drop-shadow(0 0 5px rgba(0, 255, 159, 0.5));
+            filter: drop-shadow(0 0 8px rgba(0, 255, 159, 0.6));
           "></div>
         </div>
       `,
       className: "",
       iconSize: [20, 20],
-      iconAnchor: [10, 10], // Centraliza o ícone no ponto exato
+      iconAnchor: [10, 10],
     });
 
-  // 🗺️ Inicializa o Mapa (Rodado apenas uma vez)
+  // 🗺️ Inicialização do Mapa (Dark Mode + Configurações de Trajeto)
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    // Configuração inicial do mapa
     mapRef.current = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: false,
     }).setView([-15.78, -47.92], 13);
 
-    // 🌙 TileLayer Dark (CartoDB é excelente para apps escuros)
     L.tileLayer(
       "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
       { maxZoom: 20 }
     ).addTo(mapRef.current);
 
-    // Inicializa a linha do trajeto (vazia)
+    // ✅ Aplicando suas configurações de estilo aqui:
     polylineRef.current = L.polyline([], {
       color: "#00ff9f",
-      weight: 5,
-      opacity: 0.8,
+      weight: 6,      // Mais visível
+      opacity: 0.9,   // Quase sólido
       lineJoin: "round",
+      lineCap: "round",
     }).addTo(mapRef.current);
 
-    // Cleanup ao desmontar o componente
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      if (mapRef.current) mapRef.current.remove();
+      cancelAnimationFrame(animationFrameRef.current);
     };
   }, []);
 
-  // 📍 Atualiza Posição e Câmera (Efeito Suave)
+  // 📍 Atualiza Posição e Câmera
   useEffect(() => {
     if (!mapRef.current || !currentPosition) return;
 
     const { lat, lng, heading = 0 } = currentPosition;
     const latlng = [lat, lng];
 
-    // 🔍 Movimentação suave da câmera
     mapRef.current.flyTo(latlng, 17, {
       duration: 1.5,
       easeLinearity: 0.25,
     });
 
     if (!markerRef.current) {
-      // Cria o marcador se não existir
-      markerRef.current = L.marker(latlng, {
-        icon: createIcon(heading),
-      }).addTo(mapRef.current);
-      // Armazena a rotação atual para suavização futura
+      markerRef.current = L.marker(latlng, { icon: createIcon(heading) }).addTo(mapRef.current);
       markerRef.current.options.currentHeading = heading;
     } else {
-      // Atualiza posição do marcador
       markerRef.current.setLatLng(latlng);
-
-      // 🧭 Lógica de rotação suave do ícone
-      const prevRotation = markerRef.current.options.currentHeading || 0;
       
-      // Filtro simples para evitar que a seta gire 360 graus loucamente
+      const prevRotation = markerRef.current.options.currentHeading || 0;
       let diff = heading - prevRotation;
       if (diff > 180) diff -= 360;
       if (diff < -180) diff += 360;
       
       const smoothRotation = prevRotation + diff;
-
       markerRef.current.setIcon(createIcon(smoothRotation));
       markerRef.current.options.currentHeading = smoothRotation;
     }
   }, [currentPosition]);
 
-  // 📏 Atualiza o Trajeto (Polyline)
+  // 📏 Linha Animada com Prioridade
   useEffect(() => {
-    if (!polylineRef.current || !positions?.length) return;
+    if (!polylineRef.current || !positions || positions.length < 2) {
+        if (positions?.length === 1) {
+            const firstPoint = [positions[0].lat, positions[0].lng];
+            animatedPathRef.current = [firstPoint];
+            polylineRef.current.setLatLngs(animatedPathRef.current);
+        }
+        return;
+    }
 
-    const latLngs = positions.map((p) => [p.lat, p.lng]);
-    polylineRef.current.setLatLngs(latLngs);
+    const last = positions[positions.length - 1];
+    const prev = positions[positions.length - 2];
+    
+    let progress = 0;
+
+    function animate() {
+      progress += 0.05; 
+
+      if (progress >= 1) progress = 1;
+
+      const lat = prev.lat + (last.lat - prev.lat) * progress;
+      const lng = prev.lng + (last.lng - prev.lng) * progress;
+      const interpolatedPoint = [lat, lng];
+
+      const currentPath = [...animatedPathRef.current, interpolatedPoint];
+      polylineRef.current.setLatLngs(currentPath);
+
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        animatedPathRef.current.push([last.lat, last.lng]);
+      }
+    }
+
+    cancelAnimationFrame(animationFrameRef.current);
+    animate();
+
   }, [positions]);
 
   return (
-    <div className="w-full h-full relative z-0 bg-slate-900">
+    <div className="w-full h-full relative z-0 bg-slate-900 overflow-hidden">
       <div ref={mapContainerRef} className="w-full h-full" />
-      
-      {/* Overlay opcional para garantir que o mapa pareça integrado ao app */}
-      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] z-[400]" />
+      {/* Vinheta Dark para acabamento Premium */}
+      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.7)] z-[400]" />
     </div>
   );
 }
