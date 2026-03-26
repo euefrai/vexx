@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getRoute } from "@/utils/getRoute"; // 🧠 Importação da utilidade de rota
+import { getRoute } from "@/utils/getRoute";
 
-export default function MapContainer({ positions, currentPosition }) {
+export default function MapContainer({ positions, currentPosition, destination }) {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const polylineRef = useRef(null);
-  const routeRef = useRef(null); // 🛣️ Ref para a rota de destino
+  const routeRef = useRef(null);
   const mapContainerRef = useRef(null);
+  const LRef = useRef(null);
 
-  // 🧭 Ícone de Seta
-  const createIcon = (rotation = 0) =>
+  // 🧭 Função auxiliar para ícone (agora recebe L como argumento)
+  const createIcon = (L, rotation = 0) =>
     L.divIcon({
       html: `
         <div style="transform: rotate(${rotation}deg); transition: transform 0.3s ease-out; display: flex; justify-content: center; align-items: center;">
@@ -25,97 +25,98 @@ export default function MapContainer({ positions, currentPosition }) {
       iconAnchor: [10, 10],
     });
 
-  // 1. 🗺️ Inicializa o Mapa
+  // 1. 🗺️ Inicializa o Mapa (Build-Safe + Correção de Tela Preta)
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    mapRef.current = L.map(mapContainerRef.current, {
-      zoomControl: false,
-      attributionControl: false,
-    }).setView([-15.78, -47.92], 13);
+    import("leaflet").then((L) => {
+      LRef.current = L;
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { 
-      maxZoom: 20 
-    }).addTo(mapRef.current);
+      mapRef.current = L.map(mapContainerRef.current, {
+        zoomControl: false,
+        attributionControl: false,
+      }).setView([-15.78, -47.92], 13);
 
-    // Rastro da Corrida (Verde Neon)
-    polylineRef.current = L.polyline([], {
-      color: "#00ff9f",
-      weight: 6,
-      opacity: 0.9,
-      lineCap: "round",
-      lineJoin: "round",
-    }).addTo(mapRef.current);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { 
+        maxZoom: 20 
+      }).addTo(mapRef.current);
+
+      // 🔥 Força o Leaflet a reconhecer o tamanho do container após o render
+      setTimeout(() => {
+        if (mapRef.current) mapRef.current.invalidateSize();
+      }, 200);
+
+      // Rastro da Corrida (Verde Neon)
+      polylineRef.current = L.polyline([], {
+        color: "#00ff9f",
+        weight: 6,
+        opacity: 0.9,
+        lineCap: "round",
+        lineJoin: "round",
+      }).addTo(mapRef.current);
+    });
 
     return () => {
       if (mapRef.current) mapRef.current.remove();
     };
   }, []);
 
-  // 2. 🔥 DETECTAR CLIQUE PARA DEFINIR DESTINO
+  // 2. 🛣️ ROTA AUTOMÁTICA (Destino via SearchBox ou Clique)
   useEffect(() => {
-    if (!mapRef.current) return;
+    const L = LRef.current;
+    if (!mapRef.current || !currentPosition || !destination || !L) return;
 
-    const handleMapClick = async (e) => {
-      if (!currentPosition) {
-        console.warn("Aguardando posição atual para traçar rota...");
-        return;
-      }
-
-      const destination = {
-        lat: e.latlng.lat,
-        lng: e.latlng.lng,
-      };
-
+    async function drawRoute() {
       try {
-        // Busca a rota entre a posição atual e o clique
         const route = await getRoute(currentPosition, destination);
+        if (!route || route.length === 0) return;
 
-        // Remove a rota anterior se existir
         if (routeRef.current) {
           mapRef.current.removeLayer(routeRef.current);
         }
 
-        // Desenha a nova rota (Azul para diferenciar do rastro verde)
         routeRef.current = L.polyline(route, {
-          color: "#3b82f6", // Azul vibrante
-          weight: 5,
-          dashArray: "10, 10", // Opcional: linha pontilhada para indicar "guia"
-          opacity: 0.7,
+          color: "#00e0ff",
+          weight: 6,
+          opacity: 0.9,
+          lineCap: "round",
+          lineJoin: "round",
+          className: "route-glow"
         }).addTo(mapRef.current);
 
+        const bounds = L.latLngBounds([
+          [currentPosition.lat, currentPosition.lng],
+          [destination.lat, destination.lng]
+        ]);
+        mapRef.current.fitBounds(bounds, { padding: [50, 50] });
       } catch (error) {
-        console.error("Erro ao buscar rota:", error);
+        console.error("Erro ao traçar rota:", error);
       }
-    };
+    }
 
-    mapRef.current.on("click", handleMapClick);
+    drawRoute();
+  }, [destination, currentPosition]);
 
-    // Cleanup do evento de clique
-    return () => {
-      if (mapRef.current) mapRef.current.off("click", handleMapClick);
-    };
-  }, [currentPosition]); // Recarrega se a posição mudar para manter a lógica atualizada
-
-  // 3. 📍 Atualiza Posição e Câmera
+  // 3. 📍 Atualiza Posição e Marcador
   useEffect(() => {
-    if (!mapRef.current || !currentPosition) return;
+    const L = LRef.current;
+    if (!mapRef.current || !currentPosition || !L) return;
 
     const { lat, lng, heading = 0 } = currentPosition;
     const latlng = [lat, lng];
 
-    mapRef.current.flyTo(latlng, 17, {
-      duration: 1.5,
-      easeLinearity: 0.25,
-    });
+    // Só foca automaticamente se não estiver visualizando uma rota
+    if (!destination) {
+      mapRef.current.flyTo(latlng, 17, { duration: 1.5 });
+    }
 
     if (!markerRef.current) {
-      markerRef.current = L.marker(latlng, { icon: createIcon(heading) }).addTo(mapRef.current);
+      markerRef.current = L.marker(latlng, { icon: createIcon(L, heading) }).addTo(mapRef.current);
     } else {
       markerRef.current.setLatLng(latlng);
-      markerRef.current.setIcon(createIcon(heading));
+      markerRef.current.setIcon(createIcon(L, heading));
     }
-  }, [currentPosition]);
+  }, [currentPosition, destination]);
 
   // 4. 📏 Atualiza o Rastro da Corrida
   useEffect(() => {
@@ -125,8 +126,13 @@ export default function MapContainer({ positions, currentPosition }) {
   }, [positions]);
 
   return (
-    <div className="w-full h-full relative z-0 bg-slate-900 overflow-hidden">
-      <div ref={mapContainerRef} className="w-full h-full" />
+    <div className="w-full h-screen relative z-0 bg-slate-900 overflow-hidden">
+      <div 
+        ref={mapContainerRef} 
+        className="w-full h-full" 
+        style={{ minHeight: '100vh', background: '#0f172a' }} 
+      />
+      {/* Vinheta Dark para acabamento Premium */}
       <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.7)] z-[400]" />
     </div>
   );
