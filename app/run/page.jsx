@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import L from "leaflet";
+// ❌ REMOVA: import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getRoute } from "@/utils/getRoute";
 
@@ -11,9 +11,41 @@ export default function MapContainer({ positions, currentPosition, destination }
   const polylineRef = useRef(null);
   const routeRef = useRef(null);
   const mapContainerRef = useRef(null);
+  const LRef = useRef(null); // Guardar a instância do Leaflet
 
-  // 🧭 Ícone de Seta
-  const createIcon = (rotation = 0) =>
+  // 1. 🗺️ Inicializa o Mapa e carrega Leaflet
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    // Importa o Leaflet dinamicamente apenas no cliente
+    import("leaflet").then((L) => {
+      LRef.current = L; // Salva para usar nos outros effects
+
+      mapRef.current = L.map(mapContainerRef.current, {
+        zoomControl: false,
+        attributionControl: false,
+      }).setView([-15.78, -47.92], 13);
+
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { 
+        maxZoom: 20 
+      }).addTo(mapRef.current);
+
+      polylineRef.current = L.polyline([], {
+        color: "#00ff9f",
+        weight: 6,
+        opacity: 0.9,
+        lineCap: "round",
+        lineJoin: "round",
+      }).addTo(mapRef.current);
+    });
+
+    return () => {
+      if (mapRef.current) mapRef.current.remove();
+    };
+  }, []);
+
+  // 🧭 Função auxiliar atualizada para usar LRef
+  const createIcon = (L, rotation = 0) =>
     L.divIcon({
       html: `
         <div style="transform: rotate(${rotation}deg); transition: transform 0.3s ease-out; display: flex; justify-content: center; align-items: center;">
@@ -25,57 +57,26 @@ export default function MapContainer({ positions, currentPosition, destination }
       iconAnchor: [10, 10],
     });
 
-  // 1. 🗺️ Inicializa o Mapa
+  // 2. 🛣️ ROTA AUTOMÁTICA
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
-
-    mapRef.current = L.map(mapContainerRef.current, {
-      zoomControl: false,
-      attributionControl: false,
-    }).setView([-15.78, -47.92], 13);
-
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { 
-      maxZoom: 20 
-    }).addTo(mapRef.current);
-
-    // Rastro da Corrida (Verde Neon)
-    polylineRef.current = L.polyline([], {
-      color: "#00ff9f",
-      weight: 6,
-      opacity: 0.9,
-      lineCap: "round",
-      lineJoin: "round",
-    }).addTo(mapRef.current);
-
-    return () => {
-      if (mapRef.current) mapRef.current.remove();
-    };
-  }, []);
-
-  // 2. 🛣️ ROTA AUTOMÁTICA (Baseada no SearchBox)
-  useEffect(() => {
-    if (!mapRef.current || !currentPosition || !destination) return;
+    const L = LRef.current;
+    if (!mapRef.current || !currentPosition || !destination || !L) return;
 
     async function drawRoute() {
       const route = await getRoute(currentPosition, destination);
-
       if (!route || route.length === 0) return;
 
-      if (routeRef.current) {
-        mapRef.current.removeLayer(routeRef.current);
-      }
+      if (routeRef.current) mapRef.current.removeLayer(routeRef.current);
 
-      // Desenha a rota azul com o efeito de brilho CSS
       routeRef.current = L.polyline(route, {
         color: "#00e0ff",
         weight: 6,
         opacity: 0.9,
         lineCap: "round",
         lineJoin: "round",
-        className: "route-glow" // Ativa o filtro do globals.css
+        className: "route-glow"
       }).addTo(mapRef.current);
 
-      // Opcional: Ajusta o zoom para mostrar a rota inteira ao selecionar
       const bounds = L.latLngBounds([
         [currentPosition.lat, currentPosition.lng],
         [destination.lat, destination.lng]
@@ -88,21 +89,21 @@ export default function MapContainer({ positions, currentPosition, destination }
 
   // 3. 📍 Atualiza Posição do Usuário
   useEffect(() => {
-    if (!mapRef.current || !currentPosition) return;
+    const L = LRef.current;
+    if (!mapRef.current || !currentPosition || !L) return;
 
     const { lat, lng, heading = 0 } = currentPosition;
     const latlng = [lat, lng];
 
-    // Se NÃO houver destino selecionado, mantém o foco no usuário
     if (!destination) {
       mapRef.current.flyTo(latlng, 17, { duration: 1.5 });
     }
 
     if (!markerRef.current) {
-      markerRef.current = L.marker(latlng, { icon: createIcon(heading) }).addTo(mapRef.current);
+      markerRef.current = L.marker(latlng, { icon: createIcon(L, heading) }).addTo(mapRef.current);
     } else {
       markerRef.current.setLatLng(latlng);
-      markerRef.current.setIcon(createIcon(heading));
+      markerRef.current.setIcon(createIcon(L, heading));
     }
   }, [currentPosition, destination]);
 
