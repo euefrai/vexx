@@ -28,7 +28,7 @@ export default function RunPage() {
       
       <div className="flex-1 flex flex-col lg:flex-row gap-0 overflow-hidden relative z-10">
         {/* 🗺️ MAPA - Ocupa 100% em mobile, 65% em desktop */}
-        <div className="flex-1 order-2 lg:order-1 relative w-full lg:w-3/5 h-1/2 lg:h-full bg-slate-900 shadow-2xl overflow-hidden">
+        <div className="flex-1 order-2 lg:order-1 relative w-full lg:w-3/5 h-auto lg:h-full bg-slate-900 shadow-2xl overflow-hidden" style={{ minHeight: 'clamp(200px, 50vh, 100%)' }}>
           <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-emerald-500/5 via-transparent to-blue-500/5" />
           <Map
             positions={positions}
@@ -38,21 +38,21 @@ export default function RunPage() {
         </div>
 
         {/* 📊 PAINEL DE CONTROLE - Ocupa 100% em mobile, 35% em desktop */}
-        <div className="order-1 lg:order-2 w-full lg:w-2/5 h-1/2 lg:h-full bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-t lg:border-t-0 lg:border-l border-slate-800/50 p-4 lg:p-6 flex flex-col justify-between overflow-y-auto">
+        <div className="order-1 lg:order-2 w-full lg:w-2/5 h-auto lg:h-full bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-t lg:border-t-0 lg:border-l border-slate-800/50 p-3 sm:p-4 lg:p-6 flex flex-col justify-between overflow-y-auto">
           
           {/* HEADER */}
-          <div className="text-center mb-6 pb-6 border-b border-slate-800/30">
-            <div className="flex items-center justify-center gap-3 mb-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-500/50 animate-pulse">
-                <span className="text-2xl">🏃</span>
+          <div className="text-center mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-slate-800/30">
+            <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-500/50 animate-pulse">
+                <span className="text-lg sm:text-2xl">🏃</span>
               </div>
-              <h1 className="text-3xl font-black bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">RUNNER</h1>
+              <h1 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">RUNNER</h1>
             </div>
-            <p className="text-xs text-slate-400 font-medium tracking-widest uppercase">Rastreador de Performance</p>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-medium tracking-widest uppercase">Rastreador de Performance</p>
           </div>
 
           {/* TRACKER COMPONENT */}
-          <div className="flex-1 flex items-center justify-center px-2">
+          <div className="flex-1 flex items-center justify-center px-0 sm:px-2 min-h-0">
             <RunTracker
               isActive={isActive}
               distance={distance}
@@ -66,7 +66,7 @@ export default function RunPage() {
           </div>
 
           {/* RODAPÉ COM DICAS */}
-          <div className="mt-6 pt-6 border-t border-slate-800/30 text-center">
+          <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-slate-800/30 text-center hidden sm:block">
             <p className="text-xs text-slate-500 leading-relaxed">
               💡 {isActive ? "Sua corrida está sendo rastreada em tempo real" : "Pressione INICIAR para começar o rastreamento"}
             </p>

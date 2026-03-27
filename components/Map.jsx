@@ -143,9 +143,9 @@ export default function MapContainer({ positions, currentPosition, destination }
       <div className="absolute inset-0 pointer-events-none border border-transparent group-hover:shadow-[inset_0_0_40px_rgba(0,255,159,0.1)] rounded-lg transition-shadow duration-300 z-[400]" />
       
       {/* Indicador de status */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-900/80 backdrop-blur px-4 py-2 rounded-full border border-slate-700/50 z-[401]">
+      <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-900/80 backdrop-blur px-3 py-2 rounded-full border border-slate-700/50 z-[401] text-xs sm:text-sm">
         <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-        <span className="text-xs text-slate-300 font-medium">GPS Ativo</span>
+        <span className="text-slate-300 font-medium">GPS Ativo</span>
       </div>
     </div>
   );

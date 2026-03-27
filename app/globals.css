@@ -24,3 +24,131 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ==================== ANIMAÇÕES CUSTOMIZADAS ==================== */
+
+@keyframes neon-glow {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(0, 255, 159, 0.7), 0 0 20px rgba(0, 255, 159, 0.4);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(0, 255, 159, 1), 0 0 30px rgba(0, 255, 159, 0.6);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 255, 159, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(0, 255, 159, 0.6);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-heavy {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes border-glow {
+  0%, 100% {
+    border-color: rgba(0, 255, 159, 0.3);
+    box-shadow: inset 0 0 20px rgba(0, 255, 159, 0.1);
+  }
+  50% {
+    border-color: rgba(0, 255, 159, 0.6);
+    box-shadow: inset 0 0 30px rgba(0, 255, 159, 0.2);
+  }
+}
+
+/* Classes utilitárias personalizadas */
+.neon-glow {
+  animation: neon-glow 2s ease-in-out infinite;
+}
+
+.glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.slide-up {
+  animation: slide-up 0.5s ease-out;
+}
+
+.pulse-heavy {
+  animation: pulse-heavy 1.5s ease-in-out infinite;
+}
+
+.border-glow {
+  animation: border-glow 2s ease-in-out infinite;
+}
+
+/* Suavidade para scrolls */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Melhor performance com GPU */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==================== ESTILO BRUTAL E INOVADOR ==================== */
+
+/* Cards com efeito glassmorphism agressivo */
+.card-brutal {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(100, 255, 159, 0.1);
+  border-radius: 1rem;
+  transition: all 0.3s ease;
+}
+
+.card-brutal:hover {
+  border-color: rgba(100, 255, 159, 0.4);
+  background: rgba(15, 23, 42, 0.8);
+  box-shadow: 0 0 30px rgba(0, 255, 159, 0.15);
+}
+
+/* ==================== SCROLLBAR CUSTOMIZADO ==================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.4);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #00ff9f, #00e0ff);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #00ffaa, #00f0ff);
+  box-shadow: 0 0 20px rgba(0, 255, 159, 0.5);
+}
+
+/* Firefox */
+* {
+  scrollbar-color: linear-gradient(to bottom, #00ff9f, #00e0ff) rgba(15, 23, 42, 0.4);
+  scrollbar-width: thin;
+}
