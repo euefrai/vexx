@@ -126,14 +126,27 @@ export default function MapContainer({ positions, currentPosition, destination }
   }, [positions]);
 
   return (
-    <div className="w-full h-screen relative z-0 bg-slate-900 overflow-hidden">
+    <div className="w-full h-full relative z-0 bg-slate-900 overflow-hidden group">
       <div 
         ref={mapContainerRef} 
-        className="w-full h-full" 
-        style={{ minHeight: '100vh', background: '#0f172a' }} 
+        className="w-full h-full transition-all duration-300" 
+        style={{ 
+          minHeight: '100vh', 
+          background: '#0f172a',
+        }} 
       />
+      
       {/* Vinheta Dark para acabamento Premium */}
       <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.7)] z-[400]" />
+      
+      {/* Orla com brilho neon */}
+      <div className="absolute inset-0 pointer-events-none border border-transparent group-hover:shadow-[inset_0_0_40px_rgba(0,255,159,0.1)] rounded-lg transition-shadow duration-300 z-[400]" />
+      
+      {/* Indicador de status */}
+      <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-900/80 backdrop-blur px-4 py-2 rounded-full border border-slate-700/50 z-[401]">
+        <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+        <span className="text-xs text-slate-300 font-medium">GPS Ativo</span>
+      </div>
     </div>
   );
 }

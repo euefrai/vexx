@@ -7,6 +7,7 @@ export function useTracker() {
   const [isActive, setIsActive] = useState(false);
   const [distance, setDistance] = useState(0); // km
   const [time, setTime] = useState(0); // segundos
+  const [currentPosition, setCurrentPosition] = useState(null);
 
   const positionsRef = useRef([]);
   const watchId = useRef(null);
@@ -35,13 +36,15 @@ export function useTracker() {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         if (positionsRef.current.length === 0) {
-          positionsRef.current = [{
+          const initialPos = {
             lat: latitude,
             lng: longitude,
             timestamp: Date.now(),
             heading: 0,
             speed: 0
-          }];
+          };
+          positionsRef.current = [initialPos];
+          setCurrentPosition(initialPos);
         }
       },
       (err) => console.error("Erro na posição inicial:", err),
@@ -87,23 +90,27 @@ export function useTracker() {
           // Filtro anti-ruído (só registra se mover mais de 3 metros)
           if (dist > 0.003) {
             setDistance((prev) => prev + dist);
-            positionsRef.current.push({
+            const newPos = {
               lat: latitude,
               lng: longitude,
               timestamp: now,
               heading: heading,
               speed: velocity > 0 ? velocity : 0,
-            });
+            };
+            positionsRef.current.push(newPos);
+            setCurrentPosition(newPos);
           }
         } else {
           // Registro caso a lista esteja vazia
-          positionsRef.current.push({
+          const newPos = {
             lat: latitude,
             lng: longitude,
             timestamp: now,
             heading: 0,
             speed: 0,
-          });
+          };
+          positionsRef.current.push(newPos);
+          setCurrentPosition(newPos);
         }
       },
       (err) => console.error("Erro no watchPosition:", err),
@@ -148,5 +155,6 @@ export function useTracker() {
     resetTracking,
     pace: getPace(),
     positions: positionsRef.current,
+    currentPosition,
   };
 }
