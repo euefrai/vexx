@@ -1,13 +1,15 @@
 export async function getRoute(start, end) {
   try {
-    // Se não tiver API key, retorna uma rota simples (linha reta)
-    if (!process.env.NEXT_PUBLIC_ORS_KEY) {
-      console.warn("OpenRouteService API key não configurada, usando rota simples");
+    const key = (process.env.NEXT_PUBLIC_ORS_KEY || "").trim();
+    if (!key) {
+      console.warn("OpenRouteService API key ausente ou vazia, usando rota simples");
       return [
         [start.lat, start.lng],
         [end.lat, end.lng],
       ];
     }
+
+    console.debug("OpenRouteService key presente. Usando rota via API.");
 
     const res = await fetch(
       "https://api.openrouteservice.org/v2/directions/foot-walking",
@@ -27,7 +29,11 @@ export async function getRoute(start, end) {
     );
 
     if (!res.ok) {
-      console.error("Erro na API de Rota:", res.statusText);
+      const texto = await res.text().catch(() => "sem corpo");
+      console.error("Erro na API de Rota:", res.status, res.statusText, texto);
+      if (res.status === 401 || res.status === 403) {
+        console.warn("OpenRouteService key inválida ou sem permissão (401/403)");
+      }
       // Fallback: rota simples
       return [
         [start.lat, start.lng],

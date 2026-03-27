@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import Navbar from "@/components/Navbar"
+import PageHeader from "@/components/PageHeader"
 
 export default function ListaMensagens() {
   const [conversas, setConversas] = useState([])
@@ -67,11 +68,7 @@ export default function ListaMensagens() {
   return (
     <div className="min-h-screen bg-black text-white font-sans">
       <div className="max-w-md mx-auto p-4 pb-24">
-        
-        <div className="flex flex-col mb-6">
-          <h1 className="text-2xl font-black italic uppercase text-green-500 tracking-tighter">Mensagens</h1>
-          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Quartel General • Comunicações</p>
-        </div>
+        <PageHeader icon="💌" title="Mensagens" subtitle="Comunique-se direto com sua squad" color="blue" />
 
         {/* CARROSSEL DE QUEM EU SIGO */}
         {!loading && seguindo.length > 0 && (

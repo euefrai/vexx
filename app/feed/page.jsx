@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import TreinoCard from "@/components/TreinoCard"
+import PageHeader from "@/components/PageHeader"
 import Navbar from "@/components/Navbar"
 import BotaoFlutuante from "@/components/BotaoFlutuante"
 import Link from "next/link"
@@ -127,6 +128,7 @@ export default function Feed() {
   return (
     <>
       <div className="max-w-md mx-auto p-4 pb-24 min-h-screen bg-black font-sans text-white">
+        <PageHeader icon="🏠" title="Feed" subtitle="Acompanhe os treinos da sua squad" color="green" />
         
         {/* HEADER */}
         <div className="flex justify-between items-center mb-8 mt-4">

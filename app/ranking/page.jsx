@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import Navbar from "@/components/Navbar"
+import PageHeader from "@/components/PageHeader"
 
 export default function Ranking() {
   const [usuarios, setUsuarios] = useState([])
@@ -92,14 +93,7 @@ export default function Ranking() {
 
   return (
     <div className="max-w-md mx-auto p-4 pb-24 min-h-screen bg-black text-white font-sans">
-      <header className="py-6 flex flex-col items-center">
-        <div className="bg-green-500/10 p-3 rounded-full mb-3 border border-green-500/20">
-          <span className="text-2xl">🏆</span>
-        </div>
-        <h1 className="text-white text-2xl font-black italic uppercase tracking-tighter">
-          Hall da <span className="text-green-500">Elite</span>
-        </h1>
-      </header>
+      <PageHeader icon="🏆" title="Ranking" subtitle="Os elite squads do VEXX" color="orange" />
 
       {/* TABS */}
       <div className="flex bg-zinc-900/50 p-1.5 rounded-[2rem] mb-8 border border-zinc-800 backdrop-blur-sm">

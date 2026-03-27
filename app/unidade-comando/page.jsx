@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
 import Navbar from "@/components/Navbar"
+import PageHeader from "@/components/PageHeader"
 
 export default function UnidadeComando() {
   const [chat, setChat] = useState([])
@@ -65,6 +66,7 @@ export default function UnidadeComando() {
 
   return (
     <div className="min-h-screen bg-black text-white p-4 pb-32">
+      <PageHeader icon="🛰️" title="Unidade de Comando" subtitle="Inteligência de campo em tempo real" color="blue" />
       <header className="flex justify-between items-center mt-6 mb-10 max-w-md mx-auto">
         <button onClick={limparMemoria} className="text-[8px] text-zinc-600 font-black border border-zinc-900 p-2 rounded-lg uppercase hover:bg-zinc-900">Reset Log</button>
         <div className="text-center">

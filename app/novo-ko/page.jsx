@@ -4,6 +4,7 @@ import { useState } from "react" // Adicione esta linha!
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
+import PageHeader from "@/components/PageHeader"
 
 export default function NovoKO() {
   const router = useRouter()
@@ -69,6 +70,8 @@ export default function NovoKO() {
   return (
     <>
       <div className="max-w-md mx-auto p-6 pb-24 text-white min-h-screen bg-black">
+        <PageHeader icon="🎥" title="Novo KO" subtitle="Compartilhe seu melhor momento" color="orange" />
+
         <h1 className="text-2xl font-black uppercase italic text-green-500 mb-8 tracking-tighter">Novo Nocaute 🥊</h1>
 
         <div className="flex flex-col gap-6">

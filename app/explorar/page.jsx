@@ -5,6 +5,7 @@ import Link from "next/link"
 import Navbar from "@/components/Navbar"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
+import PageHeader from "@/components/PageHeader"
 
 export default function Explorar() {
   const [busca, setBusca] = useState("")
@@ -57,14 +58,7 @@ export default function Explorar() {
 
   return (
     <div className="min-h-screen bg-black text-white p-4 pb-24">
-      <div className="flex flex-col mb-6">
-        <h1 className="text-2xl font-black italic uppercase text-green-500">
-          🔍 Explorar
-        </h1>
-        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
-          Encontre novos parceiros de treino
-        </p>
-      </div>
+      <PageHeader icon="🔍" title="Explorar" subtitle="Descubra novos usuários e tendências" color="purple" />
 
       <Link href="/ranking">
         <motion.div 
