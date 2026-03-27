@@ -30,25 +30,36 @@ export function useTracker() {
 
   // 📍 Pega localização inicial automática ao carregar
   useEffect(() => {
-    if (!("geolocation" in navigator)) return;
+    if (!("geolocation" in navigator)) {
+      console.error("Geolocation não disponível no navegador");
+      return;
+    }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords;
-        if (positionsRef.current.length === 0) {
-          const initialPos = {
-            lat: latitude,
-            lng: longitude,
-            timestamp: Date.now(),
-            heading: 0,
-            speed: 0
-          };
-          positionsRef.current = [initialPos];
-          setCurrentPosition(initialPos);
+        try {
+          const { latitude, longitude } = pos.coords;
+          if (positionsRef.current.length === 0) {
+            const initialPos = {
+              lat: latitude,
+              lng: longitude,
+              timestamp: Date.now(),
+              heading: 0,
+              speed: 0
+            };
+            positionsRef.current = [initialPos];
+            setCurrentPosition(initialPos);
+          }
+        } catch (error) {
+          console.error("Erro ao processar posição inicial:", error);
         }
       },
       (err) => console.error("Erro na posição inicial:", err),
-      { enableHighAccuracy: true }
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 0,
+      }
     );
   }, []);
 

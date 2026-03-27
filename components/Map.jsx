@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ZoomIn, ZoomOut, Navigation, Crosshair } from "lucide-react";
-import "leaflet/dist/leaflet.css";
+import { ZoomIn, ZoomOut, Navigation } from "lucide-react";
 import { getRoute } from "@/utils/getRoute";
 
-export default function MapContainer({ positions, currentPosition, destination, onDestinationSelect }) {
+// Importar CSS no useEffect para evitar problemas
+const MapContainer = ({ positions, currentPosition, destination, onDestinationSelect }) => {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const polylineRef = useRef(null);
@@ -14,6 +14,7 @@ export default function MapContainer({ positions, currentPosition, destination, 
   const mapContainerRef = useRef(null);
   const LRef = useRef(null);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [mapError, setMapError] = useState(false);
 
   // Ícone para marcador de usuário
   const createIcon = (L, rotation = 0) =>
@@ -43,54 +44,72 @@ export default function MapContainer({ positions, currentPosition, destination, 
 
   // 1. Inicializa o Mapa
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
+    if (!mapContainerRef.current || mapRef.current || mapError) return;
 
-    import("leaflet").then((L) => {
-      LRef.current = L;
+    (async () => {
+      try {
+        const L = (await import("leaflet")).default;
+        LRef.current = L;
 
-      mapRef.current = L.map(mapContainerRef.current, {
-        zoomControl: false,
-        attributionControl: false,
-        tap: true,
-      }).setView([-15.78, -47.92], 14);
+        // Corrige problema de ícones padrão do Leaflet
+        delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+          iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+        });
 
-      // Camada de tile (mapa escuro)
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 20,
-        attribution: "",
-      }).addTo(mapRef.current);
+        mapRef.current = L.map(mapContainerRef.current, {
+          zoomControl: false,
+          attributionControl: false,
+          tap: true,
+        }).setView([-15.78, -47.92], 14);
 
-      // Rastro da corrida
-      polylineRef.current = L.polyline([], {
-        color: "#00ff9f",
-        weight: 6,
-        opacity: 0.9,
-        lineCap: "round",
-        lineJoin: "round",
-      }).addTo(mapRef.current);
+        // Camada de tile (mapa escuro)
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+          maxZoom: 20,
+          attribution: "",
+        }).addTo(mapRef.current);
 
-      setTimeout(() => {
-        if (mapRef.current) mapRef.current.invalidateSize();
-      }, 200);
+        // Rastro da corrida
+        polylineRef.current = L.polyline([], {
+          color: "#00ff9f",
+          weight: 6,
+          opacity: 0.9,
+          lineCap: "round",
+          lineJoin: "round",
+        }).addTo(mapRef.current);
 
-      setIsMapReady(true);
+        setTimeout(() => {
+          if (mapRef.current) mapRef.current.invalidateSize();
+        }, 200);
 
-      // Adiciona listener para cliques no mapa
-      mapRef.current.on("click", (e) => {
-        if (onDestinationSelect) {
-          onDestinationSelect({
-            lat: e.latlng.lat,
-            lng: e.latlng.lng,
-            name: "Ponto de destino",
-          });
-        }
-      });
-    });
+        setIsMapReady(true);
+
+        // Adiciona listener para cliques no mapa
+        mapRef.current.on("click", (e) => {
+          if (onDestinationSelect) {
+            onDestinationSelect({
+              lat: e.latlng.lat,
+              lng: e.latlng.lng,
+              name: "Ponto de destino",
+            });
+          }
+        });
+      } catch (error) {
+        console.error("Erro ao carregar Leaflet:", error);
+        setMapError(true);
+      }
+    })();
 
     return () => {
-      if (mapRef.current) mapRef.current.remove();
+      if (mapRef.current) {
+        mapRef.current.off();
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
     };
-  }, [onDestinationSelect]);
+  }, [onDestinationSelect, mapError]);
 
   // 2. Rota automática
   useEffect(() => {
@@ -187,13 +206,26 @@ export default function MapContainer({ positions, currentPosition, destination, 
         style={{ minHeight: "100vh", background: "#0f172a" }}
       />
 
+      {/* FALLBACK DE ERRO */}
+      {mapError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur z-[999]">
+          <div className="text-center">
+            <p className="text-red-400 font-bold mb-2">Erro ao carregar mapa</p>
+            <p className="text-slate-300 text-sm mb-4">Verifique sua conexão ou recarregue a página</p>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-emerald-500 text-black font-bold rounded-lg">
+              Recarregar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Vinheta */}
       <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.7)] z-[100]" />
 
       {/* Status GPS */}
       <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-900/90 backdrop-blur border border-emerald-500/30 px-3 py-2 rounded-full z-[401] text-xs sm:text-sm">
         <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-        <span className="text-slate-300 font-medium">GPS Online</span>
+        <span className="text-slate-300 font-medium">{isMapReady ? "GPS Online" : "Carregando..."}</span>
       </div>
 
       {/* CONTROLES DO MAPA */}
@@ -249,4 +281,6 @@ export default function MapContainer({ positions, currentPosition, destination, 
       )}
     </div>
   );
-}
+};
+
+export default MapContainer;
