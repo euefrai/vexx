@@ -216,7 +216,9 @@ export default function KO() {
           </div>
         )}
       </div>
-      <Navbar />
-    </>
+    )}
+  </div>
+  <Navbar />
+</>
   )
 }
