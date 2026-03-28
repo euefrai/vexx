@@ -19,7 +19,9 @@ export default function UpdatePrompt() {
 
       // Checa se já existe um worker esperando (waiting)
       sw.getRegistration().then((reg) => {
-        if (reg?.waiting) {
+        if (!reg) return // Guard clause
+
+        if (reg.waiting) {
           setShowUpdate(true)
         }
 
@@ -28,7 +30,7 @@ export default function UpdatePrompt() {
           const newWorker = reg.installing
           
           const handleStateChange = () => {
-            if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+            if (newWorker?.state === "installed" && navigator.serviceWorker.controller) {
               setShowUpdate(true)
             }
           }
@@ -42,11 +44,11 @@ export default function UpdatePrompt() {
         }
 
         const cleanup = handleUpdateFound()
-        reg?.addEventListener("updatefound", handleUpdateFound)
+        reg.addEventListener("updatefound", handleUpdateFound)
 
         // Retornar cleanup para o updatefound listener
         return () => {
-          reg?.removeEventListener("updatefound", handleUpdateFound)
+          reg.removeEventListener("updatefound", handleUpdateFound)
           cleanup?.()
         }
       })
