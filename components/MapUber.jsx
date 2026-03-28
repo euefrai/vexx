@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { ZoomIn, ZoomOut, Navigation, Compass } from "lucide-react";
 import { getRoute } from "@/utils/getRoute";
 import "leaflet/dist/leaflet.css";
@@ -8,10 +8,11 @@ import "leaflet/dist/leaflet.css";
 /**
  * MapUber - Componente de mapa estilo Uber que segue o usuário
  * Características:
- * - Mapa sempre centralizado no usuário (como Uber)
+ * - Mapa sempre centralizado no usuário (como Uber) - SEM FLICKER
  * - Rotaciona com a orientação do usuário (bearing)
  * - Zoom adaptativo baseado em velocidade
  * - Mostra rota até destino com ETA
+ * - Cache de última posição como fallback
  * - Responsivo e fluido
  */
 const MapUber = ({ 
@@ -35,54 +36,93 @@ const MapUber = ({
   const currentRotationRef = useRef(0);
   const routeCacheRef = useRef(null);
   const lastDestinationRef = useRef(null);
+  
+  // Cache de última posição conhecida (para fallback)
+  const lastKnownPositionRef = useRef(null);
+  // Throttle de atualizações (evita flicker)
+  const lastMapUpdateRef = useRef(0);
+  const MIN_UPDATE_INTERVAL = 200; // ms
+  // Estado de carregamento
+  const isInitializedRef = useRef(false);
 
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [eta, setEta] = useState(null);
   const [distanceToDestination, setDistanceToDestination] = useState(null);
+  
+  // Usar última posição conhecida como fallback
+  const effectivePosition = useMemo(() => {
+    if (currentPosition) {
+      lastKnownPositionRef.current = currentPosition;
+      return currentPosition;
+    }
+    return lastKnownPositionRef.current;
+  }, [currentPosition]);
 
-  // 🎯 Criar ícone do usuário com rotação dinâmica
+  // 🎯 Criar ícone do usuário com seta MUITO VISÍVEL
   const createUserIcon = useCallback((L, rotationDeg = 0) => {
-    const size = 32;
-    const arrowSize = 20;
-
     return L.divIcon({
       html: `
         <div style="
-          width: ${size}px;
-          height: ${size}px;
+          width: 60px;
+          height: 60px;
           display: flex;
           justify-content: center;
           align-items: center;
           transform: rotate(${rotationDeg}deg);
-          transition: transform 0.2s ease-out;
+          transition: transform 0.3s ease-out;
+          filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
         ">
-          <!-- Círculo de fundo branco semi-transparente -->
+          <!-- Círculo externo (halo) -->
           <div style="
             position: absolute;
-            width: ${size}px;
-            height: ${size}px;
-            background: white;
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, rgba(0, 255, 159, 0.3), rgba(0, 255, 159, 0.1));
             border-radius: 50%;
-            opacity: 0.2;
-            filter: drop-shadow(0 0 4px rgba(255,255,255,0.3));
+            border: 2px solid #00ff9f;
+            opacity: 0.8;
+            animation: pulse-user 2s infinite;
           "></div>
           
-          <!-- Seta direcionada (tipo Uber) -->
+          <!-- Círculo interno branco -->
           <div style="
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.95;
+            z-index: 5;
+          "></div>
+          
+          <!-- Seta verde (GRANDE E VISÍVEL) -->
+          <div style="
+            position: relative;
+            z-index: 10;
             width: 0;
             height: 0;
-            border-left: ${arrowSize / 2}px solid transparent;
-            border-right: ${arrowSize / 2}px solid transparent;
-            border-bottom: ${arrowSize}px solid #00ff9f;
-            filter: drop-shadow(0 0 8px rgba(0, 255, 159, 0.9)) drop-shadow(0 0 2px rgba(0,0,0,0.5));
-            z-index: 10;
+            border-left: 14px solid transparent;
+            border-right: 14px solid transparent;
+            border-bottom: 28px solid #00ff9f;
+            filter: drop-shadow(0 0 6px rgba(0, 255, 159, 1)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+          "></div>
+          
+          <!-- Sombra interior (mais definição) -->
+          <div style="
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent);
+            border-radius: 50%;
+            opacity: 0.6;
+            z-index: 4;
           "></div>
         </div>
       `,
       className: "uber-user-marker",
-      iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2],
+      iconSize: [60, 60],
+      iconAnchor: [30, 30],
     });
   }, []);
 
@@ -257,13 +297,28 @@ const MapUber = ({
     drawRoute();
   }, [destination, currentPosition, isMapReady]);
 
-  // 3️⃣ Seguir Usuário com Rotation (Estilo Uber)
+  // 3️⃣ Seguir Usuário com Rotation (Estilo Uber) - SEM FLICKER
   useEffect(() => {
     const L = LRef.current;
-    if (!mapRef.current || !currentPosition || !L || !isMapReady) return;
+    if (!mapRef.current || !effectivePosition || !L || !isMapReady) return;
 
-    const { lat, lng } = currentPosition;
+    const { lat, lng } = effectivePosition;
     const latlng = [lat, lng];
+
+    // Primeira inicialização: usar setView (sem animação)
+    if (!isInitializedRef.current && currentPosition) {
+      console.debug("[MapUber] 🗺️ Primeira inicialização no mapa");
+      mapRef.current.setView(latlng, 18);
+      isInitializedRef.current = true;
+      lastMapUpdateRef.current = Date.now();
+    }
+
+    // Throttle: só atualizar a cada 200ms (evita flicker)
+    const now = Date.now();
+    if (now - lastMapUpdateRef.current < MIN_UPDATE_INTERVAL) {
+      return;
+    }
+    lastMapUpdateRef.current = now;
 
     // 🔄 Animar rotação suavemente
     if (rotationAnimationRef.current) {
@@ -273,7 +328,7 @@ const MapUber = ({
     const targetRotation = heading || 0;
     const currentRot = currentRotationRef.current;
     let startTime = Date.now();
-    const animationDuration = 300; // 300ms para interpolação suave
+    const animationDuration = 200; // Mais rápido
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -288,7 +343,7 @@ const MapUber = ({
       currentRotationRef.current = newRotation;
 
       // Atualizar bearing do mapa
-      if (mapRef.current.getBearing) {
+      if (mapRef.current && mapRef.current.setBearing) {
         mapRef.current.setBearing(newRotation);
       }
 
@@ -317,12 +372,18 @@ const MapUber = ({
     else if (currentSpeed > 2) targetZoom = 18; // Lento: zoom ligeiramente in
     else targetZoom = 18; // Parado: manter zoom
 
-    // Mapa sempre segue o usuário com flyTo suave
-    mapRef.current.flyTo(latlng, targetZoom, {
-      duration: 0.8,
-      easeLinearity: 0.1,
-    });
-  }, [currentPosition, heading, currentSpeed, isMapReady, createUserIcon]);
+    // Atualizar zoom sem animação (suave e sem flicker)
+    if (mapRef.current.getZoom() !== targetZoom) {
+      mapRef.current.setZoom(targetZoom);
+    }
+
+    // Atualizar view sem flyTo agressivo (move suave)
+    // Se é primeira vez, já foi feito acima
+    if (isInitializedRef.current && currentPosition) {
+      // Usar setView sem zoom para apenas mover (muito mais suave)
+      mapRef.current.panTo(latlng, { animate: false });
+    }
+  }, [effectivePosition, heading, currentSpeed, isMapReady, createUserIcon, currentPosition]);
 
   // 4️⃣ Marcador de Destino
   useEffect(() => {
@@ -397,8 +458,20 @@ const MapUber = ({
           }
         }
 
+        @keyframes pulse-user {
+          0% {
+            box-shadow: 0 0 0 0 rgba(0, 255, 159, 0.7);
+          }
+          70% {
+            box-shadow: 0 0 0 15px rgba(0, 255, 159, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(0, 255, 159, 0);
+          }
+        }
+
         .uber-user-marker {
-          filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
+          filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
         }
 
         .uber-destination-marker {
