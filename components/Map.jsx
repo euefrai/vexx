@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ZoomIn, ZoomOut, Navigation } from "lucide-react";
 import { getRoute } from "@/utils/getRoute";
+import "leaflet/dist/leaflet.css";
 
 // Importar CSS no useEffect para evitar problemas
 const MapContainer = ({ positions, currentPosition, destination, onDestinationSelect }) => {
@@ -214,18 +215,29 @@ const MapContainer = ({ positions, currentPosition, destination, onDestinationSe
       <div
         ref={mapContainerRef}
         className="w-full h-full"
-        style={{ minHeight: "100vh", background: "#0f172a" }}
+        style={{ height: "100%", background: "#0f172a" }}
       />
 
       {/* FALLBACK DE ERRO */}
       {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur z-[999]">
           <div className="text-center">
-            <p className="text-red-400 font-bold mb-2">Erro ao carregar mapa</p>
+            <p className="text-red-400 font-bold mb-2">❌ Erro ao carregar mapa</p>
             <p className="text-slate-300 text-sm mb-4">Verifique sua conexão ou recarregue a página</p>
             <button onClick={() => window.location.reload()} className="px-4 py-2 bg-emerald-500 text-black font-bold rounded-lg">
-              Recarregar
+              🔄 Recarregar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* LOADING OVERLAY */}
+      {!isMapReady && !mapError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-slate-900/80 to-black/80 backdrop-blur z-[998]">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-slate-300 font-semibold mb-1">Inicializando mapa...</p>
+            <p className="text-slate-500 text-sm">Conectando com Leaflet | Carregando tiles</p>
           </div>
         </div>
       )}

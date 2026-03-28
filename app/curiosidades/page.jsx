@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { PageHeader } from "@/components/PageHeader";
-import { TrendingUp, Users, Zap, Target, Lightning, Trophy } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
+import { TrendingUp, Users, Zap, Target, Sparkles, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Curiosidades() {
@@ -102,7 +102,7 @@ export default function Curiosidades() {
       valor: stats?.numTreinos,
       unidade: "treinos",
       cor: "from-purple-500/20 to-pink-500/20 border-purple-500/50",
-      icone: Lightning,
+      icone: Sparkles,
     },
     {
       icon: "🎯",

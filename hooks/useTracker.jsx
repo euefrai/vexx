@@ -35,30 +35,42 @@ export function useTracker() {
       return;
     }
 
+    console.debug("[Tracker] Obtendo localização inicial...");
+    
+    const timeoutId = setTimeout(() => {
+      console.warn("[Tracker] Geolocation inicial timeout após 10s");
+    }, 10000);
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        clearTimeout(timeoutId);
         try {
-          const { latitude, longitude } = pos.coords;
+          const { latitude, longitude, accuracy } = pos.coords;
+          console.debug(`[Tracker] ✅ Localização inicial: lat=${latitude}, lng=${longitude}, accuracy=${accuracy}m`);
+          
           if (positionsRef.current.length === 0) {
             const initialPos = {
               lat: latitude,
               lng: longitude,
               timestamp: Date.now(),
               heading: 0,
-              speed: 0
+              speed: 0,
             };
             positionsRef.current = [initialPos];
             setCurrentPosition(initialPos);
           }
         } catch (error) {
-          console.error("Erro ao processar posição inicial:", error);
+          console.error("[Tracker] Erro ao processar posição inicial:", error);
         }
       },
-      (err) => console.error("Erro na posição inicial:", err),
+      (err) => {
+        clearTimeout(timeoutId);
+        console.warn("[Tracker] ⚠️ Erro na geolocation inicial:", err.message);
+      },
       {
-        enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 0,
+        enableHighAccuracy: true, // Melhor precisão (foi false!)
+        timeout: 15000, // Aumentado para Render
+        maximumAge: 0, // Sempre fresco
       }
     );
   }, []);
@@ -77,13 +89,17 @@ export function useTracker() {
 
   // 📍 Lógica Principal de Tracking (Unificada)
   const startTracking = useCallback(() => {
-    if (!("geolocation" in navigator)) return;
+    if (!("geolocation" in navigator)) {
+      console.error("[Tracker] Geolocation não disponível!");
+      return;
+    }
 
+    console.debug("[Tracker] ▶️ Iniciando tracking de corrida...");
     setIsActive(true);
 
     watchId.current = navigator.geolocation.watchPosition(
       (pos) => {
-        const { latitude, longitude, speed } = pos.coords;
+        const { latitude, longitude, speed, accuracy } = pos.coords;
         const now = Date.now();
         
         const lastPos = positionsRef.current[positionsRef.current.length - 1];
@@ -110,6 +126,10 @@ export function useTracker() {
             };
             positionsRef.current.push(newPos);
             setCurrentPosition(newPos);
+            
+            if (positionsRef.current.length % 10 === 0) {
+              console.debug(`[Tracker] 📍 ${positionsRef.current.length} pontos | ${dist.toFixed(3)}km esta volta | vel=${velocity.toFixed(1)}km/h | acc=${accuracy}m`);
+            }
           }
         } else {
           // Registro caso a lista esteja vazia
@@ -122,13 +142,17 @@ export function useTracker() {
           };
           positionsRef.current.push(newPos);
           setCurrentPosition(newPos);
+          console.debug("[Tracker] 📍 Primeiro ponto registrado");
         }
       },
-      (err) => console.error("Erro no watchPosition:", err),
+      (err) => {
+        console.warn(`[Tracker] ⚠️ Erro no watchPosition:`, err.message);
+        // Não pausar - deixar tentar continuar
+      },
       {
         enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 5000,
+        maximumAge: 500, // Um pouco menos agressivo que 1000
+        timeout: 8000, // Timeout por watchPosition call
       }
     );
   }, []);

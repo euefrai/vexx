@@ -30,9 +30,22 @@ export default function LocationSearch({ onLocationSelect, currentPosition }) {
   const performSearch = async (query) => {
     setIsSearching(true);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout 10s
+
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&countrycodes=br`
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&countrycodes=br`,
+        { signal: controller.signal }
       );
+      
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn(`[LocationSearch] HTTP ${response.status}`);
+        setSearchResults([]);
+        return;
+      }
+
       const data = await response.json();
 
       const results = data
@@ -47,7 +60,11 @@ export default function LocationSearch({ onLocationSelect, currentPosition }) {
 
       setSearchResults(results);
     } catch (error) {
-      console.error("Erro ao buscar:", error);
+      if (error.name === "AbortError") {
+        console.warn("[LocationSearch] Nominatim timeout após 10s");
+      } else {
+        console.error("[LocationSearch] Erro ao buscar:", error);
+      }
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -57,11 +74,16 @@ export default function LocationSearch({ onLocationSelect, currentPosition }) {
   const handleCurrentLocation = () => {
     setIsLoadingCurrent(true);
     if ("geolocation" in navigator) {
+      console.debug("[LocationSearch] Obtendo localização atual...");
+      
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const { latitude, longitude } = pos.coords;
+          const { latitude, longitude, accuracy } = pos.coords;
+          console.debug(`[LocationSearch] ✅ Localização atual: lat=${latitude}, lng=${longitude}, accuracy=${accuracy}m`);
+          
           onLocationSelect({
             name: "Minha Localização Atual",
+            address: `${accuracy.toFixed(0)}m de precisão`,
             lat: latitude,
             lng: longitude,
           });
@@ -70,8 +92,13 @@ export default function LocationSearch({ onLocationSelect, currentPosition }) {
           setIsLoadingCurrent(false);
         },
         (error) => {
-          console.error("Erro ao obter localização:", error);
+          console.error("[LocationSearch] ❌ Erro ao obter localização:", error.message);
           setIsLoadingCurrent(false);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000, // Aumentado para Render
+          maximumAge: 0,
         }
       );
     }
