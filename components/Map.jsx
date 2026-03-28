@@ -48,8 +48,10 @@ const MapContainer = ({ positions, currentPosition, destination, onDestinationSe
 
     (async () => {
       try {
+        console.debug("[Map] Importando Leaflet...");
         const L = (await import("leaflet")).default;
         LRef.current = L;
+        console.debug("[Map] Leaflet carregado com sucesso");
 
         // Corrige problema de ícones padrão do Leaflet
         delete L.Icon.Default.prototype._getIconUrl;
@@ -59,12 +61,14 @@ const MapContainer = ({ positions, currentPosition, destination, onDestinationSe
           shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
         });
 
+        console.debug("[Map] Inicializando mapa em container...");
         mapRef.current = L.map(mapContainerRef.current, {
           zoomControl: false,
           attributionControl: false,
           tap: true,
         }).setView([-15.78, -47.92], 14);
 
+        console.debug("[Map] Adicionando tile layer...");
         // Camada de tile (mapa escuro)
         L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
           maxZoom: 20,
@@ -85,6 +89,7 @@ const MapContainer = ({ positions, currentPosition, destination, onDestinationSe
         }, 200);
 
         setIsMapReady(true);
+        console.debug("[Map] ✅ Mapa inicializado com sucesso");
 
         // Adiciona listener para cliques no mapa
         mapRef.current.on("click", (e) => {
@@ -97,7 +102,7 @@ const MapContainer = ({ positions, currentPosition, destination, onDestinationSe
           }
         });
       } catch (error) {
-        console.error("Erro ao carregar Leaflet:", error);
+        console.error("[Map] ❌ Erro ao carregar Leaflet:", error);
         setMapError(true);
       }
     })();
@@ -118,8 +123,14 @@ const MapContainer = ({ positions, currentPosition, destination, onDestinationSe
 
     async function drawRoute() {
       try {
+        console.debug("[Map] Desenhando rota...", { currentPosition, destination });
         const route = await getRoute(currentPosition, destination);
-        if (!route || route.length === 0) return;
+        if (!route || route.length === 0) {
+          console.warn("[Map] Rota vazia recebida");
+          return;
+        }
+
+        console.debug(`[Map] ✅ Rota recebida com ${route.length} pontos`);
 
         if (routeRef.current) {
           mapRef.current.removeLayer(routeRef.current);
@@ -140,7 +151,7 @@ const MapContainer = ({ positions, currentPosition, destination, onDestinationSe
         ]);
         mapRef.current.fitBounds(bounds, { padding: [80, 80] });
       } catch (error) {
-        console.error("Erro ao traçar rota:", error);
+        console.error("[Map] Erro ao traçar rota:", error);
       }
     }
 

@@ -1,15 +1,16 @@
 export async function getRoute(start, end) {
   try {
     const key = (process.env.NEXT_PUBLIC_ORS_KEY || "").trim();
+    
     if (!key) {
-      console.warn("OpenRouteService API key ausente ou vazia, usando rota simples");
+      console.warn("[ORS] API key ausente ou vazia, usando rota simples");
       return [
         [start.lat, start.lng],
         [end.lat, end.lng],
       ];
     }
 
-    console.debug("OpenRouteService key presente. Usando rota via API.");
+    console.debug(`[ORS] Key presente (${key.length} chars). Chamando API...`);
 
     const res = await fetch(
       "https://api.openrouteservice.org/v2/directions/foot-walking",
@@ -17,7 +18,7 @@ export async function getRoute(start, end) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": process.env.NEXT_PUBLIC_ORS_KEY,
+          "Authorization": key,
         },
         body: JSON.stringify({
           coordinates: [
@@ -30,9 +31,9 @@ export async function getRoute(start, end) {
 
     if (!res.ok) {
       const texto = await res.text().catch(() => "sem corpo");
-      console.error("Erro na API de Rota:", res.status, res.statusText, texto);
+      console.error(`[ORS] Erro HTTP ${res.status}: ${res.statusText}`, texto.substring(0, 200));
       if (res.status === 401 || res.status === 403) {
-        console.warn("OpenRouteService key inválida ou sem permissão (401/403)");
+        console.error("[ORS] ⚠️ Key inválida, expirada ou sem permissão (401/403)");
       }
       // Fallback: rota simples
       return [
@@ -42,22 +43,26 @@ export async function getRoute(start, end) {
     }
 
     const data = await res.json();
+    console.debug("[ORS] Resposta recebida, processando geometria...");
 
     // Verifica se a geometria existe antes de mapear
     if (data.features && data.features.length > 0) {
-      return data.features[0].geometry.coordinates.map(coord => [
+      const coordinates = data.features[0].geometry.coordinates.map(coord => [
         coord[1], // Latitude (Leaflet)
         coord[0], // Longitude (Leaflet)
       ]);
+      console.debug(`[ORS] ✅ Rota calculada com ${coordinates.length} pontos`);
+      return coordinates;
     }
 
     // Fallback: rota simples
+    console.warn("[ORS] Nenhuma feature na resposta, usando rota simples");
     return [
       [start.lat, start.lng],
       [end.lat, end.lng],
     ];
   } catch (error) {
-    console.error("Erro ao buscar rota:", error);
+    console.error("[ORS] Exceção:", error.message);
     // Fallback: rota simples entre os dois pontos
     return [
       [start.lat, start.lng],
