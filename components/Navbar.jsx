@@ -192,7 +192,6 @@ function Navbar() {
 
 // Memoizar o componente inteiro
 export default memo(Navbar)
-              <span className="text-[8px] font-black uppercase tracking-tighter text-inherit">Feed</span>
             </Link>
 
             {/* TREINO */}

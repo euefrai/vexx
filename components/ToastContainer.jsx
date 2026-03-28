@@ -2,7 +2,7 @@
 
 import React, { useContext } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ToastContext } from "./ToastContext"
+import { ToastContext } from "@/context/ToastContext"
 
 export function ToastContainer() {
   const context = useContext(ToastContext)
