@@ -3,63 +3,105 @@
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
+import { useToast } from "@/context/ToastContext"
+import { validarLogin, MENSAGENS_SUCESSO } from "@/utils/validators"
 
 export default function Login() {
   const router = useRouter()
+  const toast = useToast()
 
   const [email, setEmail] = useState("")
   const [senha, setSenha] = useState("")
   const [carregando, setCarregando] = useState(false)
+  const [erros, setErros] = useState({})
 
   async function fazerLogin(e) {
-    e.preventDefault() // Previne que a página recarregue
-    
-    if (!email || !senha) {
-      alert("Por favor, preencha todos os campos.")
+    e.preventDefault()
+
+    // Validar inputs
+    const validacao = validarLogin(email, senha)
+    setErros(validacao.erros)
+
+    if (!validacao.valido) {
+      toast.error("Por favor, corrija os erros")
       return
     }
 
     setCarregando(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: senha,
-    })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: senha,
+      })
 
-    if (error) {
-      alert("Erro ao entrar: " + error.message)
-    } else {
-      // Login com sucesso! Manda para o Feed
-      router.push("/feed")
+      if (error) {
+        toast.error(error.message || "Erro ao fazer login")
+        setErros({ geral: error.message })
+      } else {
+        toast.success(MENSAGENS_SUCESSO.loginSucesso)
+        // Login com sucesso! Manda para o Feed
+        setTimeout(() => {
+          router.push("/feed")
+        }, 500)
+      }
+    } catch (err) {
+      toast.error(err.message || "Erro desconhecido")
+      setErros({ geral: err.message })
+    } finally {
+      setCarregando(false)
     }
-
-    setCarregando(false)
   }
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col justify-center items-center px-6">
-      
       <div className="w-full max-w-xs text-center">
         <h1 className="text-3xl font-bold mb-2">Bem-vindo</h1>
         <p className="text-zinc-500 mb-8">Faça login para ver seus treinos</p>
       </div>
 
-      <form onSubmit={fazerLogin} className="w-full max-w-xs flex flex-col">
-        <input
-          type="email"
-          placeholder="E-mail"
-          value={email}
-          className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl mb-3 focus:outline-none focus:border-green-500 transition-colors"
-          onChange={(e) => setEmail(e.target.value)}
-        />
+      {erros.geral && (
+        <div className="w-full max-w-xs bg-red-500/20 border border-red-500/50 text-red-300 p-3 rounded-lg mb-4 text-sm">
+          {erros.geral}
+        </div>
+      )}
 
-        <input
-          type="password"
-          placeholder="Senha"
-          value={senha}
-          className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl mb-6 focus:outline-none focus:border-green-500 transition-colors"
-          onChange={(e) => setSenha(e.target.value)}
-        />
+      <form onSubmit={fazerLogin} className="w-full max-w-xs flex flex-col">
+        <div className="mb-3">
+          <input
+            type="email"
+            placeholder="E-mail"
+            value={email}
+            className={`w-full bg-zinc-900 border p-3 rounded-xl focus:outline-none transition-colors ${
+              erros.email
+                ? "border-red-500 focus:border-red-600"
+                : "border-zinc-800 focus:border-green-500"
+            }`}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setErros({ ...erros, email: "" }) // Limpar erro ao digitar
+            }}
+          />
+          {erros.email && <p className="text-red-500 text-xs mt-1">{erros.email}</p>}
+        </div>
+
+        <div className="mb-6">
+          <input
+            type="password"
+            placeholder="Senha"
+            value={senha}
+            className={`w-full bg-zinc-900 border p-3 rounded-xl focus:outline-none transition-colors ${
+              erros.senha
+                ? "border-red-500 focus:border-red-600"
+                : "border-zinc-800 focus:border-green-500"
+            }`}
+            onChange={(e) => {
+              setSenha(e.target.value)
+              setErros({ ...erros, senha: "" }) // Limpar erro ao digitar
+            }}
+          />
+          {erros.senha && <p className="text-red-500 text-xs mt-1">{erros.senha}</p>}
+        </div>
 
         <button
           type="submit"
@@ -75,15 +117,14 @@ export default function Login() {
       <div className="mt-8 text-center">
         <p className="text-zinc-400 text-sm">
           Ainda não tem uma conta?{" "}
-          <span 
+          <span
             className="text-green-500 font-semibold cursor-pointer hover:underline"
-            onClick={() => router.push("/cadastro")} // Ajuste o caminho se sua pasta de cadastro for diferente
+            onClick={() => router.push("/cadastro")}
           >
             Cadastre-se
           </span>
         </p>
       </div>
-
     </div>
   )
 }

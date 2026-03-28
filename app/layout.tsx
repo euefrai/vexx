@@ -4,6 +4,8 @@ import "./globals.css";
 import InstallPrompt from "@/components/InstallPrompt";
 import UpdatePrompt from "@/components/UpdatePrompt";
 import RegisterSW from "@/components/RegisterSW";
+import { ToastProvider } from "@/context/ToastContext";
+import { ToastContainer } from "@/components/ToastContainer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,10 +45,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
         suppressHydrationWarning={true}
       >
-        <RegisterSW />
-        <UpdatePrompt />
-        <main>{children}</main>
-        <InstallPrompt />
+        <ToastProvider>
+          <RegisterSW />
+          <UpdatePrompt />
+          <main>{children}</main>
+          <InstallPrompt />
+          <ToastContainer />
+        </ToastProvider>
       </body>
     </html>
   );

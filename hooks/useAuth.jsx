@@ -1,27 +1,83 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
-export default function useAuth(){
+export default function useAuth(requireAuth = true) {
+  const router = useRouter()
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
- const router = useRouter()
+  useEffect(() => {
+    let isMounted = true // Previne memory leaks
 
- useEffect(()=>{
+    const verificarAutenticacao = async () => {
+      try {
+        const { data, error: authError } = await supabase.auth.getUser()
 
-  verificar()
+        if (!isMounted) return
 
- },[])
+        if (authError) {
+          setError(authError.message)
+          setUser(null)
+          if (requireAuth) {
+            router.push("/login")
+          }
+          return
+        }
 
- async function verificar(){
+        if (!data.user) {
+          setUser(null)
+          if (requireAuth) {
+            router.push("/login")
+          }
+          return
+        }
 
-  const { data } = await supabase.auth.getUser()
+        // Salvar dados do usuário
+        setUser(data.user)
+        setError(null)
+      } catch (err) {
+        if (!isMounted) return
+        setError(err.message)
+        if (requireAuth) {
+          router.push("/login")
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
 
-  if(!data.user){
-   router.push("/login")
+    verificarAutenticacao()
+
+    // Cleanup
+    return () => {
+      isMounted = false
+    }
+  }, [router, requireAuth])
+
+  // Função para fazer logout
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      router.push("/")
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
- }
-
+  // Retornar estado da autenticação
+  return {
+    user,
+    loading,
+    error,
+    logout,
+    isAuthenticated: !!user,
+    isAdmin: user?.user_metadata?.role === "admin"
+  }
 }

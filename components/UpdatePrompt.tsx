@@ -8,29 +8,57 @@ export default function UpdatePrompt() {
   useEffect(() => {
     // Verifica se o Service Worker tem uma atualização pendente
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      const sw = navigator.serviceWorker;
+      const sw = navigator.serviceWorker
 
-      sw.addEventListener("controllerchange", () => {
-        // Recarrega a página automaticamente quando o novo SW assume o controle
-        window.location.reload();
-      });
+      // Handler para quando o SW muda de controle
+      const handleControllerChange = () => {
+        window.location.reload()
+      }
+
+      sw.addEventListener("controllerchange", handleControllerChange)
 
       // Checa se já existe um worker esperando (waiting)
       sw.getRegistration().then((reg) => {
         if (reg?.waiting) {
-          setShowUpdate(true);
+          setShowUpdate(true)
         }
 
         // Escuta por novas atualizações encontradas enquanto o app está aberto
-        reg?.addEventListener("updatefound", () => {
-          const newWorker = reg.installing;
-          newWorker?.addEventListener("statechange", () => {
+        const handleUpdateFound = () => {
+          const newWorker = reg.installing
+          
+          const handleStateChange = () => {
             if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              setShowUpdate(true);
+              setShowUpdate(true)
             }
-          });
-        });
-      });
+          }
+
+          newWorker?.addEventListener("statechange", handleStateChange)
+
+          // Cleanup para o state change listener
+          return () => {
+            newWorker?.removeEventListener("statechange", handleStateChange)
+          }
+        }
+
+        const cleanup = handleUpdateFound()
+        reg?.addEventListener("updatefound", handleUpdateFound)
+
+        // Retornar cleanup para o updatefound listener
+        return () => {
+          reg?.removeEventListener("updatefound", handleUpdateFound)
+          cleanup?.()
+        }
+      })
+    }
+
+    // Cleanup: Remover event listeners
+    return () => {
+      if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+        const sw = navigator.serviceWorker
+        // Note: Não é possível remover listeners anônimos, então
+        // uma abordagem melhor seria usar named functions como acima
+      }
     }
   }, [])
 
@@ -38,15 +66,15 @@ export default function UpdatePrompt() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.getRegistration().then((reg) => {
         // Envia mensagem para o Service Worker pular a espera e ativar
-        reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
-      });
+        reg?.waiting?.postMessage({ type: "SKIP_WAITING" })
+      })
     }
-  };
+  }
 
   return (
     <AnimatePresence>
       {showUpdate && (
-        <motion.div 
+        <motion.div
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -100, opacity: 0 }}
@@ -60,8 +88,8 @@ export default function UpdatePrompt() {
                 <p className="text-[9px] font-bold uppercase opacity-80 mt-1">Atualize para as últimas melhorias</p>
               </div>
             </div>
-            
-            <button 
+
+            <button
               onClick={handleUpdate}
               className="bg-black text-white text-[10px] font-black uppercase px-4 py-2 rounded-xl active:scale-95 transition-all shadow-lg"
             >
