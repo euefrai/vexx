@@ -27,6 +27,7 @@ export const metadata: Metadata = {
   title: "VEXX SQUAD",
   description: "Elite Training Log & Community",
   manifest: "/manifest.json",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   openGraph: {
     title: 'VEXX SQUAD',
     description: 'Treine como um soldado de elite.',
