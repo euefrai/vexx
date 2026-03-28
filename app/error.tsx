@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { useToast } from "@/context/ToastContext"
 
-export default function error({ error, reset }) {
+export default function error({ error, reset }: { error: Error; reset: () => void }) {
   const toast = useToast()
 
   useEffect(() => {
