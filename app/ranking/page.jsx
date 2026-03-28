@@ -8,7 +8,7 @@ import PageHeader from "@/components/PageHeader"
 export default function Ranking() {
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
-  const [abaAtiva, setAbaAtiva] = useState("level")
+  const [abaAtiva, setAbaAtiva] = useState("semanal")
 
   useEffect(() => {
     carregarRanking()
@@ -27,7 +27,52 @@ export default function Ranking() {
   async function carregarRanking() {
     setLoading(true)
     try {
-      if (abaAtiva === "level") {
+      if (abaAtiva === "semanal") {
+        // Ranking da semana por KM
+        const agora = new Date()
+        const inicioSemana = new Date(agora)
+        inicioSemana.setDate(agora.getDate() - agora.getDay())
+
+        const { data: runs } = await supabase
+          .from("runs")
+          .select("user_id, distancia")
+          .gte("created_at", inicioSemana.toISOString())
+
+        const kmPorUsuario = {}
+        if (runs) {
+          runs.forEach(run => {
+            kmPorUsuario[run.user_id] = (kmPorUsuario[run.user_id] || 0) + (run.distancia || 0)
+          })
+        }
+
+        const idsUnicos = Object.keys(kmPorUsuario)
+        if (idsUnicos.length === 0) {
+          setUsuarios([])
+          setLoading(false)
+          return
+        }
+
+        const { data: infoUsuarios } = await supabase
+          .from("usuarios")
+          .select("id, username, foto, xp")
+          .in("id", idsUnicos)
+
+        const ranking = Object.entries(kmPorUsuario)
+          .map(([id, km]) => {
+            const user = infoUsuarios?.find(u => u.id === id)
+            return {
+              id,
+              username: user?.username || "Recruta",
+              foto: user?.foto,
+              valor: Math.round(km * 10) / 10,
+              xp: user?.xp || 0,
+              tipo: "km"
+            }
+          })
+          .sort((a, b) => b.valor - a.valor)
+
+        setUsuarios(ranking)
+      } else if (abaAtiva === "level") {
         const { data, error } = await supabase
           .from("usuarios")
           .select("id, username, foto, xp")
@@ -96,20 +141,33 @@ export default function Ranking() {
       <PageHeader icon="🏆" title="Ranking" subtitle="Os elite squads do VEXX" color="orange" />
 
       {/* TABS */}
-      <div className="flex bg-zinc-900/50 p-1.5 rounded-[2rem] mb-8 border border-zinc-800 backdrop-blur-sm">
+      <div className="flex gap-1.5 mb-8 overflow-x-auto pb-2">
+        <button 
+          onClick={() => setAbaAtiva("semanal")}
+          className={`px-4 py-2 rounded-full font-black text-xs uppercase whitespace-nowrap transition-all duration-300 ${abaAtiva === 'semanal' ? 'bg-green-500 text-black shadow-lg' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
+        >
+          🔥 Esta Semana
+        </button>
         <button 
           onClick={() => setAbaAtiva("level")}
-          className={`flex-1 py-3 rounded-[1.5rem] font-black text-[10px] uppercase italic transition-all duration-300 ${abaAtiva === 'level' ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'text-zinc-500 hover:text-white'}`}
+          className={`px-4 py-2 rounded-full font-black text-xs uppercase whitespace-nowrap transition-all duration-300 ${abaAtiva === 'level' ? 'bg-green-500 text-black shadow-lg' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
         >
-          Ranking XP
+          ⚡ Ranking XP
         </button>
         <button 
           onClick={() => setAbaAtiva("peso")}
-          className={`flex-1 py-3 rounded-[1.5rem] font-black text-[10px] uppercase italic transition-all duration-300 ${abaAtiva === 'peso' ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'text-zinc-500 hover:text-white'}`}
+          className={`px-4 py-2 rounded-full font-black text-xs uppercase whitespace-nowrap transition-all duration-300 ${abaAtiva === 'peso' ? 'bg-green-500 text-black shadow-lg' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
         >
-          Força Bruta
+          💪 Força Bruta
         </button>
       </div>
+
+      {abaAtiva === 'semanal' && (
+        <div className="mb-6 p-3 rounded-lg bg-gradient-to-r from-orange-500/20 to-green-500/20 border border-orange-500/30 text-center">
+          <p className="text-xs font-bold text-orange-300">🔥 Desafio da Semana: Quem vai fechar mais KM?</p>
+          <p className="text-[11px] text-gray-400 mt-1">Complete uma corrida hoje e apareça no ranking!</p>
+        </div>
+      )}
 
       <div className="space-y-4">
         {loading ? (
@@ -151,9 +209,9 @@ export default function Ranking() {
 
                 <div className="text-right">
                   <p className="text-white font-black text-xs italic">
-                    {abaAtiva === 'level' ? `${user.xp || 0} XP` : `${user.valor || 0} KG`}
+                    {abaAtiva === 'semanal' ? `${user.valor || 0} km` : abaAtiva === 'level' ? `${user.xp || 0} XP` : `${user.valor || 0} KG`}
                   </p>
-                  <p className="text-zinc-600 text-[8px] font-bold uppercase">ARSENAL</p>
+                  <p className="text-zinc-600 text-[8px] font-bold uppercase">{abaAtiva === 'semanal' ? '🔥 QUEIMANDO' : 'ARSENAL'}</p>
                 </div>
               </div>
             )

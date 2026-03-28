@@ -5,6 +5,7 @@ import Map from "@/components/Map";
 import RunTracker from "@/components/RunTracker";
 import LocationSearch from "@/components/LocationSearch";
 import RunSummary from "@/components/RunSummary";
+import { CelebracaoModal } from "@/components/CelebracaoModal";
 import { useTracker } from "@/hooks/useTracker";
 import Navbar from "@/components/Navbar";
 import { X, MapPin, Zap } from "lucide-react";
@@ -26,6 +27,7 @@ export default function RunPage() {
   const [destination, setDestination] = useState(null);
   const [showDestinationModal, setShowDestinationModal] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [celebrando, setCelebrando] = useState(false);
 
   const handleDestinationSelect = (location) => {
     setDestination(location);
@@ -37,9 +39,14 @@ export default function RunPage() {
   };
 
   const handleReset = () => {
+    if (!celebrando && distance > 0) {
+      setCelebrando(true);
+      return;
+    }
     resetTracking();
     setShowSummary(false);
     clearDestination();
+    setCelebrando(false);
   };
 
   return (
@@ -187,6 +194,18 @@ export default function RunPage() {
 
       {/* STATUS DA CORRIDA */}
       <RunStatus isActive={isActive} distance={distance} isPaused={!isActive && distance > 0} />
+
+      {/* CELEBRAÇÃO */}
+      <CelebracaoModal
+        isOpen={celebrando}
+        onClose={handleReset}
+        dados={{
+          distancia: Number(distance.toFixed(2)),
+          tempo: time,
+          calorias: Math.round((distance / 1000) * 70),
+          velocidadeMedia: Number((distance > 0 && time ? (distance / 1000) / (time.split(":").reduce((acc, val, idx) => acc + (parseInt(val) * (idx === 0 ? 60 : 1)), 0) / 3600) : 0).toFixed(1)),
+        }}
+      />
     </div>
   );
 }

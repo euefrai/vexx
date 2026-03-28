@@ -11,10 +11,12 @@ export default function MobileDrawer({ isOpen, onClose, isAdmin, userId }) {
   const isActive = (path) => pathname.startsWith(path) ? "text-green-400 font-black" : "text-zinc-300"
 
   const menuItems = [
+    { href: "/dashboard", icon: "📊", label: "Dashboard" },
+    { href: "/curiosidades", icon: "📈", label: "Curiosidades" },
     { href: "/lab", icon: "🧪", label: "Laboratório" },
     { href: "/forum", icon: "💬", label: "Fórum" },
     { href: "/social", icon: "📱", label: "Social" },
-    { href: "/explorar", icon: "🔍", label: "Explorar" },
+    { href: "/ranking", icon: "🏆", label: "Ranking Semanal" },
   ]
 
   return (
