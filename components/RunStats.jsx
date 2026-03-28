@@ -1,13 +1,31 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Zap, Flame, Gauge, Clock, MapPin, Eye } from "lucide-react";
 
-export default function RunStats({ distance, time, pace, positions }) {
-  const currentSpeed = positions.length > 0 ? (positions[positions.length - 1].speed || 0).toFixed(1) : "0";
-  const avgSpeed = time > 0 && distance > 0 ? ((distance / (time / 3600)).toFixed(1)) : 0;
-  const calories = Math.round(distance * 63);
-  const maxSpeed = positions.length > 0 ? Math.max(...positions.map(p => p.speed || 0)).toFixed(1) : 0;
+export default function RunStats({ 
+  distance, 
+  time, 
+  pace, 
+  positions = [],
+  currentSpeed = 0,
+  avgSpeed = 0,
+}) {
+  // Memoize cálculos
+  const statsData = useMemo(() => {
+    const maxSpeedVal = positions.length > 0 
+      ? Math.max(...positions.map(p => p.speed || 0)).toFixed(1) 
+      : 0;
+    
+    const calories = Math.round(distance * 63);
+
+    return {
+      currentSpeed: currentSpeed > 0 ? currentSpeed.toFixed(1) : "0",
+      maxSpeed: maxSpeedVal,
+      avgSpeedVal: avgSpeed > 0 ? avgSpeed.toFixed(1) : 0,
+      calories,
+    };
+  }, [distance, positions, currentSpeed, avgSpeed]);
 
   const stats = [
     {
@@ -21,7 +39,7 @@ export default function RunStats({ distance, time, pace, positions }) {
     },
     {
       label: "Queimadas",
-      value: calories,
+      value: statsData.calories,
       unit: "kcal",
       icon: Flame,
       color: "from-orange-500 to-red-500",
@@ -30,7 +48,7 @@ export default function RunStats({ distance, time, pace, positions }) {
     },
     {
       label: "Vel. Atual",
-      value: currentSpeed,
+      value: statsData.currentSpeed,
       unit: "km/h",
       icon: Gauge,
       color: "from-blue-500 to-cyan-500",
@@ -39,7 +57,7 @@ export default function RunStats({ distance, time, pace, positions }) {
     },
     {
       label: "Vel. Máxima",
-      value: maxSpeed,
+      value: statsData.maxSpeed,
       unit: "km/h",
       icon: Zap,
       color: "from-purple-500 to-pink-500",
@@ -48,7 +66,7 @@ export default function RunStats({ distance, time, pace, positions }) {
     },
     {
       label: "Vel. Média",
-      value: avgSpeed,
+      value: statsData.avgSpeedVal,
       unit: "km/h",
       icon: Eye,
       color: "from-cyan-500 to-blue-500",

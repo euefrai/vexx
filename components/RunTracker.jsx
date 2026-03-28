@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Play, Pause, RotateCcw, TrendingUp } from "lucide-react";
+import React, { useMemo } from "react";
+import { Play, Pause, RotateCcw, TrendingUp, Gauge } from "lucide-react";
 import RunChart from "./RunChart";
 import RunStats from "./RunStats";
 
@@ -14,14 +14,39 @@ export default function RunTracker({
   startTracking,
   pauseTracking,
   resetTracking,
+  currentSpeed = 0,
+  avgSpeed = 0,
+  maxSpeed = 0,
+  isGPSConnected = true,
 }) {
-  // Velocidade média
-  const avgSpeed = time > 0 && distance > 0 ? ((distance / (time / 3600)).toFixed(1)) : 0;
+  // Memoize cálculos para evitar re-renderings desnecessários
+  const metrics = useMemo(() => {
+    return {
+      avgSpeedKmh: avgSpeed > 0 ? avgSpeed.toFixed(1) : "0",
+      currentSpeedKmh: currentSpeed > 0 ? currentSpeed.toFixed(1) : "0",
+      maxSpeedKmh: maxSpeed > 0 ? maxSpeed.toFixed(1) : "0",
+    };
+  }, [avgSpeed, currentSpeed, maxSpeed]);
 
   return (
     <div className="w-full h-full flex flex-col justify-between space-y-3 sm:space-y-4">
       {/* ESTATÍSTICAS EM TEMPO REAL */}
-      <RunStats distance={distance} time={time} pace={pace} positions={positions} />
+      <RunStats 
+        distance={distance} 
+        time={time} 
+        pace={pace} 
+        positions={positions}
+        currentSpeed={currentSpeed}
+        avgSpeed={avgSpeed}
+      />
+
+      {/* STATUS DO GPS */}
+      {!isGPSConnected && (
+        <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2">
+          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+          <span className="text-xs text-red-400 font-semibold">⚠️ GPS Desconectado</span>
+        </div>
+      )}
 
       {/* GRÁFICO */}
       <div className="pt-2 sm:pt-3 border-t border-slate-700/30">
@@ -29,16 +54,30 @@ export default function RunTracker({
         <RunChart positions={positions} />
       </div>
 
-      {/* VELOCIDADE MÉDIA */}
-      {distance > 0 && time > 0 && (
-        <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border border-blue-600/30 hover:border-blue-500/50 rounded-lg transition-all group">
-          <div className="flex items-center gap-2">
-            <TrendingUp size={14} className="text-blue-400 group-hover:text-blue-300 transition-colors" />
-            <span className="text-xs text-slate-300 font-medium group-hover:text-slate-200 transition-colors">Vel. Média</span>
+      {/* VELOCIDADES */}
+      {distance > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {/* Velocidade Atual */}
+          <div className="flex items-center justify-between p-2 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-600/30 hover:border-cyan-500/50 rounded-lg transition-all group">
+            <div className="flex items-center gap-2">
+              <Gauge size={12} className="text-cyan-400" />
+              <span className="text-xs text-slate-300 font-medium">Vel. Atual</span>
+            </div>
+            <span className="text-sm font-black text-cyan-300">
+              {metrics.currentSpeedKmh} km/h
+            </span>
           </div>
-          <span className="text-sm font-black text-blue-300 group-hover:text-blue-200 transition-colors">
-            {avgSpeed} km/h
-          </span>
+
+          {/* Velocidade Média */}
+          <div className="flex items-center justify-between p-2 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border border-blue-600/30 hover:border-blue-500/50 rounded-lg transition-all group">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={12} className="text-blue-400" />
+              <span className="text-xs text-slate-300 font-medium">Vel. Média</span>
+            </div>
+            <span className="text-sm font-black text-blue-300">
+              {metrics.avgSpeedKmh} km/h
+            </span>
+          </div>
         </div>
       )}
 
@@ -57,7 +96,12 @@ export default function RunTracker({
         {!isActive ? (
           <button
             onClick={startTracking}
-            className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950 px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-black shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] uppercase tracking-tight text-xs sm:text-sm transform hover:-translate-y-1 active:translate-y-0 transition-all"
+            disabled={!isGPSConnected}
+            className={`flex items-center gap-2 ${
+              isGPSConnected
+                ? 'bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950'
+                : 'bg-slate-600/50 text-slate-400 cursor-not-allowed'
+            } px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-black shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] uppercase tracking-tight text-xs sm:text-sm transform hover:-translate-y-1 active:translate-y-0 transition-all`}
           >
             <Play size={12} fill="currentColor" className="sm:size-[14px]" />
             <span className="hidden sm:inline">Iniciar</span>

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Map from "@/components/Map";
+import MapUber from "@/components/MapUber";
 import RunTracker from "@/components/RunTracker";
 import LocationSearch from "@/components/LocationSearch";
 import RunSummary from "@/components/RunSummary";
 import { CelebracaoModal } from "@/components/CelebracaoModal";
-import { useTracker } from "@/hooks/useTracker";
+import { useMapTracking } from "@/hooks/useMapTracking";
 import Navbar from "@/components/Navbar";
 import { X, MapPin, Zap } from "lucide-react";
 import RunStatus from "@/components/RunStatus";
@@ -22,7 +22,11 @@ export default function RunPage() {
     pauseTracking,
     resetTracking,
     currentPosition,
-  } = useTracker();
+    heading,
+    currentSpeed,
+    avgSpeed,
+    isGPSConnected,
+  } = useMapTracking();
 
   const [destination, setDestination] = useState(null);
   const [showDestinationModal, setShowDestinationModal] = useState(false);
@@ -63,11 +67,14 @@ export default function RunPage() {
           style={{ minHeight: "clamp(200px, 50vh, 100%)" }}
         >
           <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-emerald-500/5 via-transparent to-blue-500/5" />
-          <Map
+          <MapUber
             positions={positions}
             currentPosition={currentPosition}
+            heading={heading}
+            currentSpeed={currentSpeed}
             destination={destination}
             onDestinationSelect={handleDestinationSelect}
+            showRouteInfo={true}
           />
         </div>
 
@@ -148,6 +155,9 @@ export default function RunPage() {
                   startTracking={startTracking}
                   pauseTracking={pauseTracking}
                   resetTracking={handleReset}
+                  currentSpeed={currentSpeed}
+                  avgSpeed={avgSpeed}
+                  isGPSConnected={isGPSConnected}
                 />
               </div>
             ) : (
@@ -170,7 +180,21 @@ export default function RunPage() {
 
           {/* RODAPÉ */}
           <div className="mt-4 pt-4 border-t border-slate-800/30 text-center hidden sm:block">
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                isGPSConnected 
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+              }`}>
+                📡 {isGPSConnected ? 'GPS Online' : 'GPS Desconectado'}
+              </div>
+              {currentSpeed > 0 && (
+                <div className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  ⚡ {currentSpeed.toFixed(1)} km/h
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed mt-3">
               💡{" "}
               {isActive
                 ? "Sua corrida está sendo rastreada em tempo real"
