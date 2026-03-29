@@ -1,8 +1,5 @@
 "use client"
 
-// Forçar renderização dinâmica (não pré-renderizar durante build)
-export const dynamic = 'force-dynamic'
-
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { motion, AnimatePresence } from "framer-motion"

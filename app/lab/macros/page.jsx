@@ -1,7 +1,5 @@
 "use client"
 
-// Forçar renderização dinâmica (não pré-renderizar durante build)
-export const dynamic = 'force-dynamic'
 
 import { useState, useRef, useEffect } from "react"
 import Navbar from "@/components/Navbar"

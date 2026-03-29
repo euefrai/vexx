@@ -1,7 +1,5 @@
 "use client"
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState, Suspense } from "react"
 import { supabase } from "@/lib/supabase"
 import Navbar from "@/components/Navbar"
@@ -10,8 +8,6 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import PageHeader from "@/components/PageHeader"
-
-export const dynamic = 'force-dynamic';
 
 function ConteudoPerfil() {
   const searchParams = useSearchParams()

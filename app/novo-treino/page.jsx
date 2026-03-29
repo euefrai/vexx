@@ -1,7 +1,5 @@
 "use client"
 
-export const dynamic = 'force-dynamic'
-
 import { useState, useEffect, Suspense } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -9,8 +7,6 @@ import Navbar from "@/components/Navbar"
 import { useGamificacao } from "@/hooks/useGamificacao"
 import { motion, AnimatePresence } from "framer-motion"
 import PageHeader from "@/components/PageHeader"
-
-export const dynamic = 'force-dynamic';
 
 function ConteudoNovoTreino() {
   const router = useRouter()
