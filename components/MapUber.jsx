@@ -60,17 +60,17 @@ const MapUber = ({
   }, [currentPosition]);
 
   // 🎯 Criar ícone do usuário com seta MUITO VISÍVEL
-  const createUserIcon = useCallback((L, rotationDeg = 0) => {
+  const createUserIcon = useCallback((L) => {
     return L.divIcon({
       html: `
-        <div style="
+        <div class="uber-avatar-wrapper" style="
           width: 60px;
           height: 60px;
           display: flex;
           justify-content: center;
           align-items: center;
-          transform: rotate(${rotationDeg}deg);
-          transition: transform 0.3s ease-out;
+          transform: rotate(0deg);
+          transition: transform 0.1s linear;
           filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
         ">
           <!-- Círculo externo (halo) -->
@@ -347,6 +347,14 @@ const MapUber = ({
         mapRef.current.setBearing(newRotation);
       }
 
+      // NOVO: Atualizar rotação do avatar diretamente no DOM para evitar flicker
+      if (markerRef.current && markerRef.current._icon) {
+        const avatarDiv = markerRef.current._icon.querySelector('.uber-avatar-wrapper');
+        if (avatarDiv) {
+          avatarDiv.style.transform = `rotate(${newRotation}deg)`;
+        }
+      }
+
       if (progress < 1) {
         rotationAnimationRef.current = requestAnimationFrame(animate);
       }
@@ -357,12 +365,12 @@ const MapUber = ({
     // Atualizar marcador do usuário
     if (!markerRef.current) {
       markerRef.current = L.marker(latlng, {
-        icon: createUserIcon(L, currentRotationRef.current),
+        icon: createUserIcon(L),
         zIndexOffset: 1000,
       }).addTo(mapRef.current);
     } else {
       markerRef.current.setLatLng(latlng);
-      markerRef.current.setIcon(createUserIcon(L, currentRotationRef.current));
+      // REMOVIDO: setIcon() repetitivo. Ele destruía e recriava a DOM do avatar, causando flashes.
     }
 
     // Adaptative Zoom baseado em velocidade
