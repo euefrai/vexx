@@ -129,8 +129,15 @@ export function useMapTracking() {
         const { latitude, longitude, speed: gpsSpeed, accuracy, heading: gpsHeading } = pos.coords;
         const now = Date.now();
 
-        // Throttle: não processar mais de uma vez a cada 500ms
-        if (now - lastUpdateRef.current < 500) return;
+        // Throttle: processar a cada 1000ms no máximo
+        if (now - lastUpdateRef.current < 1000) return;
+
+        // FILTRO DE PRECISÃO: Evitar "pulos" malucos do GPS
+        if (accuracy > 30) {
+          console.debug(`[MapTracking] ⚠️ Ponto ignorado: precisão ruim (${accuracy}m)`);
+          return;
+        }
+
         lastUpdateRef.current = now;
 
         try {
@@ -148,12 +155,12 @@ export function useMapTracking() {
                 : 0;
 
             // Cálculo de bearing
-            const calculatedBearing = dist > 0.001
+            const calculatedBearing = dist > 0.005
               ? calculateBearing(lastPos.lat, lastPos.lng, latitude, longitude)
               : (gpsHeading ?? lastPos.heading ?? 0);
 
-            // Filtro anti-ruído: só registra se mover mais de 2 metros
-            if (dist > 0.002) {
+            // Filtro anti-ruído: só registra se mover mais de 5 metros
+            if (dist > 0.005) {
               setDistance((prev) => prev + dist);
 
               const newPos = {
