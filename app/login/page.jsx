@@ -53,7 +53,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col justify-center items-center px-6">
+    <div className="min-h-screen text-white flex flex-col justify-center items-center px-6 fade-in">
       <div className="w-full max-w-xs text-center">
         <h1 className="text-3xl font-bold mb-2">Bem-vindo</h1>
         <p className="text-zinc-500 mb-8">Faça login para ver seus treinos</p>
@@ -71,10 +71,10 @@ export default function Login() {
             type="email"
             placeholder="E-mail"
             value={email}
-            className={`w-full bg-zinc-900 border p-3 rounded-xl focus:outline-none transition-colors ${
+            className={`w-full bg-white/5 border p-3 rounded-xl text-sm focus:outline-none transition-all duration-300 backdrop-blur-md ${
               erros.email
-                ? "border-red-500 focus:border-red-600"
-                : "border-zinc-800 focus:border-green-500"
+                ? "border-red-500/50 focus:border-red-500 bg-red-500/5"
+                : "border-white/10 focus:border-green-500 focus:bg-white/10"
             }`}
             onChange={(e) => {
               setEmail(e.target.value)
@@ -89,10 +89,10 @@ export default function Login() {
             type="password"
             placeholder="Senha"
             value={senha}
-            className={`w-full bg-zinc-900 border p-3 rounded-xl focus:outline-none transition-colors ${
+            className={`w-full bg-white/5 border p-3 rounded-xl text-sm focus:outline-none transition-all duration-300 backdrop-blur-md ${
               erros.senha
-                ? "border-red-500 focus:border-red-600"
-                : "border-zinc-800 focus:border-green-500"
+                ? "border-red-500/50 focus:border-red-500 bg-red-500/5"
+                : "border-white/10 focus:border-green-500 focus:bg-white/10"
             }`}
             onChange={(e) => {
               setSenha(e.target.value)
@@ -105,8 +105,8 @@ export default function Login() {
         <button
           type="submit"
           disabled={carregando}
-          className={`bg-green-500 text-black font-bold py-3 rounded-xl transition-all ${
-            carregando ? "opacity-50 cursor-not-allowed" : "hover:bg-green-400 active:scale-95"
+          className={`bg-green-500 text-black font-semibold text-sm py-3 rounded-xl transition-all duration-300 ${
+            carregando ? "opacity-50 cursor-not-allowed" : "hover:bg-green-400 hover:shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:-translate-y-0.5 active:scale-95"
           }`}
         >
           {carregando ? "Entrando..." : "Entrar"}

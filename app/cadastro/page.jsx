@@ -73,7 +73,7 @@ export default function Cadastro() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col justify-center items-center px-6">
+    <div className="min-h-screen text-white flex flex-col justify-center items-center px-6 fade-in">
       <div className="w-full max-w-xs text-center mb-8">
         <h1 className="text-4xl font-black uppercase italic text-green-500 tracking-tighter mb-2">
           Elite Squad
@@ -95,10 +95,10 @@ export default function Cadastro() {
             type="text"
             placeholder="Nome completo"
             value={nome}
-            className={`w-full bg-zinc-900 border p-4 rounded-2xl focus:outline-none transition-colors font-medium ${
+            className={`w-full bg-white/5 border p-4 rounded-xl text-sm focus:outline-none transition-all duration-300 backdrop-blur-md ${
               erros.nome
-                ? "border-red-500 focus:border-red-600"
-                : "border-zinc-800 focus:border-green-500"
+                ? "border-red-500/50 focus:border-red-500 bg-red-500/5"
+                : "border-white/10 focus:border-green-500 focus:bg-white/10"
             }`}
             onChange={(e) => {
               setNome(e.target.value)
@@ -113,10 +113,10 @@ export default function Cadastro() {
             type="email"
             placeholder="E-mail"
             value={email}
-            className={`w-full bg-zinc-900 border p-4 rounded-2xl focus:outline-none transition-colors font-medium ${
+            className={`w-full bg-white/5 border p-4 rounded-xl text-sm focus:outline-none transition-all duration-300 backdrop-blur-md ${
               erros.email
-                ? "border-red-500 focus:border-red-600"
-                : "border-zinc-800 focus:border-green-500"
+                ? "border-red-500/50 focus:border-red-500 bg-red-500/5"
+                : "border-white/10 focus:border-green-500 focus:bg-white/10"
             }`}
             onChange={(e) => {
               setEmail(e.target.value)
@@ -131,10 +131,10 @@ export default function Cadastro() {
             type="password"
             placeholder="Senha"
             value={senha}
-            className={`w-full bg-zinc-900 border p-4 rounded-2xl focus:outline-none transition-colors font-medium ${
+            className={`w-full bg-white/5 border p-4 rounded-xl text-sm focus:outline-none transition-all duration-300 backdrop-blur-md ${
               erros.senha
-                ? "border-red-500 focus:border-red-600"
-                : "border-zinc-800 focus:border-green-500"
+                ? "border-red-500/50 focus:border-red-500 bg-red-500/5"
+                : "border-white/10 focus:border-green-500 focus:bg-white/10"
             }`}
             onChange={(e) => {
               setSenha(e.target.value)
@@ -149,10 +149,10 @@ export default function Cadastro() {
             type="password"
             placeholder="Confirmar senha"
             value={senhaConfirm}
-            className={`w-full bg-zinc-900 border p-4 rounded-2xl focus:outline-none transition-colors font-medium ${
+            className={`w-full bg-white/5 border p-4 rounded-xl text-sm focus:outline-none transition-all duration-300 backdrop-blur-md ${
               erros.senhaConfirm
-                ? "border-red-500 focus:border-red-600"
-                : "border-zinc-800 focus:border-green-500"
+                ? "border-red-500/50 focus:border-red-500 bg-red-500/5"
+                : "border-white/10 focus:border-green-500 focus:bg-white/10"
             }`}
             onChange={(e) => {
               setSenhaConfirm(e.target.value)
@@ -165,8 +165,8 @@ export default function Cadastro() {
         <button
           type="submit"
           disabled={salvando}
-          className={`mt-2 bg-green-500 text-black font-black py-4 rounded-2xl uppercase tracking-widest transition-all ${
-            salvando ? "opacity-50 cursor-not-allowed" : "hover:bg-green-400 active:scale-95 shadow-lg shadow-green-500/20"
+          className={`mt-2 bg-green-500 text-black font-semibold py-4 rounded-xl text-sm uppercase tracking-widest transition-all duration-300 ${
+            salvando ? "opacity-50 cursor-not-allowed" : "hover:bg-green-400 hover:shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:-translate-y-0.5 active:scale-95"
           }`}
         >
           {salvando ? "PROCESSANDO..." : "CRIAR CONTA 🔥"}
