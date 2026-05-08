@@ -113,7 +113,9 @@ function ConteudoPerfil() {
         await navigator.clipboard.writeText(window.location.href)
         alert("Link copiado! ⚡")
       }
-    } catch (err) { console.log(err) }
+    } catch (err) { 
+      // Erro ao compartilhar
+    }
   }
 
   const getInfoIMC = () => {

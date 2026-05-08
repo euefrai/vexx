@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { z } from "zod";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const requestSchema = z.object({
+  image: z.string().min(1, "Imagem é obrigatória"),
+  tipo: z.enum(["comida", "rotulo"], { errorMap: () => ({ message: "Tipo deve ser 'comida' ou 'rotulo'" }) }),
+});
+
 export async function POST(req) {
   try {
-    const { image, tipo } = await req.json(); // image: base64, tipo: 'comida' ou 'rotulo'
+    const body = await req.json();
+    const { image, tipo } = requestSchema.parse(body); // Validação com zod
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: "API Key não configurada no servidor." }, { status: 500 });

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
+import { toast } from "react-toastify"
 
 export default function Cadastro() {
   const router = useRouter()
@@ -13,7 +14,7 @@ export default function Cadastro() {
 
   async function cadastrar() {
     if (!email || !senha) {
-      alert("Preencha todos os campos!")
+      toast.error("Preencha todos os campos!")
       return
     }
 
@@ -27,10 +28,10 @@ export default function Cadastro() {
 
       if (error) throw error
 
-      alert("Conta criada com sucesso! Verifique seu e-mail se necessário.")
+      toast.success("Conta criada com sucesso! Verifique seu e-mail se necessário.")
       router.push("/login")
     } catch (error) {
-      alert("Erro ao cadastrar: " + error.message)
+      toast.error("Erro ao cadastrar: " + error.message)
     } finally {
       setSalvando(false) // ✅ Destrava o botão
     }

@@ -14,17 +14,22 @@ const nextConfig = {
   reactStrictMode: true,
   // Usa o compilador SWC do Rust (muito mais rápido que o antigo)
 
-  
-  // Mantemos isso apenas para o deploy na Vercel não barrar por tipagem
-  typescript: { 
-    ignoreBuildErrors: true 
+  turbopack: {
+    root: process.cwd(),
   },
+
+  outputFileTracingRoot: process.cwd(),
+
+  // Mantemos isso apenas para o deploy na Vercel não barrar por tipagem
+  // typescript: { 
+  //   ignoreBuildErrors: true
+  // },
 
   // Se precisar de imagens externas (ex: fotos de perfil do Google/Supabase), 
   // adicione os domínios aqui futuramente
-  images: {
-    formats: ['image/avif', 'image/webp'],
-  },
+  // images: {
+  //   formats: ['image/avif', 'image/webp'],
+  // },
 };
 
 export default withPWA(nextConfig);

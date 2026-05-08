@@ -26,7 +26,7 @@ export default function InstallPrompt() {
     const { outcome } = await deferredPrompt.userChoice
     
     if (outcome === "accepted") {
-      console.log("Usuário aceitou a instalação")
+      // Usuário aceitou a instalação
     }
     setDeferredPrompt(null)
     setShowPrompt(false)
