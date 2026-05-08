@@ -3,12 +3,11 @@
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/context/ToastContext"
+import { toast } from "react-toastify"
 import { validarLogin, MENSAGENS_SUCESSO } from "@/utils/validators"
 
 export default function Login() {
   const router = useRouter()
-  const toast = useToast()
 
   const [email, setEmail] = useState("")
   const [senha, setSenha] = useState("")
