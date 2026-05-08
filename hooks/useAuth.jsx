@@ -4,31 +4,77 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
-export default function useAuth(){
- const [isAuthenticated, setIsAuthenticated] = useState(false)
- const [loading, setLoading] = useState(true)
- const router = useRouter()
+export default function useAuth(requireAuth = true) {
+  const router = useRouter()
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
- useEffect(()=>{
+  useEffect(() => {
+    let isMounted = true
 
-  verificar()
+    const verificarAutenticacao = async () => {
+      try {
+        const { data, error: authError } = await supabase.auth.getUser()
 
- },[])
+        if (!isMounted) return
 
- async function verificar(){
+        if (authError) {
+          setError(authError.message)
+          setUser(null)
+          if (requireAuth) {
+            router.push("/login")
+          }
+          return
+        }
 
-  const { data } = await supabase.auth.getUser()
+        if (!data?.user) {
+          setUser(null)
+          if (requireAuth) {
+            router.push("/login")
+          }
+          return
+        }
 
-  if(!data.user){
-   router.push("/login")
-   setIsAuthenticated(false)
-  } else {
-   setIsAuthenticated(true)
+        setUser(data.user)
+        setError(null)
+      } catch (err) {
+        if (!isMounted) return
+        setError(err.message)
+        if (requireAuth) {
+          router.push("/login")
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    verificarAutenticacao()
+
+    return () => {
+      isMounted = false
+    }
+  }, [router, requireAuth])
+
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      router.push("/")
+    } catch (err) {
+      setError(err.message)
+    }
   }
-  setLoading(false)
 
- }
-
- return { isAuthenticated, loading }
-
+  return {
+    user,
+    loading,
+    error,
+    logout,
+    isAuthenticated: !!user,
+    isAdmin: user?.user_metadata?.role === "admin",
+  }
 }
+

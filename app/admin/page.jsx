@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { motion, AnimatePresence } from "framer-motion"
 import Navbar from "@/components/Navbar"
 import AdminGuard from "@/components/AdminGuard"
+import PageHeader from "@/components/PageHeader"
 
 export default function AdminMaster() {
   const [abaAtiva, setAbaAtiva] = useState("arsenal") 
@@ -104,6 +105,8 @@ export default function AdminMaster() {
     <AdminGuard>
       <div className="min-h-screen bg-black text-white pb-32 font-sans">
         
+        <PageHeader icon="🛡️" title="Admin" subtitle="Painel de controle para operadores" color="red" />
+
         {/* HEADER UNIFICADO */}
         <div className="max-w-5xl mx-auto p-6 text-center">
           <h1 className="text-green-500 text-5xl font-black italic uppercase tracking-tighter leading-none mb-2 drop-shadow-[0_0_15px_rgba(34,197,94,0.3)]">

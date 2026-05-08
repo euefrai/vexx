@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { useEffect, useState } from "react"
+import PageHeader from "@/components/PageHeader"
 
 export default function LabPage() {
 
@@ -27,7 +28,6 @@ export default function LabPage() {
   const progressoCal = Math.min((calorias / META_CALORIAS) * 100, 100)
   const progressoProt = Math.min((proteina / META_PROTEINA) * 100, 100)
 
-  // 🤖 IA OFFLINE (AGORA CORRETA)
   function getMensagem() {
     if (progressoProt >= 100) return "🔥 Shape batido hoje. Monstro."
     if (progressoProt >= 70) return "💪 Tá no caminho. Continua."
@@ -35,30 +35,32 @@ export default function LabPage() {
     return "💀 Tá fraco hoje..."
   }
 
+  // 🚀 RUN ADICIONADO NO TOPO
   const tools = [
+    {
+      nome: "RUN",
+      desc: "Corrida em tempo real (GPS)",
+      icon: "🏃‍♂️",
+      link: "/run",
+      cor: "border-emerald-500/40"
+    },
+
     { nome: "CRONÔMETRO", desc: "Tempo Total de Treino", icon: "⏱️", link: "/lab/cronometro", cor: "border-blue-500/30" },
     { nome: "DESCANSO", desc: "Timer de Intervalo", icon: "⏳", link: "/lab/descanso", cor: "border-orange-500/30" },
     { nome: "MEDIR IMC", desc: "Índice de Massa Corporal", icon: "⚖️", link: "/lab/imc", cor: "border-green-500/30" },
-    { nome: "RPM / 1RM", desc: "Cálculo de Força Máxima", icon: "⚡", link: "/lab/rpm", cor: "border-purple-500/30" },
+    { nome: "1RM", desc: "Força máxima estimada", icon: "⚡", link: "/lab/1rm", cor: "border-purple-500/30" },
+    { nome: "COOPER", desc: "Teste de 12 minutos", icon: "🏃", link: "/lab/cooper", cor: "border-emerald-500/30" },
+    { nome: "ZONAS FC", desc: "Treino por pulso", icon: "❤️", link: "/lab/zona-fc", cor: "border-red-500/30" },
+    { nome: "CALORIAS", desc: "Estimativa de gasto", icon: "🔥", link: "/lab/calorias", cor: "border-orange-500/30" },
+    { nome: "VO2", desc: "Estimativa de capacidade aeróbica", icon: "🧠", link: "/lab/vo2", cor: "border-blue-500/30" },
     { nome: "MACROS", desc: "Proteína/Carbo/Gordura", icon: "🥩", link: "/lab/macros", cor: "border-red-500/30" },
     { nome: "METABOLISMO", desc: "Gasto Calórico Diário", icon: "🔥", link: "/lab/tmb", cor: "border-yellow-500/30" },
   ]
 
   return (
     <div className="max-w-md mx-auto p-6 pb-32 min-h-screen bg-black text-white font-sans">
+      <PageHeader icon="🧪" title="Laboratório" subtitle="Ferramentas e calculadoras de fitness" color="purple" />
 
-      {/* HEADER */}
-      <header className="mb-6">
-        <h1 className="text-3xl font-black uppercase italic text-green-500 tracking-tighter">
-          BIOMETRICS <span className="text-white">LAB</span>
-        </h1>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="h-[2px] w-12 bg-green-500"></div>
-          <p className="text-zinc-500 text-[9px] font-black uppercase tracking-[0.2em]">
-            Elite Squad Performance Tools
-          </p>
-        </div>
-      </header>
 
       {/* 🔥 DASHBOARD */}
       <div className="bg-zinc-900/40 border border-green-500/20 p-4 rounded-3xl mb-8">
@@ -111,6 +113,13 @@ export default function LabPage() {
             <Link href={tool.link}>
               <div className={`group relative bg-zinc-900/40 border ${tool.cor} p-5 rounded-[2.5rem] hover:bg-zinc-800/60 transition-all active:scale-95 h-full flex flex-col justify-between overflow-hidden`}>
                 
+                {/* 🔥 BADGE LIVE NO RUN */}
+                {tool.nome === "RUN" && (
+                  <span className="absolute top-2 right-3 text-[8px] bg-emerald-500 text-black px-2 py-[2px] rounded-full font-black animate-pulse">
+                    LIVE
+                  </span>
+                )}
+
                 <div className="absolute -right-4 -top-4 w-12 h-12 bg-white/5 blur-2xl group-hover:bg-green-500/10 transition-colors"></div>
                 
                 <div>

@@ -1,4 +1,6 @@
 "use client"
+
+
 import { useState, useRef, useEffect } from "react"
 import Navbar from "@/components/Navbar"
 import { alimentos } from "../../data/alimentos"

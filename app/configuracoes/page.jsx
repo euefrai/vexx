@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
+import PageHeader from "@/components/PageHeader"
 
 export default function Configuracoes() {
   const [loading, setLoading] = useState(false)
@@ -97,6 +98,8 @@ export default function Configuracoes() {
 
   return (
     <div className="max-w-md mx-auto p-6 pb-24 text-white min-h-screen bg-black font-sans">
+      <PageHeader icon="⚙️" title="Configurações" subtitle="Personalize sua experiência" color="blue" />
+
       <div className="flex items-center gap-4 mb-10">
         <button onClick={() => router.back()} className="text-zinc-500 font-bold hover:text-white transition-colors">← VOLTAR</button>
         <h1 className="text-xl font-black uppercase italic text-green-500 tracking-tighter">Configurações</h1>

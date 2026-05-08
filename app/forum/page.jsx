@@ -1,9 +1,11 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import Navbar from "@/components/Navbar"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
+import PageHeader from "@/components/PageHeader"
 
 export default function Forum() {
   const [topicos, setTopicos] = useState([])
@@ -87,11 +89,8 @@ export default function Forum() {
   return (
     <div className="min-h-screen bg-black text-white font-sans pb-24">
       <div className="max-w-md mx-auto p-4">
+        <PageHeader icon="💬" title="Fórum" subtitle="Discussões e estratégias da comunidade" color="blue" />
         
-        <div className="flex flex-col mb-8 pt-6">
-          <h1 className="text-2xl font-black italic uppercase text-green-500 tracking-tighter">Centro de Inteligência</h1>
-          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Fórum • Briefing de Dúvidas</p>
-        </div>
 
         <form onSubmit={criarPergunta} className="mb-10 bg-zinc-900/30 p-4 rounded-[2rem] border border-zinc-800 focus-within:border-green-500/50 transition-all">
           <textarea 

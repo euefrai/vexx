@@ -17,20 +17,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// 1. Mova o themeColor para cá para sumir os avisos do terminal
 export const viewport: Viewport = {
   themeColor: "#22c55e",
 };
 
-// 2. Unifiquei os dois blocos de metadata em um só
 export const metadata: Metadata = {
   title: "VEXX SQUAD",
   description: "Elite Training Log & Community",
   manifest: "/manifest.json",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   openGraph: {
     title: 'VEXX SQUAD',
     description: 'Treine como um soldado de elite.',
-    images: ['/logo-compartilhamento.png'], 
+    images: ['/logo-compartilhamento.png'],
   },
 };
 

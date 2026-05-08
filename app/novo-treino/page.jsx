@@ -6,8 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Navbar from "@/components/Navbar"
 import { useGamificacao } from "@/hooks/useGamificacao"
 import { motion, AnimatePresence } from "framer-motion"
-
-export const dynamic = 'force-dynamic';
+import PageHeader from "@/components/PageHeader"
 
 function ConteudoNovoTreino() {
   const router = useRouter()
@@ -160,14 +159,7 @@ function ConteudoNovoTreino() {
 
   return (
     <div className="max-w-md mx-auto p-4 pb-24 text-white min-h-screen bg-black font-sans">
-      <header className="mb-8 mt-4 text-center">
-        <h1 className="text-3xl font-black uppercase italic tracking-tighter text-green-500">
-          {modoEdicao ? "EDITAR MISSÃO" : "REGISTRAR MISSÃO"}
-        </h1>
-        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">
-          Operador: {autor || "..."}
-        </p>
-      </header>
+      <PageHeader icon="🏋️" title="Novo Treino" subtitle="Crie e personalize seu treino" color="green" />
 
       <div className="space-y-6">
         {/* 🔥 BOTÃO GERADOR IA */}

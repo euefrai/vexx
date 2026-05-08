@@ -7,8 +7,7 @@ import TreinoCard from "@/components/TreinoCard"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-
-export const dynamic = 'force-dynamic';
+import PageHeader from "@/components/PageHeader"
 
 function ConteudoPerfil() {
   const searchParams = useSearchParams()
@@ -176,6 +175,7 @@ function ConteudoPerfil() {
 
   return (
     <div className="max-w-md mx-auto p-4 pb-24 text-white min-h-screen bg-black font-sans">
+      <PageHeader icon="👤" title="Perfil" subtitle="Seu histórico e conquistas" color="green" />
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-xl font-black uppercase italic tracking-tighter text-green-500">
           {isProprioPerfil ? "Elite Squad / Perfil" : `Dossiê / ${perfil?.username}`}

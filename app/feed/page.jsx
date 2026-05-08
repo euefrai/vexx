@@ -1,10 +1,13 @@
 "use client"
 
+
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import TreinoCard from "@/components/TreinoCard"
+import PageHeader from "@/components/PageHeader"
 import Navbar from "@/components/Navbar"
 import BotaoFlutuante from "@/components/BotaoFlutuante"
+import { MotivacaoDoDia } from "@/components/MotivacaoDoDia"
 import Link from "next/link"
 import { useGamificacao } from "@/hooks/useGamificacao"
 import { useRanks } from "@/hooks/useRanks" 
@@ -127,6 +130,12 @@ export default function Feed() {
   return (
     <>
       <div className="max-w-md mx-auto p-4 pb-24 min-h-screen bg-black font-sans text-white">
+        <PageHeader icon="🏠" title="Feed" subtitle="Acompanhe os treinos da sua squad" color="green" />
+        
+        {/* MOTIVAÇÃO DO DIA */}
+        <div className="mb-6 mt-4">
+          <MotivacaoDoDia />
+        </div>
         
         {/* HEADER */}
         <div className="flex justify-between items-center mb-8 mt-4">
