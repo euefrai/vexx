@@ -14,9 +14,9 @@ export async function POST(req) {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    // 🧠 OTIMIZAÇÃO: Mantém apenas as últimas 15 mensagens para economizar tokens
-    // e garantir que a IA foque no contexto mais recente.
-    const contextoLimitado = historico.slice(-15);
+    // 🧠 OTIMIZAÇÃO: Mantém as últimas 20 mensagens (memória curta solicitada)
+    // para garantir foco e economia de tokens de contexto.
+    const contextoLimitado = historico.slice(-20);
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",

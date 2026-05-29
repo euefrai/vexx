@@ -280,7 +280,7 @@ const MapUber = ({
           bearing: 0,
         }).setView([-15.7942, -47.8822], 16);
 
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           maxZoom: 20,
           attribution: "",
         }).addTo(mapRef.current);
@@ -307,6 +307,10 @@ const MapUber = ({
 
         // Click no mapa para ADICIONAR ou ALTERAR destino livremente a qualquer instante
         mapRef.current.on("click", (e) => {
+          if (destinationRef.current) {
+            console.debug("[MapUber] Destino já ativo. Clique bloqueado. Use o botão Limpar.");
+            return;
+          }
           if (onDestinationSelectRef.current) {
             onDestinationSelectRef.current({
               lat: e.latlng.lat,
@@ -465,7 +469,7 @@ const MapUber = ({
 
     destinationMarkerRef.current = L.marker(
       [destination.lat, destination.lng],
-      { icon: createDestinationIcon(L), draggable: true }
+      { icon: createDestinationIcon(L), draggable: false }
     ).addTo(mapRef.current);
 
     destinationMarkerRef.current.on("dragend", (e) => {
@@ -661,6 +665,10 @@ const MapUber = ({
 
         .leaflet-container {
           cursor: crosshair !important;
+        }
+
+        .leaflet-tile {
+          filter: invert(90%) hue-rotate(180deg) brightness(85%) contrast(100%) saturate(110%);
         }
       `}</style>
 

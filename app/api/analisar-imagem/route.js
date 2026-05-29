@@ -30,8 +30,8 @@ export async function POST(req) {
     const systemPrompt =
       tipo === "rotulo"
         ? `Você é um scanner de rótulos de elite do VEXX SQUAD. 
-           Analise a imagem e extraia os valores nutricionais da porção principal.
-           Retorne APENAS um JSON no formato:
+           Analise a imagem da tabela nutricional e extraia os valores correspondentes.
+           Retorne APENAS um JSON no formato exato:
            {
              "alimento": "Nome do Produto",
              "proteina": number,
@@ -39,17 +39,19 @@ export async function POST(req) {
              "gordura": number,
              "calorias": number,
              "nota_pureza": number,
-             "veredito": "texto curto e motivador"
+             "veredito": "texto curto tático analisando os conservantes e pureza dos macros de forma militar"
            }`
         : `Você é um scanner de alimentos do VEXX SQUAD. 
-           Identifique os alimentos na foto e estime o peso.
-           Retorne APENAS um JSON no formato:
+           Identifique os alimentos na foto, estime o peso e calcule seus macronutrientes.
+           Retorne APENAS um JSON no formato exato:
            {
              "alimento": "Descrição rápida do prato",
              "proteina": number,
              "carbo": number,
              "gordura": number,
-             "calorias": number
+             "calorias": number,
+             "nota_pureza": number,
+             "veredito": "texto curto tático avaliando a refeição como combustível operacional"
            }`;
 
     // 2. Chamada para a API (Vision)

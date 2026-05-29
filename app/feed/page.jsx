@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import TreinoCard from "@/components/TreinoCard"
 import PageHeader from "@/components/PageHeader"
@@ -26,9 +26,15 @@ export default function Feed() {
   const [challenges, setChallenges] = useState([])
   const [showStoryModal, setShowStoryModal] = useState(false)
   const [activeStoryIdx, setActiveStoryIdx] = useState(null)
+  
+  // Criação de Story
   const [novoStoryText, setNovoStoryText] = useState("")
   const [novoStoryMedia, setNovoStoryMedia] = useState("")
+  const [imagePreview, setImagePreview] = useState("")
   const [showCreateStory, setShowCreateStory] = useState(false)
+
+  // Gestos de Deslizar (Swipe) para Stories
+  const [touchStartX, setTouchStartX] = useState(0)
   
   const { adicionarXP } = useGamificacao()
   const { getRanks, calcularRank } = useRanks()
@@ -163,6 +169,20 @@ export default function Feed() {
     }
   }
 
+  // --- ARQUIVO LOCAL DE UPLOAD E LEITURA EM BASE64 ---
+  const handleStoryFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64 = reader.result
+      setNovoStoryMedia(base64)
+      setImagePreview(base64)
+    }
+    reader.readAsDataURL(file)
+  }
+
   async function publicarStoryFeed() {
     if (!novoStoryText.trim()) return
 
@@ -183,6 +203,7 @@ export default function Feed() {
 
       setNovoStoryText("")
       setNovoStoryMedia("")
+      setImagePreview("")
       setShowCreateStory(false)
       await carregarStoriesEChallenges(user)
     } catch (err) {
@@ -193,6 +214,12 @@ export default function Feed() {
       const expires = new Date(Date.now() + 24 * 3600000).toISOString()
       const localStories = JSON.parse(localStorage.getItem("vexx_stories") || "[]")
 
+      const { data: userData } = await supabase
+        .from("usuarios")
+        .select("username, foto")
+        .eq("id", user.id)
+        .single()
+
       const novoItem = {
         id: `story-${Date.now()}`,
         usuario_id: user.id,
@@ -200,7 +227,10 @@ export default function Feed() {
         media_url: novoStoryMedia || null,
         created_at: new Date().toISOString(),
         expires_at: expires,
-        usuarios: { username: user.email.split("@")[0], foto: null }
+        usuarios: { 
+          username: userData?.username || user.email.split("@")[0], 
+          foto: userData?.foto || null 
+        }
       }
 
       const atualizados = [novoItem, ...localStories]
@@ -209,6 +239,7 @@ export default function Feed() {
 
       setNovoStoryText("")
       setNovoStoryMedia("")
+      setImagePreview("")
       setShowCreateStory(false)
     }
   }
@@ -280,6 +311,39 @@ export default function Feed() {
     t.grupo?.toLowerCase().includes(busca.toLowerCase())
   )
 
+  // --- NAVEGAÇÃO DOS STORIES (ESTILO INSTAGRAM/WHATSAPP) ---
+  const nextStory = useCallback(() => {
+    if (activeStoryIdx < stories.length - 1) {
+      setActiveStoryIdx(prev => prev + 1)
+    } else {
+      setShowStoryModal(false)
+      setActiveStoryIdx(null)
+    }
+  }, [activeStoryIdx, stories.length])
+
+  const prevStory = useCallback(() => {
+    if (activeStoryIdx > 0) {
+      setActiveStoryIdx(prev => prev - 1)
+    }
+  }, [activeStoryIdx])
+
+  const handleTouchStart = (e) => {
+    setTouchStartX(e.changedTouches[0].clientX)
+  }
+
+  const handleTouchEnd = (e) => {
+    const touchEndX = e.changedTouches[0].clientX
+    const diffX = touchStartX - touchEndX
+    
+    if (diffX > 50) {
+      // Deslizar para a esquerda -> Próximo Story
+      nextStory()
+    } else if (diffX < -50) {
+      // Deslizar para a direita -> Story Anterior
+      prevStory()
+    }
+  }
+
   return (
     <>
       <div className="max-w-md mx-auto p-4 pb-24 min-h-screen bg-zinc-950 font-sans text-zinc-100 relative">
@@ -315,7 +379,7 @@ export default function Feed() {
                 <div className="w-16 h-16 rounded-full p-[3.5px] bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg relative">
                   <div className="w-full h-full rounded-full border border-black overflow-hidden bg-zinc-900">
                     <img 
-                      src={st.usuarios?.foto || "https://via.placeholder.com/150"} 
+                      src={st.usuarios?.foto || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
                       className="w-full h-full object-cover"
                       alt={st.usuarios?.username}
                     />
@@ -366,7 +430,7 @@ export default function Feed() {
 
           <div className="space-y-3">
             {challenges.slice(0, 2).map((ch, idx) => (
-              <div key={ch.id || idx} className="bg-black/35 border border-zinc-850/50 p-4 rounded-2xl relative">
+              <div key={ch.id || idx} className="bg-black/35 border border-zinc-855 p-4 rounded-2xl relative">
                 <div className="flex justify-between items-start gap-4">
                   <div>
                     <h4 className="text-xs font-black uppercase italic text-zinc-200">{ch.title}</h4>
@@ -501,31 +565,40 @@ export default function Feed() {
         </footer>
       </div>
 
-      {/* MODAL STORY VIEWER FULLSCREEN */}
+      {/* MODAL STORY VIEWER FULLSCREEN (INSTAGRAM/WHATSAPP GESTURES) */}
       <AnimatePresence>
         {showStoryModal && activeStoryIdx !== null && (
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/95 backdrop-blur-md z-[500] flex flex-col justify-between p-4"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="fixed inset-0 bg-black/95 backdrop-blur-md z-[500] flex flex-col justify-between p-4 relative"
           >
+            {/* Tap Gestures Overlay (Left 30% goes back, Right 70% goes forward) */}
+            <div className="absolute inset-x-0 top-20 bottom-16 z-[501] flex select-none">
+              <div 
+                onClick={(e) => { e.stopPropagation(); prevStory(); }}
+                className="w-[30%] h-full cursor-pointer active:bg-white/5 transition-all"
+                title="Story Anterior"
+              />
+              <div 
+                onClick={(e) => { e.stopPropagation(); nextStory(); }}
+                className="w-[70%] h-full cursor-pointer active:bg-white/5 transition-all"
+                title="Próximo Story"
+              />
+            </div>
+
             {/* Header com foto do usuário e barra de progresso */}
-            <div className="w-full max-w-md mx-auto space-y-4 pt-4">
+            <div className="w-full max-w-md mx-auto space-y-4 pt-4 relative z-[502]">
               {/* Barra de progresso */}
               <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: "0%" }} 
                   animate={{ width: "100%" }} 
                   transition={{ duration: 6, ease: "linear" }}
-                  onAnimationComplete={() => {
-                    if (activeStoryIdx < stories.length - 1) {
-                      setActiveStoryIdx(activeStoryIdx + 1);
-                    } else {
-                      setShowStoryModal(false);
-                      setActiveStoryIdx(null);
-                    }
-                  }}
+                  onAnimationComplete={nextStory}
                   className="h-full bg-emerald-500"
                   key={activeStoryIdx} // Reseta a animação ao mudar de story
                 />
@@ -536,7 +609,7 @@ export default function Feed() {
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full border border-emerald-500/50 overflow-hidden bg-zinc-900">
                     <img 
-                      src={stories[activeStoryIdx]?.usuarios?.foto || "https://via.placeholder.com/150"} 
+                      src={stories[activeStoryIdx]?.usuarios?.foto || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
                       className="w-full h-full object-cover" 
                       alt="avatar" 
                     />
@@ -548,7 +621,8 @@ export default function Feed() {
                 </div>
                 <button 
                   onClick={() => { setShowStoryModal(false); setActiveStoryIdx(null); }}
-                  className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-white font-black hover:bg-zinc-800"
+                  className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-white font-black hover:bg-zinc-800 border border-zinc-800 pointer-events-auto"
+                  style={{ position: 'relative', zIndex: 600 }}
                 >
                   ✕
                 </button>
@@ -556,7 +630,7 @@ export default function Feed() {
             </div>
 
             {/* Conteúdo Central */}
-            <div className="flex-1 w-full max-w-md mx-auto flex flex-col items-center justify-center py-6">
+            <div className="flex-1 w-full max-w-md mx-auto flex flex-col items-center justify-center py-6 relative z-[502] pointer-events-none">
               {stories[activeStoryIdx]?.media_url && (
                 <div className="w-full h-[50vh] max-h-[380px] rounded-3xl overflow-hidden mb-6 border border-zinc-900 shadow-2xl bg-zinc-950">
                   <img 
@@ -567,7 +641,7 @@ export default function Feed() {
                 </div>
               )}
               
-              <div className="bg-zinc-900/60 border border-zinc-850 p-5 rounded-2xl w-full text-center backdrop-blur-sm">
+              <div className="bg-zinc-900/80 border border-zinc-850 p-5 rounded-2xl w-full text-center backdrop-blur-sm">
                 <p className="text-sm font-bold text-white leading-relaxed">
                   {stories[activeStoryIdx]?.text}
                 </p>
@@ -575,7 +649,7 @@ export default function Feed() {
             </div>
 
             {/* Footer */}
-            <div className="w-full max-w-md mx-auto text-center pb-6">
+            <div className="w-full max-w-md mx-auto text-center pb-6 relative z-[502]">
               <span className="text-[7.5px] font-bold text-zinc-500 uppercase tracking-widest">
                 VEXX ATHLETICS STORIES // Expira em 24h
               </span>
@@ -584,7 +658,7 @@ export default function Feed() {
         )}
       </AnimatePresence>
 
-      {/* MODAL DE CRIAÇÃO DE STORY */}
+      {/* MODAL DE CRIAÇÃO DE STORY COM UPLOAD DE IMAGEM FÍSICA (REPLACED RAW URL INPUT) */}
       <AnimatePresence>
         {showCreateStory && (
           <motion.div 
@@ -596,34 +670,58 @@ export default function Feed() {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-base font-black italic text-emerald-400 uppercase">Novo Story</h2>
               <button 
-                onClick={() => setShowCreateStory(false)}
-                className="w-8 h-8 rounded-full bg-zinc-900 text-white font-bold flex items-center justify-center"
+                onClick={() => { setShowCreateStory(false); setImagePreview(""); setNovoStoryMedia(""); }}
+                className="w-8 h-8 rounded-full bg-zinc-900 text-white font-bold flex items-center justify-center border border-zinc-800"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4.5">
               <textarea 
                 value={novoStoryText}
                 onChange={(e) => setNovoStoryText(e.target.value)}
                 placeholder="O que está acontecendo no treino hoje?"
-                className="w-full bg-zinc-900 border border-zinc-850 p-4 rounded-2xl text-xs font-semibold outline-none text-zinc-100 focus:border-emerald-500 transition-all placeholder:text-zinc-600"
+                className="w-full bg-zinc-900 border border-zinc-850 p-4 rounded-2xl text-xs font-semibold outline-none text-zinc-100 focus:border-emerald-500 transition-all placeholder:text-zinc-650 resize-none"
                 rows={3}
               />
 
-              <input 
-                value={novoStoryMedia}
-                onChange={(e) => setNovoStoryMedia(e.target.value)}
-                placeholder="Link da imagem/foto (opcional)"
-                className="w-full bg-zinc-900 border border-zinc-850 p-4 rounded-2xl text-xs font-semibold outline-none text-zinc-100 focus:border-emerald-500 transition-all placeholder:text-zinc-600"
-              />
+              {/* 📷 FILE IMAGE UPLOADER & THUMBNAIL PREVIEW */}
+              <div className="space-y-2">
+                <label className="text-[8px] font-black uppercase tracking-widest text-zinc-500 block px-1">
+                  Mídia do Story (Upload Local)
+                </label>
+                
+                {imagePreview ? (
+                  <div className="relative w-full h-40 rounded-2xl overflow-hidden border border-zinc-850 bg-zinc-950 flex items-center justify-center">
+                    <img src={imagePreview} className="w-full h-full object-cover" alt="Story preview" />
+                    <button
+                      type="button"
+                      onClick={() => { setNovoStoryMedia(""); setImagePreview(""); }}
+                      className="absolute top-2 right-2 bg-black/85 text-red-500 border border-red-500/25 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wide shadow-md active:scale-95 transition-transform"
+                    >
+                      ✕ Remover
+                    </button>
+                  </div>
+                ) : (
+                  <label className="w-full border border-dashed border-zinc-800 hover:border-emerald-500/50 py-7 rounded-2xl font-black bg-zinc-900/30 hover:bg-emerald-500/5 transition-all duration-300 uppercase italic text-[9px] tracking-widest flex flex-col items-center justify-center gap-2 cursor-pointer text-zinc-400">
+                    <span className="text-xl">📷</span>
+                    <span>SELECIONAR FOTO DO TREINO</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleStoryFileChange} 
+                      className="hidden" 
+                    />
+                  </label>
+                )}
+              </div>
 
               <button 
                 onClick={publicarStoryFeed}
-                className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase text-[10px] tracking-wider rounded-2xl transition-all active:scale-95 shadow-[0_0_15px_rgba(16,185,129,0.25)]"
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all active:scale-95 shadow-[0_0_15px_rgba(16,185,129,0.25)] mt-3 cursor-pointer"
               >
-                Publicar Story
+                Publicar Story 🔥
               </button>
             </div>
           </motion.div>
