@@ -6,30 +6,192 @@ import { motion, AnimatePresence } from "framer-motion"
 import Navbar from "@/components/Navbar"
 import AdminGuard from "@/components/AdminGuard"
 import PageHeader from "@/components/PageHeader"
+import { 
+  Shield, Users, Trophy, Flame, Zap, Sparkles, Activity, Trash2, Plus, 
+  Search, ShieldAlert, Award, Calendar, Check, X, RefreshCw, BarChart2,
+  Wrench, Settings, Trash, AlertTriangle, UserCheck, ShieldCheck
+} from "lucide-react"
 
 export default function AdminMaster() {
-  const [abaAtiva, setAbaAtiva] = useState("arsenal") 
+  const [abaAtiva, setAbaAtiva] = useState("overview") 
+
+  // --- ESTADOS GLOBAIS DE MÉTRICAS ---
+  const [metricas, setMetricas] = useState({ usuarios: 0, squads: 0, corridas: 0, desafios: 0 })
+  const [loadingMetricas, setLoadingMetricas] = useState(true)
 
   // --- ESTADOS GESTÃO (ARSENAL) ---
   const [ranks, setRanks] = useState([])
   const [loadingRanks, setLoadingRanks] = useState(true)
   const [novoRank, setNovoRank] = useState({ 
-    nome: "", icone: "⭐", xp_minimo: 0, trofeus_min: 0, trofeus_max: 9999,
-    cor_texto: "#ffffff", cor_bg: "#27272a", cor_border: "#3f3f46" 
+    nome: "", icone: "🎖️", xp_minimo: 0, trofeus_min: 0, trofeus_max: 9999,
+    cor_texto: "#ffffff", cor_bg: "#18181b", cor_border: "#27272a" 
   })
+
+  // --- GESTÃO DE OPERADORES (USUÁRIOS) ---
   const [buscaUser, setBuscaUser] = useState("")
   const [usuarios, setUsuarios] = useState([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [selectedUserXp, setSelectedUserXp] = useState({}) // Stores custom XP value for input fields by user ID
 
-  // --- ESTADOS LOGS (VIGILÂNCIA) ---
+  // --- GESTÃO DE DESAFIOS E SQUADS ---
+  const [challengesList, setChallengesList] = useState([])
+  const [squadsList, setSquadsList] = useState([])
+  const [loadingDesafiosSquads, setLoadingDesafiosSquads] = useState(false)
+
+  // --- GESTÃO LOGS (VIGILÂNCIA) ---
   const [logs, setLogs] = useState([])
   const [buscaLog, setBuscaLog] = useState("")
   const [loadingLogs, setLoadingLogs] = useState(true)
 
   useEffect(() => {
-    carregarDadosArsenal()
-    carregarLogs()
-  }, [])
+    if (abaAtiva === "overview") carregarMetricasGlobais()
+    if (abaAtiva === "usuarios") carregarUsuarios()
+    if (abaAtiva === "arsenal") carregarDadosArsenal()
+    if (abaAtiva === "desafios_squads") carregarDadosDesafiosESquads()
+    if (abaAtiva === "vigilancia") carregarLogs()
+  }, [abaAtiva])
+
+  // --- CARREGAR METRICAS GLOBAIS ---
+  async function carregarMetricasGlobais() {
+    setLoadingMetricas(true)
+    try {
+      const [uRes, sRes, rRes, cRes] = await Promise.all([
+        supabase.from("usuarios").select("id", { count: "exact", head: true }),
+        supabase.from("squads").select("id", { count: "exact", head: true }),
+        supabase.from("runs").select("id", { count: "exact", head: true }),
+        supabase.from("challenges").select("id", { count: "exact", head: true })
+      ])
+      setMetricas({
+        usuarios: uRes.count || 0,
+        squads: sRes.count || 0,
+        corridas: rRes.count || 0,
+        desafios: cRes.count || 0
+      })
+    } catch (err) {
+      console.error("Erro ao carregar metricas:", err)
+    } finally {
+      setLoadingMetricas(false)
+    }
+  }
+
+  // --- CARREGAR USUÁRIOS (OPERADORES) ---
+  async function carregarUsuarios() {
+    setLoadingUsers(true)
+    try {
+      let query = supabase
+        .from("usuarios")
+        .select("id, username, xp, status, titulo_manual, is_admin, foto")
+        .order("username", { ascending: true })
+
+      if (buscaUser.trim()) {
+        query = query.ilike("username", `%${buscaUser}%`)
+      }
+
+      const { data, error } = await query.limit(50)
+      if (error) throw error
+      setUsuarios(data || [])
+    } catch (err) {
+      console.error("Erro carregar usuarios:", err)
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  // --- ALTERAR PERMISSÕES ADMIN ---
+  async function toggleAdmin(uid, isCurrentlyAdmin) {
+    try {
+      const { error } = await supabase
+        .from("usuarios")
+        .update({ is_admin: !isCurrentlyAdmin })
+        .eq("id", uid)
+
+      if (error) throw error
+      alert(`Permissão administrativa alterada com sucesso!`)
+      carregarUsuarios()
+    } catch (err) {
+      console.error(err)
+      alert("Falha ao alterar privilégios admin")
+    }
+  }
+
+  // --- MODULAR XP DIRETO E PRECISO ---
+  async function modularXPAvançado(uid, novoXPValue) {
+    const val = parseInt(novoXPValue)
+    if (isNaN(val) || val < 0) return alert("Por favor, defina um valor numérico válido para o XP")
+    
+    try {
+      const { error } = await supabase
+        .from("usuarios")
+        .update({ xp: val })
+        .eq("id", uid)
+
+      if (error) throw error
+      alert("XP operacional atualizado!")
+      carregarUsuarios()
+    } catch (err) {
+      console.error(err)
+      alert("Erro ao modular XP")
+    }
+  }
+
+  // --- GESTÃO DE DESAFIOS E SQUADS ---
+  async function carregarDadosDesafiosESquads() {
+    setLoadingDesafiosSquads(true)
+    try {
+      const [challengesRes, squadsRes] = await Promise.all([
+        supabase.from("challenges").select("*, usuarios:owner_id (username)").order("created_at", { ascending: false }),
+        supabase.from("squads").select("*, usuarios:owner_id (username), squad_members (usuario_id)").order("created_at", { ascending: false })
+      ])
+
+      setChallengesList(challengesRes.data || [])
+      setSquadsList(squadsRes.data || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingDesafiosSquads(false)
+    }
+  }
+
+  async function alternarStatusDesafio(id, statusAtual) {
+    const novoStatus = statusAtual === "open" ? "closed" : "open"
+    try {
+      await supabase.from("challenges").update({ status: novoStatus }).eq("id", id)
+      carregarDadosDesafiosESquads()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  async function deletarDesafio(id) {
+    if (!confirm("Remover este desafio do VEXX permanentemente?")) return
+    try {
+      await supabase.from("challenges").delete().eq("id", id)
+      carregarDadosDesafiosESquads()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  async function deletarSquad(id) {
+    if (!confirm("Destruir esta Squad permanentemente? Todos os membros serão removidos.")) return
+    try {
+      await supabase.from("squad_members").delete().eq("squad_id", id)
+      await supabase.from("squads").delete().eq("id", id)
+      carregarDadosDesafiosESquads()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  async function ajustarCapacidadeSquad(id, capAtual, delta) {
+    const novaCap = Math.max(2, capAtual + delta)
+    try {
+      await supabase.from("squads").update({ capacity: novaCap }).eq("id", id)
+      carregarDadosDesafiosESquads()
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   // --- FUNÇÕES ARSENAL ---
   async function carregarDadosArsenal() {
@@ -41,43 +203,53 @@ export default function AdminMaster() {
   }
 
   async function salvarRank() {
-    if (!novoRank.nome) return alert("Dê um nome ao título!")
+    if (!novoRank.nome) return alert("Insira o nome do título!")
     const { error } = await supabase.from("ranks_custom").insert([novoRank])
     if (!error) {
-      alert("Novo título forjado! 🔥")
-      setNovoRank({ nome: "", icone: "⭐", xp_minimo: 0, trofeus_min: 0, trofeus_max: 9999, cor_texto: "#ffffff", cor_bg: "#27272a", cor_border: "#3f3f46" })
+      alert("Patente forjada com sucesso! 🔥")
+      setNovoRank({ nome: "", icone: "🎖️", xp_minimo: 0, trofeus_min: 0, trofeus_max: 9999, cor_texto: "#ffffff", cor_bg: "#18181b", cor_border: "#27272a" })
       carregarDadosArsenal()
     }
   }
 
   async function deletarRank(id) {
-    if(!confirm("Destruir este título permanentemente?")) return
+    if(!confirm("Remover esta patente do arsenal ativo?")) return
     await supabase.from("ranks_custom").delete().eq("id", id)
     carregarDadosArsenal()
-  }
-
-  async function buscarUsuarios() {
-    if (!buscaUser) return
-    setLoadingUsers(true)
-    const { data } = await supabase.from("usuarios").select("id, username, xp, status, titulo_manual").ilike("username", `%${buscaUser}%`).limit(5)
-    setUsuarios(data || [])
-    setLoadingUsers(false)
   }
 
   // --- FUNÇÕES VIGILÂNCIA & PUNIÇÃO ---
   async function carregarLogs() {
     setLoadingLogs(true)
-    const { data } = await supabase.from("logs_atividades").select(`*, usuarios (id, username, status, xp)`).order("created_at", { ascending: false })
+    const { data } = await supabase.from("logs_atividades").select("*, usuarios (id, username, status, xp)").order("created_at", { ascending: false })
     setLogs(data || [])
     setLoadingLogs(false)
+  }
+
+  async function expurgarLogsAntigos() {
+    if (!confirm("Expurgar logs com mais de 30 dias para otimizar o Supabase? Esta ação não pode ser desfeita.")) return
+    try {
+      const trintaDiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      const { error } = await supabase
+        .from("logs_atividades")
+        .delete()
+        .lt("created_at", trintaDiasAtras)
+
+      if (error) throw error
+      alert("Logs antigos expurgados!")
+      carregarLogs()
+    } catch (err) {
+      console.error(err)
+      alert("Falha ao expurgar logs")
+    }
   }
 
   async function alterarStatus(uid, novoStatus) {
     const { error } = await supabase.from("usuarios").update({ status: novoStatus }).eq("id", uid)
     if (!error) {
-      alert(`Status de @operador alterado: ${novoStatus.toUpperCase()}`)
+      alert(`Status de acesso alterado: ${novoStatus.toUpperCase()}`)
       carregarLogs()
-      if(usuarios.length > 0) buscarUsuarios()
+      if (usuarios.length > 0) carregarUsuarios()
     }
   }
 
@@ -86,242 +258,537 @@ export default function AdminMaster() {
     const { error } = await supabase.from("usuarios").update({ xp: novoXP }).eq("id", uid)
     if (!error) {
       carregarLogs()
-      if(usuarios.length > 0) buscarUsuarios()
+      if (usuarios.length > 0) carregarUsuarios()
     }
   }
 
   async function deletarTreino(treinoId, logId) {
-    if(!confirm("Remover protocolo permanentemente?")) return
+    if(!confirm("Remover este treino do banco de dados?")) return
     await supabase.from("treinos").delete().eq("id", treinoId)
     await supabase.from("logs_atividades").delete().eq("id", logId)
     setLogs(logs.filter(l => l.id !== logId))
   }
 
-  const logsFiltrados = logs
-    .filter(l => l.usuarios?.username?.toLowerCase().includes(buscaLog.toLowerCase()))
-    .sort((a, b) => (a.usuarios?.username || "").localeCompare(b.usuarios?.username || ""))
+  const logsFiltrados = logs.filter(l => 
+    l.usuarios?.username?.toLowerCase().includes(buscaLog.toLowerCase())
+  )
 
   return (
     <AdminGuard>
-      <div className="min-h-screen bg-black text-white pb-32 font-sans">
-        
-        <PageHeader icon="🛡️" title="Admin" subtitle="Painel de controle para operadores" color="red" />
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-32 font-sans relative">
+        <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-rose-500/5 to-transparent pointer-events-none" />
 
-        {/* HEADER UNIFICADO */}
-        <div className="max-w-5xl mx-auto p-6 text-center">
-          <h1 className="text-green-500 text-5xl font-black italic uppercase tracking-tighter leading-none mb-2 drop-shadow-[0_0_15px_rgba(34,197,94,0.3)]">
-            CENTRAL DE COMANDO
-          </h1>
-          <p className="text-zinc-500 text-[10px] font-bold tracking-[0.3em] uppercase mb-6">Controle de Arsenal e Vigilância de Rede</p>
-          
-          <div className="flex justify-center gap-4 border-b border-zinc-800 pb-4">
-            <button 
-              onClick={() => setAbaAtiva('arsenal')}
-              className={`text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-t-xl transition-all ${abaAtiva === 'arsenal' ? 'bg-zinc-800 text-green-500 border-b-2 border-green-500' : 'text-zinc-500 hover:text-white'}`}
-            >
-              [ 01. Gestão de Arsenal ]
-            </button>
-            <button 
-              onClick={() => setAbaAtiva('vigilancia')}
-              className={`text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-t-xl transition-all ${abaAtiva === 'vigilancia' ? 'bg-zinc-800 text-red-500 border-b-2 border-red-500' : 'text-zinc-500 hover:text-white'}`}
-            >
-              [ 02. Vigilância & Logs ]
-            </button>
+        <PageHeader 
+          icon={<Shield className="w-7 h-7 text-rose-400 animate-pulse" />} 
+          title="Comando" 
+          subtitle="Central de controle administrativo VEXX" 
+          color="red" 
+        />
+
+        {/* NAVEGAÇÃO DE ABAS OPERACIONAIS */}
+        <div className="max-w-5xl mx-auto px-4 mb-6">
+          <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none border-b border-zinc-900">
+            {[
+              { id: "overview", label: "Visão Geral", icon: BarChart2, activeColor: "border-blue-500/30 bg-blue-500/5 text-blue-400" },
+              { id: "usuarios", label: "Operadores", icon: Users, activeColor: "border-indigo-500/30 bg-indigo-500/5 text-indigo-400" },
+              { id: "arsenal", label: "Arsenal Ranks", icon: Trophy, activeColor: "border-emerald-500/30 bg-emerald-500/5 text-emerald-400" },
+              { id: "desafios_squads", label: "Desafios & Squads", icon: Award, activeColor: "border-amber-500/30 bg-amber-500/5 text-amber-400" },
+              { id: "vigilancia", label: "Vigilância Logs", icon: ShieldAlert, activeColor: "border-rose-500/30 bg-rose-500/5 text-rose-400" }
+            ].map(tab => {
+              const TabIcon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setAbaAtiva(tab.id)}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wider whitespace-nowrap transition-all duration-300 flex items-center gap-2 border ${
+                    abaAtiva === tab.id 
+                      ? tab.activeColor 
+                      : "bg-zinc-900/30 text-zinc-500 border-zinc-900/60 hover:bg-zinc-900/60 hover:text-zinc-300"
+                  }`}
+                >
+                  <TabIcon className="w-3.5 h-3.5" />
+                  {tab.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto px-6">
+        <div className="max-w-5xl mx-auto px-4">
           <AnimatePresence mode="wait">
-            {abaAtiva === 'arsenal' ? (
-              <motion.div key="arsenal" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                
-                {/* GRID DE DUAS COLUNAS PARA O ARSENAL */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  
-                  {/* COLUNA ESQUERDA: FORJA E USUÁRIOS */}
-                  <div className="space-y-8">
-                    {/* BUSCA DE USUÁRIOS */}
-                    <section className="bg-zinc-900/40 p-6 rounded-3xl border border-zinc-800 backdrop-blur-sm">
-                      <h2 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_#3b82f6]"></span> Promoção Manual
-                      </h2>
-                      <div className="flex gap-2 mb-4">
-                        <input 
-                          placeholder="BUSCAR @OPERADOR..." 
-                          className="flex-1 bg-black border border-zinc-800 p-3 rounded-xl text-xs font-bold uppercase outline-none focus:border-blue-500/50"
-                          value={buscaUser} onChange={e => setBuscaUser(e.target.value)}
-                        />
-                        <button onClick={buscarUsuarios} className="bg-blue-600 text-white px-6 rounded-xl font-black text-[10px] uppercase italic hover:bg-blue-500 transition">
-                          {loadingUsers ? "..." : "Localizar"}
+            
+            {/* 1. VISÃO GERAL (OVERVIEW) */}
+            {abaAtiva === 'overview' && (
+              <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                {loadingMetricas ? (
+                  <div className="flex justify-center py-20">
+                    <div className="w-6 h-6 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5 flex flex-col justify-between">
+                        <Users className="w-5 h-5 text-blue-400 mb-3" />
+                        <div>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Atletas Cadastrados</p>
+                          <p className="text-3xl font-extrabold text-white mt-1">{metricas.usuarios}</p>
+                        </div>
+                      </div>
+                      <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5 flex flex-col justify-between">
+                        <Flame className="w-5 h-5 text-indigo-400 mb-3" />
+                        <div>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Squads Ativas</p>
+                          <p className="text-3xl font-extrabold text-white mt-1">{metricas.squads}</p>
+                        </div>
+                      </div>
+                      <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5 flex flex-col justify-between">
+                        <Activity className="w-5 h-5 text-emerald-400 mb-3" />
+                        <div>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Corridas Registradas</p>
+                          <p className="text-3xl font-extrabold text-white mt-1">{metricas.corridas}</p>
+                        </div>
+                      </div>
+                      <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5 flex flex-col justify-between">
+                        <Trophy className="w-5 h-5 text-amber-400 mb-3" />
+                        <div>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Desafios Ativos</p>
+                          <p className="text-3xl font-extrabold text-white mt-1">{metricas.desafios}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-6">
+                      <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <Wrench className="w-4 h-4 text-rose-400" /> Ações Rápidas do Administrador
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <button onClick={() => setAbaAtiva("usuarios")} className="p-4 bg-zinc-950 rounded-xl border border-zinc-900 hover:border-zinc-800 text-left transition duration-300">
+                          <p className="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-1">Buscar & Ajustar Operadores</p>
+                          <p className="text-[10px] text-zinc-500">Mudar patentes, adicionar ou remover XP e modular acessos em lote.</p>
+                        </button>
+                        <button onClick={() => setAbaAtiva("desafios_squads")} className="p-4 bg-zinc-950 rounded-xl border border-zinc-900 hover:border-zinc-800 text-left transition duration-300">
+                          <p className="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-1">Moderador de Desafios & Squads</p>
+                          <p className="text-[10px] text-zinc-500">Excluir esquadrões lotados, moderar membros e deletar desafios vencidos.</p>
                         </button>
                       </div>
-                      <div className="space-y-3">
-                        {usuarios.map(u => (
-                          <div key={u.id} className="p-4 bg-black/60 border border-zinc-800 rounded-2xl flex justify-between items-center group">
-                            <div>
-                              <p className="font-black text-zinc-100 italic group-hover:text-blue-400 transition">@{u.username}</p>
-                              <p className="text-[9px] text-zinc-500 font-bold uppercase mt-1">XP: {u.xp} | STATUS: {u.status}</p>
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            )}
+
+            {/* 2. OPERADORES (GESTÃO USUÁRIOS) */}
+            {abaAtiva === 'usuarios' && (
+              <motion.div key="usuarios" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+                <div className="flex gap-3 mb-2">
+                  <div className="relative flex-1">
+                    <input 
+                      placeholder="FILTRAR OPERADOR POR CODIDOME..." 
+                      className="w-full bg-zinc-900/30 border border-zinc-900/80 p-3.5 rounded-xl text-xs outline-none text-zinc-100 placeholder-zinc-600 focus:border-zinc-800"
+                      value={buscaUser} onChange={e => setBuscaUser(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && carregarUsuarios()}
+                    />
+                    <Search className="w-4 h-4 text-zinc-600 absolute right-4 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <button onClick={carregarUsuarios} className="bg-indigo-500 hover:bg-indigo-600 text-black px-6 rounded-xl font-extrabold text-[10px] uppercase tracking-wider transition">
+                    Filtrar
+                  </button>
+                </div>
+
+                <div className="space-y-3.5">
+                  {loadingUsers ? (
+                    <div className="flex justify-center py-20">
+                      <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  ) : usuarios.length === 0 ? (
+                    <div className="bg-zinc-900/10 border border-zinc-900/60 rounded-xl p-8 text-center">
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Nenhum operador encontrado.</p>
+                    </div>
+                  ) : (
+                    usuarios.map(u => (
+                      <div key={u.id} className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900/80 rounded-xl p-4.5 space-y-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3.5">
+                            <div className={`w-10 h-10 rounded-full border-2 overflow-hidden bg-zinc-950 ${u.is_admin ? 'border-rose-500' : 'border-zinc-800'}`}>
+                              {u.foto ? <img src={u.foto} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-zinc-600">U</div>}
                             </div>
+                            <div>
+                              <p className="font-extrabold text-zinc-100 text-xs flex items-center gap-1.5">
+                                @{u.username}
+                                {u.is_admin && <span className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[8px] font-extrabold px-1.5 py-0.5 rounded-lg uppercase tracking-wider">Admin</span>}
+                              </p>
+                              <p className="text-[8px] text-zinc-500 font-bold uppercase mt-1">XP Atual: {u.xp} | Patente: {u.titulo_manual || "Automática"}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* STATUS BADGE */}
+                            <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded-lg uppercase tracking-wider ${
+                              u.status === 'ativo' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+                            }`}>
+                              {u.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* CONTROLES AVANÇADOS INLINE */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-4.5 border-t border-zinc-900/80">
+                          {/* 1. MUDAR ROLE ADMIN */}
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block">Privilégio Comando</label>
+                            <button 
+                              onClick={() => toggleAdmin(u.id, u.is_admin)}
+                              className={`w-full py-2 px-3 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition border ${
+                                u.is_admin 
+                                  ? "bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-black" 
+                                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800"
+                              }`}
+                            >
+                              {u.is_admin ? "Remover Admin" : "Tornar Admin"}
+                            </button>
+                          </div>
+
+                          {/* 2. MUDAR STATUS BAN */}
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block">Estado de Acesso</label>
                             <select 
-                              className="bg-zinc-800 text-[9px] font-black p-2 rounded-lg outline-none border border-zinc-700 focus:border-blue-500"
-                              onChange={async (e) => {
-                                const { error } = await supabase.from("usuarios").update({ titulo_manual: e.target.value }).eq("id", u.id)
-                                if(!error) alert("Patente Alterada!")
-                              }}
+                              value={u.status} 
+                              onChange={(e) => alterarStatus(u.id, e.target.value)}
+                              className="w-full bg-zinc-900 border border-zinc-800 text-[9px] font-extrabold p-2 rounded-lg outline-none uppercase tracking-wider focus:border-zinc-700"
+                            >
+                              <option value="ativo">OPERACIONAL (ATIVO)</option>
+                              <option value="suspenso">SUSPENSO</option>
+                              <option value="banido">BANIDO</option>
+                            </select>
+                          </div>
+
+                          {/* 3. PATENTE MANUAL */}
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block">Patente Personalizada</label>
+                            <select 
                               value={u.titulo_manual || ""}
+                              onChange={async (e) => {
+                                const { error } = await supabase.from("usuarios").update({ titulo_manual: e.target.value || null }).eq("id", u.id)
+                                if (!error) {
+                                  alert("Patente forjada ajustada!")
+                                  carregarUsuarios()
+                                }
+                              }}
+                              className="w-full bg-zinc-900 border border-zinc-800 text-[9px] font-extrabold p-2 rounded-lg outline-none uppercase tracking-wider focus:border-zinc-700"
                             >
                               <option value="">RANK AUTOMÁTICO</option>
                               {ranks.map(r => <option key={r.id} value={r.nome}>{r.nome}</option>)}
                             </select>
                           </div>
-                        ))}
-                      </div>
-                    </section>
 
-                    {/* FORJAR TÍTULOS */}
-                    <section className="bg-zinc-900/40 p-6 rounded-3xl border border-zinc-800 backdrop-blur-sm">
-                      <h2 className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></span> Forjar Nova Patente
-                      </h2>
-                      
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-3">
-                          <input placeholder="NOME DO TÍTULO" className="col-span-2 bg-black border border-zinc-800 p-3 rounded-xl text-xs font-bold uppercase text-white" 
+                          {/* 4. DEFINIR XP PRECISO */}
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block">Ajuste Granular de XP</label>
+                            <div className="flex gap-1.5">
+                              <input 
+                                type="number" 
+                                placeholder="NOVO XP..." 
+                                className="flex-1 bg-zinc-950 border border-zinc-900 p-1.5 rounded-lg text-[10px] font-bold outline-none text-zinc-200"
+                                value={selectedUserXp[u.id] !== undefined ? selectedUserXp[u.id] : ""}
+                                onChange={e => setSelectedUserXp({...selectedUserXp, [u.id]: e.target.value})}
+                              />
+                              <button 
+                                onClick={() => {
+                                  modularXPAvançado(u.id, selectedUserXp[u.id])
+                                  setSelectedUserXp({...selectedUserXp, [u.id]: ""})
+                                }}
+                                className="bg-indigo-500 hover:bg-indigo-600 text-black px-2.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition"
+                              >
+                                Fixar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* 3. ARSENAL (FORJA RANKS) */}
+            {abaAtiva === 'arsenal' && (
+              <motion.div key="arsenal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  
+                  {/* FORJAR RANK */}
+                  <div className="space-y-4 bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5">
+                    <h2 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" /> Forjar Patente Customizada
+                    </h2>
+                    
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-2 space-y-1">
+                          <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Nome do Título</label>
+                          <input placeholder="EX: GENERAL" className="w-full bg-zinc-950 border border-zinc-900 p-3 rounded-xl text-xs font-bold uppercase text-white outline-none" 
                             value={novoRank.nome} onChange={e => setNovoRank({...novoRank, nome: e.target.value.toUpperCase()})}/>
-                          <input placeholder="ÍCONE" className="bg-black border border-zinc-800 p-3 rounded-xl text-center text-lg" 
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest text-center block">Ícone</label>
+                          <input placeholder="🎖️" className="w-full bg-zinc-950 border border-zinc-900 p-3 rounded-xl text-center text-lg outline-none" 
                             value={novoRank.icone} onChange={e => setNovoRank({...novoRank, icone: e.target.value})}/>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-bold text-zinc-500 uppercase px-1">XP Mínimo</label>
-                            <input type="number" className="w-full bg-black border border-zinc-800 p-3 rounded-xl text-xs font-bold" 
-                              value={novoRank.xp_minimo} onChange={e => setNovoRank({...novoRank, xp_minimo: parseInt(e.target.value)})}/>
-                          </div>
-                          <div className="space-y-1">
-                             <label className="text-[8px] font-bold text-zinc-500 uppercase px-1">Cor do Texto</label>
-                             <div className="flex gap-2 items-center bg-black border border-zinc-800 p-1.5 rounded-xl">
-                               <input type="color" className="w-full h-8 bg-transparent cursor-pointer" 
-                                value={novoRank.cor_texto} onChange={e => setNovoRank({...novoRank, cor_texto: e.target.value})}/>
-                             </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-bold text-zinc-500 uppercase px-1">Troféus Mín.</label>
-                            <input type="number" className="w-full bg-black border border-zinc-800 p-3 rounded-xl text-xs font-bold text-yellow-500" 
-                              value={novoRank.trofeus_min} onChange={e => setNovoRank({...novoRank, trofeus_min: parseInt(e.target.value)})}/>
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-bold text-zinc-500 uppercase px-1">Troféus Máx.</label>
-                            <input type="number" className="w-full bg-black border border-zinc-800 p-3 rounded-xl text-xs font-bold text-yellow-500" 
-                              value={novoRank.trofeus_max} onChange={e => setNovoRank({...novoRank, trofeus_max: parseInt(e.target.value)})}/>
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl border-2 flex items-center justify-center gap-3" style={{ backgroundColor: novoRank.cor_bg, borderColor: novoRank.cor_border }}>
-                           <span className="text-xl">{novoRank.icone}</span>
-                           <span className="font-black italic uppercase tracking-tighter" style={{ color: novoRank.cor_texto }}>{novoRank.nome || "PREVIEW"}</span>
-                        </div>
-
-                        <button onClick={salvarRank} className="w-full bg-green-500 text-black font-black py-4 rounded-xl text-[10px] uppercase italic hover:bg-white transition-all shadow-[0_0_20px_rgba(34,197,94,0.2)]">
-                          ADICIONAR AO ARSENAL ATIVO
-                        </button>
                       </div>
-                    </section>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">XP Mínimo</label>
+                          <input type="number" className="w-full bg-zinc-950 border border-zinc-900 p-3 rounded-xl text-xs font-bold outline-none" 
+                            value={novoRank.xp_minimo} onChange={e => setNovoRank({...novoRank, xp_minimo: parseInt(e.target.value) || 0})}/>
+                        </div>
+                        <div className="space-y-1">
+                           <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Cor do Texto</label>
+                           <div className="flex gap-2 items-center bg-zinc-950 border border-zinc-900 p-1.5 rounded-xl">
+                             <input type="color" className="w-full h-8 bg-transparent cursor-pointer border-none" 
+                              value={novoRank.cor_texto} onChange={e => setNovoRank({...novoRank, cor_texto: e.target.value})}/>
+                           </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Troféus Mín.</label>
+                          <input type="number" className="w-full bg-zinc-950 border border-zinc-900 p-3 rounded-xl text-xs font-bold outline-none" 
+                            value={novoRank.trofeus_min} onChange={e => setNovoRank({...novoRank, trofeus_min: parseInt(e.target.value) || 0})}/>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Troféus Máx.</label>
+                          <input type="number" className="w-full bg-zinc-950 border border-zinc-900 p-3 rounded-xl text-xs font-bold outline-none" 
+                            value={novoRank.trofeus_max} onChange={e => setNovoRank({...novoRank, trofeus_max: parseInt(e.target.value) || 9999})}/>
+                        </div>
+                      </div>
+
+                      {/* PREVIEW CONTAINER */}
+                      <div className="p-4 rounded-xl border border-zinc-900 flex items-center justify-center gap-3 bg-zinc-950/80">
+                         <span className="text-xl">{novoRank.icone}</span>
+                         <span className="font-extrabold italic uppercase tracking-wider text-sm" style={{ color: novoRank.cor_texto }}>{novoRank.nome || "PREVIEW"}</span>
+                      </div>
+
+                      <button onClick={salvarRank} className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold py-3.5 rounded-xl text-[10px] uppercase tracking-wider transition">
+                        Integrar Patente ao Arsenal
+                      </button>
+                    </div>
                   </div>
 
-                  {/* COLUNA DIREITA: LISTA DE RANKS EXISTENTES */}
-                  <div className="bg-zinc-900/40 p-6 rounded-3xl border border-zinc-800 backdrop-blur-sm">
-                    <h2 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                       Patentes Cadastradas
-                    </h2>
-                    <div className="space-y-3">
-                      {loadingRanks ? <p className="text-center py-10 animate-pulse text-zinc-600">Lendo Arquivos...</p> : 
+                  {/* LISTA RANKS */}
+                  <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5">
+                    <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4">Patentes Operacionais</h2>
+                    <div className="space-y-3.5">
+                      {loadingRanks ? (
+                        <p className="text-center py-10 animate-pulse text-zinc-600 text-[10px] uppercase font-bold tracking-wider">Carregando arsenal...</p>
+                      ) : ranks.length === 0 ? (
+                        <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-wider text-center py-8">Nenhuma patente cadastrada.</p>
+                      ) : (
                         ranks.map(r => (
-                          <div key={r.id} className="p-4 bg-black/40 border border-zinc-800 rounded-2xl flex justify-between items-center border-l-4" style={{ borderLeftColor: r.cor_texto }}>
+                          <div key={r.id} className="p-4 bg-zinc-950/60 border border-zinc-900 rounded-xl flex justify-between items-center border-l-4" style={{ borderLeftColor: r.cor_texto }}>
                              <div className="flex items-center gap-3">
-                               <span className="text-xl">{r.icone}</span>
+                               <span className="text-lg">{r.icone}</span>
                                <div>
-                                 <p className="font-black italic text-sm uppercase tracking-tighter" style={{ color: r.cor_texto }}>{r.nome}</p>
-                                 <p className="text-[8px] text-zinc-500 font-bold uppercase mt-1">XP: {r.xp_minimo}+ | 🏆 {r.trofeus_min}-{r.trofeus_max}</p>
+                                 <p className="font-extrabold italic text-sm uppercase tracking-wider" style={{ color: r.cor_texto }}>{r.nome}</p>
+                                 <p className="text-[8px] text-zinc-500 font-bold uppercase mt-1">XP Mínimo: {r.xp_minimo} | 🏆 {r.trofeus_min} - {r.trofeus_max}</p>
                                </div>
                              </div>
-                             <button onClick={() => deletarRank(r.id)} className="text-zinc-700 hover:text-red-500 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
-                                  <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
-                                </svg>
+                             <button onClick={() => deletarRank(r.id)} className="text-zinc-600 hover:text-rose-500 transition duration-300">
+                               <Trash2 className="w-4 h-4" />
                              </button>
                           </div>
                         ))
-                      }
+                      )}
                     </div>
                   </div>
-                </div>
 
+                </div>
               </motion.div>
-            ) : (
-              <motion.div key="vigilancia" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="font-mono">
+            )}
+
+            {/* 4. DESAFIOS & SQUADS */}
+            {abaAtiva === 'desafios_squads' && (
+              <motion.div key="desafios_squads" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  
+                  {/* MODERAÇÃO DESAFIOS */}
+                  <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5 space-y-4">
+                    <h2 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                      <Trophy className="w-4 h-4" /> Moderar Desafios
+                    </h2>
+
+                    <div className="space-y-3.5">
+                      {loadingDesafiosSquads ? (
+                        <div className="flex justify-center py-10">
+                          <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : challengesList.length === 0 ? (
+                        <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-wider text-center py-8">Nenhum desafio no sistema.</p>
+                      ) : (
+                        challengesList.map(c => (
+                          <div key={c.id} className="p-4 bg-zinc-950/60 border border-zinc-900 rounded-xl flex flex-col justify-between gap-3">
+                            <div className="flex justify-between items-start gap-4">
+                              <div>
+                                <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Líder: @{c.usuarios?.username || "anon"}</p>
+                                <p className="font-extrabold uppercase text-zinc-200 text-xs mt-1">{c.title}</p>
+                              </div>
+                              <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded-lg uppercase tracking-wider ${
+                                c.status === "open" ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" : "bg-zinc-800 text-zinc-500 border border-zinc-800"
+                              }`}>
+                                {c.status}
+                              </span>
+                            </div>
+
+                            <div className="flex justify-between items-center border-t border-zinc-900/80 pt-3">
+                              <button 
+                                onClick={() => alternarStatusDesafio(c.id, c.status)}
+                                className="text-[9px] font-extrabold uppercase tracking-wider text-zinc-400 hover:text-white transition duration-300"
+                              >
+                                {c.status === "open" ? "Fechar Desafio" : "Reabrir Desafio"}
+                              </button>
+                              <button 
+                                onClick={() => deletarDesafio(c.id)}
+                                className="text-zinc-600 hover:text-rose-500 transition duration-300"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* MODERAÇÃO SQUADS */}
+                  <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5 space-y-4">
+                    <h2 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                      <Users className="w-4 h-4" /> Moderar Squads (Esquadrões)
+                    </h2>
+
+                    <div className="space-y-3.5">
+                      {loadingDesafiosSquads ? (
+                        <div className="flex justify-center py-10">
+                          <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : squadsList.length === 0 ? (
+                        <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-wider text-center py-8">Nenhuma squad no sistema.</p>
+                      ) : (
+                        squadsList.map(s => {
+                          const count = s.squad_members?.length || 0
+                          return (
+                            <div key={s.id} className="p-4 bg-zinc-950/60 border border-zinc-900 rounded-xl flex flex-col gap-3">
+                              <div className="flex justify-between items-start gap-4">
+                                <div>
+                                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Fundador: @{s.usuarios?.username || "anon"}</p>
+                                  <p className="font-extrabold uppercase text-zinc-200 text-xs mt-1">{s.name}</p>
+                                </div>
+                                <span className="text-[9px] font-extrabold bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-lg text-zinc-400">
+                                  {count} / {s.capacity} membros
+                                </span>
+                              </div>
+
+                              <div className="flex justify-between items-center border-t border-zinc-900/80 pt-3">
+                                <div className="flex gap-2 items-center">
+                                  <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Capacidade:</span>
+                                  <button onClick={() => ajustarCapacidadeSquad(s.id, s.capacity, -2)} className="bg-zinc-900 border border-zinc-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded">-2</button>
+                                  <button onClick={() => ajustarCapacidadeSquad(s.id, s.capacity, 2)} className="bg-zinc-900 border border-zinc-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded">+2</button>
+                                </div>
+                                <button 
+                                  onClick={() => deletarSquad(s.id)}
+                                  className="text-zinc-600 hover:text-rose-500 transition duration-300"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              </motion.div>
+            )}
+
+            {/* 5. VIGILÂNCIA & LOGS */}
+            {abaAtiva === 'vigilancia' && (
+              <motion.div key="vigilancia" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
                 
-                {/* INTERFACE DE VIGILÂNCIA (IDÊNTICA À QUE VOCÊ GOSTOU) */}
-                <div className="mb-6 flex gap-4 items-center">
+                <div className="flex gap-3 items-center">
                   <div className="relative flex-1">
                     <input 
-                      placeholder="FILTRAR POR CODINOME..." 
-                      className="w-full bg-zinc-900 border border-zinc-800 p-4 text-xs focus:border-red-600 outline-none pl-10"
+                      placeholder="FILTRAR REGISTROS POR OPERADOR..." 
+                      className="w-full bg-zinc-900/30 border border-zinc-900/80 p-3.5 text-xs outline-none text-zinc-100 placeholder-zinc-600 pl-10 rounded-xl focus:border-zinc-800"
                       value={buscaLog} onChange={(e) => setBuscaLog(e.target.value)}
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 italic font-black">@</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 font-bold text-xs">@</span>
                   </div>
-                  <button onClick={carregarLogs} className="bg-red-600 text-black px-6 py-4 text-[10px] font-black uppercase hover:bg-white transition-colors">RESCAN</button>
+                  
+                  <button onClick={carregarLogs} className="bg-rose-500 hover:bg-rose-600 text-black px-5 py-3.5 text-[10px] font-extrabold uppercase tracking-wider rounded-xl transition duration-300 flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5" /> Recarregar
+                  </button>
+
+                  <button onClick={expurgarLogsAntigos} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-850 text-rose-400 px-5 py-3.5 text-[10px] font-extrabold uppercase tracking-wider rounded-xl transition duration-300 flex items-center gap-1.5">
+                    <Trash className="w-3.5 h-3.5" /> Expurgar (+30d)
+                  </button>
                 </div>
 
-                <div className="space-y-4">
-                  {loadingLogs ? <p className="text-red-500 animate-pulse text-center py-20 uppercase tracking-[0.5em]">Escaneando logs de rede...</p> : 
+                <div className="space-y-3.5 font-mono">
+                  {loadingLogs ? (
+                    <p className="text-rose-500 animate-pulse text-center py-20 text-[10px] font-bold uppercase tracking-widest">Escaneando conexões de rede...</p>
+                  ) : logsFiltrados.length === 0 ? (
+                    <div className="bg-zinc-900/10 border border-zinc-900/60 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-1">
+                      <AlertTriangle className="w-5 h-5 text-zinc-600" />
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Nenhum log operacional registrado.</p>
+                    </div>
+                  ) : (
                     logsFiltrados.map((log) => (
-                      <div key={log.id} className={`border-l-4 p-5 rounded-r-2xl transition-all ${log.usuarios?.status !== 'ativo' ? 'bg-red-950/20 border-red-600 shadow-[inset_0_0_20px_rgba(220,38,38,0.1)]' : 'bg-zinc-900/40 border-zinc-700 hover:border-zinc-500'}`}>
+                      <div key={log.id} className={`border-l-4 p-5 rounded-xl transition-all ${log.usuarios?.status !== 'ativo' ? 'bg-rose-500/5 border-rose-500/40 shadow-[inset_0_0_20px_rgba(220,38,38,0.02)]' : 'bg-zinc-900/20 border-zinc-800 hover:border-zinc-700'}`}>
                         <div className="flex justify-between items-start gap-6">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 text-[10px] mb-2">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center flex-wrap gap-2.5 text-[9px]">
                               <span className="text-zinc-600">[{new Date(log.created_at).toLocaleTimeString()}]</span>
-                              <span className="font-black text-red-500 uppercase tracking-tighter text-sm italic">@{log.usuarios?.username}</span>
-                              <span className="bg-zinc-800 text-zinc-400 px-3 py-1 font-bold rounded-full border border-zinc-700">{log.tipo_evento}</span>
+                              <span className="font-bold text-rose-400 uppercase tracking-wide text-xs">@{log.usuarios?.username || "anon"}</span>
+                              <span className="bg-zinc-900/80 text-zinc-400 px-2 py-0.5 rounded border border-zinc-850 uppercase text-[8px] font-bold">{log.tipo_evento}</span>
                             </div>
                             <p className="text-xs text-zinc-300 leading-relaxed font-medium">"{log.descricao}"</p>
-                            <div className="flex gap-4 mt-3">
-                               <span className="text-[9px] font-black text-zinc-500">XP ATUAL: <span className="text-white">{log.usuarios?.xp}</span></span>
-                               <span className="text-[9px] font-black text-zinc-500">ESTADO: <span className={log.usuarios?.status === 'ativo' ? 'text-green-500' : 'text-red-500'}>{log.usuarios?.status?.toUpperCase()}</span></span>
+                            <div className="flex gap-4 text-[9px] text-zinc-500 font-bold uppercase tracking-wider">
+                               <span>XP: <span className="text-zinc-300">{log.usuarios?.xp || 0}</span></span>
+                               <span>Estado: <span className={log.usuarios?.status === 'ativo' ? 'text-emerald-400' : 'text-rose-400'}>{log.usuarios?.status?.toUpperCase()}</span></span>
                             </div>
                           </div>
                           
-                          <div className="flex gap-3">
-                            {/* AJUSTE RÁPIDO DE XP */}
+                          <div className="flex gap-2">
+                            {/* AJUSTE XP RÁPIDO */}
                             <div className="flex flex-col gap-1">
-                              <button onClick={() => modularXP(log.usuario_id, log.usuarios.xp, -500)} className="bg-zinc-800 hover:bg-red-600 text-[8px] font-black p-2 rounded transition-colors">-500</button>
-                              <button onClick={() => modularXP(log.usuario_id, log.usuarios.xp, 500)} className="bg-zinc-800 hover:bg-green-600 text-[8px] font-black p-2 rounded transition-colors">+500</button>
+                              <button onClick={() => modularXP(log.usuario_id, log.usuarios.xp, -500)} className="bg-zinc-900 hover:bg-rose-500 hover:text-black border border-zinc-850 text-[8px] font-extrabold p-1.5 rounded transition duration-300">-500</button>
+                              <button onClick={() => modularXP(log.usuario_id, log.usuarios.xp, 500)} className="bg-zinc-900 hover:bg-emerald-500 hover:text-black border border-zinc-850 text-[8px] font-extrabold p-1.5 rounded transition duration-300">+500</button>
                             </div>
-                            {/* GESTÃO DE ACESSO */}
+                            
+                            {/* ACESSO RÁPIDO */}
                             <div className="flex flex-col gap-1">
                               {log.usuarios?.status === 'ativo' ? (
-                                <button onClick={() => alterarStatus(log.usuario_id, 'banido')} className="bg-red-700 hover:bg-red-500 text-[8px] font-black p-2 uppercase h-full rounded transition-all">BANIR</button>
+                                <button onClick={() => alterarStatus(log.usuario_id, 'banido')} className="bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-black text-[8px] font-extrabold p-1.5 uppercase h-full rounded transition duration-300 flex items-center justify-center">BAN</button>
                               ) : (
-                                <button onClick={() => alterarStatus(log.usuario_id, 'ativo')} className="bg-green-600 hover:bg-green-400 text-[8px] font-black p-2 uppercase h-full rounded transition-all">UNBAN</button>
+                                <button onClick={() => alterarStatus(log.usuario_id, 'ativo')} className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-black text-[8px] font-extrabold p-1.5 uppercase h-full rounded transition duration-300 flex items-center justify-center">UNBAN</button>
                               )}
                             </div>
-                            {/* DELETAR CONTEÚDO */}
+                            
+                            {/* DELETAR TREINO */}
                             {log.treino_id && (
-                              <button onClick={() => deletarTreino(log.treino_id, log.id)} className="bg-zinc-700 hover:bg-white hover:text-black text-[8px] font-black p-2 uppercase rounded transition-all">DEL_TR</button>
+                              <button onClick={() => deletarTreino(log.treino_id, log.id)} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-850 text-[8px] font-extrabold p-2 uppercase rounded transition duration-300 flex items-center justify-center text-zinc-400 hover:text-white">DEL</button>
                             )}
                           </div>
                         </div>
                       </div>
                     ))
-                  }
+                  )}
                 </div>
               </motion.div>
             )}
+
           </AnimatePresence>
         </div>
 
@@ -329,4 +796,4 @@ export default function AdminMaster() {
       </div>
     </AdminGuard>
   )
-}
+}
