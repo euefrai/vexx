@@ -1,8 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import MapUber from "@/components/MapUber";
+import dynamic from "next/dynamic";
+const MapUber = dynamic(() => import("@/components/MapUber"), {
+  ssr: false,
+  loading: () => (
+    <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 z-[998]">
+      <div className="text-center">
+        <div className="w-10.5 h-10.5 border-2 border-emerald-500/20 border-t-emerald-400 rounded-full animate-spin mx-auto mb-3" />
+        <p className="text-slate-400 font-medium text-xs tracking-wider uppercase">Sincronizando Satélites...</p>
+      </div>
+    </div>
+  )
+});
 import RunTracker from "@/components/RunTracker";
 import LocationSearch from "@/components/LocationSearch";
 import RunSummary from "@/components/RunSummary";
@@ -181,6 +192,40 @@ export default function RunPage() {
     ? (simDistance > 0 && simTime > 0 ? simDistance / (simTime / 3600) : 0)
     : avgSpeed;
 
+  // Calcular Distância do ponto de partida ao ponto de destino (Fórmula Haversine real)
+  const distanceStartToDest = useMemo(() => {
+    if (!destination) return null;
+    const startPt = activePositions.length > 0 ? activePositions[0] : activeCurrentPos;
+    if (!startPt) return null;
+
+    const R = 6371; // Raio da Terra em km
+    const dLat = ((destination.lat - startPt.lat) * Math.PI) / 180;
+    const dLng = ((destination.lng - startPt.lng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((startPt.lat * Math.PI) / 180) *
+        Math.cos((destination.lat * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }, [activePositions, activeCurrentPos, destination]);
+
+  // Calcular Distância restante da posição atual ao ponto de destino
+  const distanceRemaining = useMemo(() => {
+    if (!activeCurrentPos || !destination) return null;
+
+    const R = 6371; // km
+    const dLat = ((destination.lat - activeCurrentPos.lat) * Math.PI) / 180;
+    const dLng = ((destination.lng - activeCurrentPos.lng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((activeCurrentPos.lat * Math.PI) / 180) *
+        Math.cos((destination.lat * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }, [activeCurrentPos, destination]);
+
   // MEMOIZAR SELEÇÃO DE DESTINO (Fim absoluto dos flashes de render de mapa!)
   const handleDestinationSelect = useCallback((location) => {
     setDestination(location);
@@ -304,7 +349,7 @@ export default function RunPage() {
           currentSpeed={activeSpeed}
           destination={destination}
           onDestinationSelect={handleDestinationSelect}
-          showRouteInfo={false}
+          showRouteInfo={true}
           clima={clima}
           triggerReplay={triggerReplay}
           userAvatar={userAvatar}
@@ -403,11 +448,21 @@ export default function RunPage() {
                   {destination ? (
                     <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 flex items-start gap-2.5">
                       <MapPin size={16} className="text-purple-400 flex-shrink-0 mt-0.5" />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-purple-300 truncate leading-none">{destination.name}</p>
                         {destination.address && (
                           <p className="text-[9px] text-zinc-500 mt-1 line-clamp-1 leading-none">{destination.address}</p>
                         )}
+                        <div className="flex gap-4 mt-2.5 pt-2 border-t border-purple-500/15 text-[10px]">
+                          <div>
+                            <span className="text-zinc-500 uppercase block text-[7px] font-black tracking-wider">Dist. Planejada</span>
+                            <span className="text-purple-300 font-extrabold">{distanceStartToDest ? `${distanceStartToDest.toFixed(2)} km` : "Calculando..."}</span>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500 uppercase block text-[7px] font-black tracking-wider">Restante</span>
+                            <span className="text-emerald-400 font-extrabold">{distanceRemaining ? `${distanceRemaining.toFixed(2)} km` : "Calculando..."}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ) : (

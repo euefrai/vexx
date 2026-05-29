@@ -46,8 +46,9 @@ export default function SocialPage() {
       if (error) throw error
       setStories(data || [])
     } catch (err) {
-      console.error("Erro carregar stories:", err)
-      setError("Falha ao carregar stories")
+      console.log("Banco sem stories, carregando fallback local no social...")
+      const localStories = JSON.parse(localStorage.getItem("vexx_stories") || "[]")
+      setStories(localStories.filter(s => new Date(s.expires_at) > new Date()))
     }
   }
 
@@ -62,8 +63,9 @@ export default function SocialPage() {
       if (error) throw error
       setChallenges(data || [])
     } catch (err) {
-      console.error("Erro carregar challenges:", err)
-      setError("Falha ao carregar desafios")
+      console.log("Banco sem challenges, carregando fallback local no social...")
+      const localChallenges = JSON.parse(localStorage.getItem("vexx_challenges") || "[]")
+      setChallenges(localChallenges.filter(c => c.status === "open"))
     }
   }
 
@@ -77,19 +79,26 @@ export default function SocialPage() {
       if (error) throw error
       setSquads(data || [])
     } catch (err) {
-      console.error("Erro carregar squads:", err)
-      setError("Falha ao carregar squads")
+      console.log("Banco sem squads, carregando fallback local no social...")
+      const localSquads = JSON.parse(localStorage.getItem("vexx_squads") || "[]")
+      setSquads(localSquads)
     }
   }
 
   async function carregarSquadMemberships(usrId) {
     if (!usrId) return
-    const { data } = await supabase
-      .from("squad_members")
-      .select("squad_id")
-      .eq("usuario_id", usrId)
-
-    setSquadMemberships(data?.map((m) => m.squad_id) || [])
+    try {
+      const { data, error } = await supabase
+        .from("squad_members")
+        .select("squad_id")
+        .eq("usuario_id", usrId)
+      
+      if (error) throw error
+      setSquadMemberships(data?.map((m) => m.squad_id) || [])
+    } catch (err) {
+      const memberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${usrId}`) || "[]")
+      setSquadMemberships(memberships)
+    }
   }
 
   async function publicarStory() {
@@ -104,8 +113,27 @@ export default function SocialPage() {
       setStoryMedia("")
       carregarStories()
     } catch (err) {
-      console.error("Erro publicar story:", err)
-      setError("Falha ao publicar story")
+      console.log("Salvando story localmente no social...")
+      const expires = new Date(Date.now() + 24 * HOUR).toISOString()
+      const localStories = JSON.parse(localStorage.getItem("vexx_stories") || "[]")
+      
+      const novoItem = {
+        id: `story-${Date.now()}`,
+        usuario_id: user.id,
+        text: storyText,
+        media_url: storyMedia || null,
+        created_at: new Date().toISOString(),
+        expires_at: expires,
+        usuarios: { username: user.email.split("@")[0], foto: null }
+      }
+      
+      const atualizados = [novoItem, ...localStories]
+      localStorage.setItem("vexx_stories", JSON.stringify(atualizados))
+      setStories(atualizados.filter(s => new Date(s.expires_at) > new Date()))
+      
+      setStoryText("")
+      setStoryMedia("")
+      setError("")
     }
   }
 
@@ -119,8 +147,23 @@ export default function SocialPage() {
       setChallenge({ title: "", description: "", goal: "", reward: "" })
       carregarChallenges()
     } catch (err) {
-      console.error("Erro criar challenge:", err)
-      setError("Falha ao criar desafio")
+      console.log("Salvando desafio localmente no social...")
+      const localChallenges = JSON.parse(localStorage.getItem("vexx_challenges") || "[]")
+      const novoItem = {
+        ...challenge,
+        id: `challenge-${Date.now()}`,
+        owner_id: user.id,
+        status: "open",
+        created_at: new Date().toISOString(),
+        usuarios: { username: user.email.split("@")[0], foto: null }
+      }
+      
+      const atualizados = [novoItem, ...localChallenges]
+      localStorage.setItem("vexx_challenges", JSON.stringify(atualizados))
+      setChallenges(atualizados.filter(c => c.status === "open"))
+      
+      setChallenge({ title: "", description: "", goal: "", reward: "" })
+      setError("")
     }
   }
 
@@ -136,8 +179,30 @@ export default function SocialPage() {
       carregarSquads()
       carregarSquadMemberships(user.id)
     } catch (err) {
-      console.error("Erro criar squad:", err)
-      setError("Falha ao criar squad")
+      console.log("Salvando squad localmente no social...")
+      const localSquads = JSON.parse(localStorage.getItem("vexx_squads") || "[]")
+      const squadId = `squad-${Date.now()}`
+      
+      const novoItem = {
+        ...squad,
+        id: squadId,
+        owner_id: user.id,
+        created_at: new Date().toISOString(),
+        squad_members: [{ usuario_id: user.id }]
+      }
+      
+      const atualizados = [novoItem, ...localSquads]
+      localStorage.setItem("vexx_squads", JSON.stringify(atualizados))
+      
+      // Adicionar membro
+      const localMemberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${user.id}`) || "[]")
+      const membershipsAtualizado = [...localMemberships, squadId]
+      localStorage.setItem(`vexx_squad_members_${user.id}`, JSON.stringify(membershipsAtualizado))
+      
+      setSquad({ name: "", description: "", capacity: 12 })
+      setSquads(atualizados)
+      setSquadMemberships(membershipsAtualizado)
+      setError("")
     }
   }
 
@@ -151,8 +216,25 @@ export default function SocialPage() {
       setSquadMemberships((prev) => [...prev, squadId])
       carregarSquads()
     } catch (err) {
-      console.error("Erro entrar em squad:", err)
-      setError("Falha ao entrar na squad")
+      console.log("Entrando em squad localmente...")
+      const localMemberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${user.id}`) || "[]")
+      const membershipsAtualizado = [...localMemberships, squadId]
+      localStorage.setItem(`vexx_squad_members_${user.id}`, JSON.stringify(membershipsAtualizado))
+      
+      // Atualizar contagem na squad local
+      const localSquads = JSON.parse(localStorage.getItem("vexx_squads") || "[]")
+      const squadsAtualizados = localSquads.map(s => {
+        if (s.id === squadId) {
+          const membersList = s.squad_members || []
+          return { ...s, squad_members: [...membersList, { usuario_id: user.id }] }
+        }
+        return s
+      })
+      localStorage.setItem("vexx_squads", JSON.stringify(squadsAtualizados))
+      
+      setSquadMemberships(membershipsAtualizado)
+      setSquads(squadsAtualizados)
+      setError("")
     }
   }
 
@@ -163,8 +245,25 @@ export default function SocialPage() {
       setSquadMemberships((prev) => prev.filter((id) => id !== squadId))
       carregarSquads()
     } catch (err) {
-      console.error("Erro sair de squad:", err)
-      setError("Falha ao sair da squad")
+      console.log("Saindo de squad localmente...")
+      const localMemberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${user.id}`) || "[]")
+      const membershipsAtualizado = localMemberships.filter(id => id !== squadId)
+      localStorage.setItem(`vexx_squad_members_${user.id}`, JSON.stringify(membershipsAtualizado))
+      
+      // Atualizar contagem na squad local
+      const localSquads = JSON.parse(localStorage.getItem("vexx_squads") || "[]")
+      const squadsAtualizados = localSquads.map(s => {
+        if (s.id === squadId) {
+          const membersList = s.squad_members || []
+          return { ...s, squad_members: membersList.filter(m => m.usuario_id !== user.id) }
+        }
+        return s
+      })
+      localStorage.setItem("vexx_squads", JSON.stringify(squadsAtualizados))
+      
+      setSquadMemberships(membershipsAtualizado)
+      setSquads(squadsAtualizados)
+      setError("")
     }
   }
 

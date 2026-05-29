@@ -52,6 +52,13 @@ const MapUber = ({
   const [eta, setEta] = useState(null);
   const [distanceToDestination, setDistanceToDestination] = useState(null);
 
+  const distanceStartToDest = useMemo(() => {
+    if (!destination) return null;
+    const startPt = positions && positions.length > 0 ? positions[0] : currentPosition;
+    if (!startPt) return null;
+    return getDistanceSimple(startPt.lat, startPt.lng, destination.lat, destination.lng);
+  }, [positions, currentPosition, destination]);
+
   // Estados do Replay Progressivo
   const [isReplaying, setIsReplaying] = useState(false);
   const [replayPositions, setReplayPositions] = useState([]);
@@ -701,12 +708,26 @@ const MapUber = ({
             Rastreamento de Destino
           </p>
           <p className="text-xs font-bold text-white mb-2 truncate">{destination.name}</p>
-          {distanceToDestination !== null && (
-            <div className="flex items-center justify-between text-[11px] text-zinc-400 border-t border-white/5 pt-2">
-              <span>📍 {distanceToDestination.toFixed(2)} km</span>
-              {eta !== null && <span className="text-purple-300">⏱️ ~{eta} min</span>}
-            </div>
-          )}
+          <div className="space-y-1.5 border-t border-white/5 pt-2 font-medium">
+            {distanceStartToDest !== null && (
+              <div className="flex justify-between items-center text-[10px] text-zinc-400">
+                <span className="font-semibold uppercase text-[8px] tracking-wider text-zinc-500">Dist. Planejada</span>
+                <span className="text-purple-300 font-extrabold">{distanceStartToDest.toFixed(2)} km</span>
+              </div>
+            )}
+            {distanceToDestination !== null && (
+              <div className="flex justify-between items-center text-[10px] text-zinc-400">
+                <span className="font-semibold uppercase text-[8px] tracking-wider text-zinc-500">Restante</span>
+                <span className="text-emerald-400 font-extrabold">{distanceToDestination.toFixed(2)} km</span>
+              </div>
+            )}
+            {eta !== null && (
+              <div className="flex justify-between items-center text-[10px] text-zinc-400">
+                <span className="font-semibold uppercase text-[8px] tracking-wider text-zinc-500">Tempo (ETA)</span>
+                <span className="text-blue-400 font-extrabold">~{eta} min</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
