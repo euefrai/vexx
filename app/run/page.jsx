@@ -65,17 +65,25 @@ export default function RunPage() {
   // Intervalo do Simulador
   const simIntervalRef = useRef(null);
 
-  // Obter Perfil do Usuário Autenticado
+  const [userAvatar, setUserAvatar] = useState(null);
+
+  // Obter Perfil do Usuário Autenticado (Codinome e Foto de Perfil)
   useEffect(() => {
     if (!user) return;
     async function fetchPerfil() {
       const { data } = await supabase
         .from("usuarios")
-        .select("username")
+        .select("username, foto")
         .eq("id", user.id)
         .single();
+      
       if (data?.username) {
         setUsername(data.username);
+      }
+      if (data?.foto) {
+        setUserAvatar(data.foto);
+      } else if (user?.user_metadata?.avatar_url) {
+        setUserAvatar(user.user_metadata.avatar_url);
       }
     }
     fetchPerfil();
@@ -299,6 +307,7 @@ export default function RunPage() {
           showRouteInfo={false}
           clima={clima}
           triggerReplay={triggerReplay}
+          userAvatar={userAvatar}
         />
       </div>
 

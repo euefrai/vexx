@@ -8,10 +8,12 @@ import "leaflet/dist/leaflet.css";
 /**
  * MapUber - Componente de mapa premium de corrida
  * Características:
- * - Mapa estático e livre de flickers ou flashes (inicialização isolada)
- * - Rota de destino com setas animadas flutuantes (fluxo ciano móvel)
+ * - Mapa estático e livre de flickers (inicialização isolada)
+ * - Rota de destino com setas animadas flutuantes (fluxo ciano móvel por caminhos reais)
  * - Escolha livre de destino clicando em qualquer lugar do mapa ou arrastando o pin
  * - Força atualização imediata de localização exata por satélite no botão central
+ * - Mostra avatar real do usuário na bolha pulsante
+ * - Desenha um pin premium brilhante indicando o Ponto de Partida exato
  */
 const MapUber = ({ 
   positions = [], 
@@ -23,9 +25,11 @@ const MapUber = ({
   showRouteInfo = true,
   clima = "sol",
   triggerReplay = false,
+  userAvatar = null, // Foto do atleta do Supabase/OAuth
 }) => {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const startMarkerRef = useRef(null); // Marcador para o ponto de partida
   const polylineRef = useRef(null);
   const polylineGlowRef = useRef(null);
   const routeRef = useRef(null);
@@ -52,7 +56,7 @@ const MapUber = ({
   const [isReplaying, setIsReplaying] = useState(false);
   const [replayPositions, setReplayPositions] = useState([]);
 
-  // Estabilizar referências para evitar reconstruir efeitos do mapa (FIM DOS FLASHES!)
+  // Estabilizar referências para evitar reconstruir efeitos do mapa
   const onDestinationSelectRef = useRef(onDestinationSelect);
   const destinationRef = useRef(destination);
 
@@ -69,8 +73,13 @@ const MapUber = ({
     return lastKnownPositionRef.current;
   }, [currentPosition]);
 
-  // Ícone do radar de localização pulsante
+  // 🎯 ÍCONE DO USUÁRIO PULSANTE COM FOTO DO ATHLETA
   const createUserIcon = useCallback((L) => {
+    // Caso não tenha foto, usamos um gradiente escuro com símbolo de corrida
+    const avatarBackground = userAvatar 
+      ? `url('${userAvatar}')` 
+      : `radial-gradient(circle, #1e293b, #0f172a)`;
+
     return L.divIcon({
       html: `
         <div class="uber-avatar-wrapper" style="
@@ -82,7 +91,7 @@ const MapUber = ({
           transform: rotate(0deg);
           transition: transform 0.1s linear;
         ">
-          <!-- Anéis de Radar Concêntricos Pulsantes (Estilo GPS Satélite) -->
+          <!-- Anéis de Radar Concêntricos Pulsantes -->
           <div class="radar-pulse-ring active-day active-night" style="
             position: absolute;
             width: 70px;
@@ -106,25 +115,37 @@ const MapUber = ({
           <!-- Glow Central -->
           <div style="
             position: absolute;
-            width: 32px;
-            height: 32px;
-            background: radial-gradient(circle, rgba(0, 255, 159, 0.45), transparent);
+            width: 34px;
+            height: 34px;
+            background: radial-gradient(circle, rgba(0, 255, 159, 0.5), transparent);
             border-radius: 50%;
             z-index: 2;
           "></div>
           
-          <!-- Círculo interno branco brilhante -->
+          <!-- Círculo interno branco com foto do usuário ou avatar -->
           <div style="
             position: absolute;
-            width: 24px;
-            height: 24px;
-            background: #ffffff;
-            border: 2.5px solid #0f172a;
+            width: 28px;
+            height: 28px;
+            background: ${avatarBackground};
+            background-size: cover;
+            background-position: center;
+            border: 2.5px solid #00ff9f;
             border-radius: 50%;
-            opacity: 0.95;
             z-index: 5;
             box-shadow: 0 0 12px rgba(0, 255, 159, 0.95);
-          "></div>
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            ${!userAvatar ? `
+              <!-- Silhueta esportiva minimalista ciano se não houver foto -->
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00ff9f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 21a6 6 0 0 0-12 0"/>
+                <circle cx="12" cy="10" r="4"/>
+              </svg>
+            ` : ""}
+          </div>
           
           <!-- Seta verde esportiva ciano de direção -->
           <div style="
@@ -136,13 +157,58 @@ const MapUber = ({
             border-right: 9px solid transparent;
             border-bottom: 20px solid #00ff9f;
             filter: drop-shadow(0 0 6px rgba(0, 255, 159, 0.9)) drop-shadow(0 1.5px 3px rgba(0, 0, 0, 0.5));
-            transform: translateY(-4px);
+            transform: translateY(-5px);
           "></div>
         </div>
       `,
       className: "uber-user-marker-glow",
       iconSize: [70, 70],
       iconAnchor: [35, 35],
+    });
+  }, [userAvatar]);
+
+  // 🏁 ÍCONE DO PONTO DE PARTIDA PREMIUM
+  const createStartIcon = useCallback((L) => {
+    return L.divIcon({
+      html: `
+        <div style="
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        ">
+          <!-- Círculo externo brilhante ciano -->
+          <div style="
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: radial-gradient(circle, #00e0ff, #0099ff);
+            border-radius: 50%;
+            filter: drop-shadow(0 0 8px rgba(0, 224, 255, 0.8));
+            border: 2px solid white;
+          "></div>
+          <!-- Label interna START -->
+          <div style="
+            position: absolute;
+            top: -22px;
+            background: #0f172a;
+            border: 1px solid #00e0ff;
+            color: #00e0ff;
+            font-size: 8px;
+            font-weight: 900;
+            padding: 1.5px 4.5px;
+            border-radius: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.6);
+            white-space: nowrap;
+          ">
+            Partida
+          </div>
+        </div>
+      `,
+      className: "uber-start-marker",
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
     });
   }, []);
 
@@ -155,6 +221,7 @@ const MapUber = ({
           align-items: center;
           animation: pulse-destination 2s infinite;
         ">
+          <!-- Círculo externo pulsante -->
           <div style="
             position: absolute;
             width: 28px;
@@ -181,7 +248,7 @@ const MapUber = ({
     });
   }, []);
 
-  // 1️⃣ Inicializar Mapa - EXECUTA RIGOROSAMENTE APENAS UMA VEZ NO MONTAGEM DO COMPONENTE
+  // 1️⃣ Inicializar Mapa - EXECUTA RIGOROSAMENTE APENAS UMA VEZ
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || mapError) return;
 
@@ -251,7 +318,6 @@ const MapUber = ({
       }
     })();
 
-    // Destruir mapa apenas quando o componente for totalmente desmontado do DOM
     return () => {
       if (mapRef.current) {
         mapRef.current.off();
@@ -261,7 +327,7 @@ const MapUber = ({
     };
   }, [mapError]);
 
-  // 2️⃣ Traçar Rota Dinâmica (Ciano Neon Fluido Animado)
+  // 2️⃣ Traçar Rota Dinâmica (Ciano Neon Fluido Animado por Ruas Reais)
   useEffect(() => {
     const L = LRef.current;
     if (!mapRef.current || !currentPosition || !destination || !L || !isMapReady) return;
@@ -287,7 +353,7 @@ const MapUber = ({
           mapRef.current.removeLayer(routeRef.current);
         }
 
-        // Polyline de Rota com Classe CSS animada para criar setas/traços em movimento
+        // Polyline de Rota com Classe CSS animada para criar setas/traços em movimento pelas ruas
         routeRef.current = L.polyline(route, {
           color: "#00e0ff",
           weight: 5.5,
@@ -298,7 +364,7 @@ const MapUber = ({
           bubblingMouseEvents: false,
         }).addTo(mapRef.current);
 
-        console.debug(`[MapUber] Rota com ${route.length} pontos desenhada`);
+        console.debug(`[MapUber] Rota real com ${route.length} pontos desenhada`);
       } catch (error) {
         console.error("[MapUber] Erro ao obter rota:", error);
       }
@@ -381,7 +447,7 @@ const MapUber = ({
     }
   }, [effectivePosition, heading, currentSpeed, isMapReady, createUserIcon, currentPosition]);
 
-  // 4️⃣ Marcador de Destino Dragável (Tactilidade Total)
+  // 4️⃣ Marcador de Destino Dragável
   useEffect(() => {
     const L = LRef.current;
     if (!mapRef.current || !destination || !L || !isMapReady) return;
@@ -390,7 +456,6 @@ const MapUber = ({
       mapRef.current.removeLayer(destinationMarkerRef.current);
     }
 
-    // Criar marcador arrastável para ajustar destino direto no mapa
     destinationMarkerRef.current = L.marker(
       [destination.lat, destination.lng],
       { icon: createDestinationIcon(L), draggable: true }
@@ -440,6 +505,31 @@ const MapUber = ({
     }
   }, [positions, replayPositions, isReplaying]);
 
+  // 6️⃣ DESENHAR MARCADOR PREMIUM DO PONTO DE PARTIDA (LARGADA)
+  useEffect(() => {
+    const L = LRef.current;
+    if (!mapRef.current || !L || !isMapReady) return;
+
+    if (positions && positions.length > 0) {
+      const startPt = positions[0];
+      const startLatLng = [startPt.lat, startPt.lng];
+
+      if (!startMarkerRef.current) {
+        startMarkerRef.current = L.marker(startLatLng, {
+          icon: createStartIcon(L),
+          zIndexOffset: 500,
+        }).addTo(mapRef.current);
+      } else {
+        startMarkerRef.current.setLatLng(startLatLng);
+      }
+    } else {
+      if (startMarkerRef.current) {
+        mapRef.current.removeLayer(startMarkerRef.current);
+        startMarkerRef.current = null;
+      }
+    }
+  }, [positions, isMapReady, createStartIcon]);
+
   // Replay
   const runReplayAnimation = useCallback(() => {
     if (positions.length < 2) return;
@@ -478,7 +568,7 @@ const MapUber = ({
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
   
-  // 🎯 CENTRO DE ALTA PRECISÃO (Força instantâneamente lock via Geolocation real na hora)
+  // Centro
   const centerMap = useCallback(() => {
     if (navigator.geolocation && mapRef.current) {
       navigator.geolocation.getCurrentPosition(
@@ -546,7 +636,6 @@ const MapUber = ({
           }
         }
 
-        /* Setas/Traços móveis que deslizam sobre a rota de destino ciano glow */
         .route-path-flow {
           stroke-dasharray: 10, 14;
           animation: route-flow 1.1s linear infinite;
