@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import OpenAI from "openai";
 
 export async function POST(req) {
   try {
@@ -6,23 +7,23 @@ export async function POST(req) {
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: "API KEY não configurada" },
+        { error: "API KEY não configurada no servidor." },
         { status: 500 }
       );
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini", // 🔥 MAIS ESTÁVEL
-        input: `
-Você é um treinador profissional.
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-Crie um treino baseado nisso:
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "Você é um treinador profissional e instrutor de elite do VEXX SQUAD. Crie treinos práticos e diretos."
+        },
+        {
+          role: "user",
+          content: `Crie um treino baseado nisso:
 ${prompt}
 
 Responda exatamente assim:
@@ -30,32 +31,19 @@ Responda exatamente assim:
 Nome do Treino
 Exercício: séries
 
-Sem explicações extras.
-        `,
-      }),
+Sem explicações extras ou introduções.`
+        }
+      ]
     });
 
-    if (!response.ok) {
-      const erro = await response.text();
-      console.error("❌ ERRO OPENAI:", erro);
-
-      return NextResponse.json(
-        { error: "Erro na OpenAI", details: erro },
-        { status: 500 }
-      );
-    }
-
-    const data = await response.json();
-
-    const texto =
-      data.output?.[0]?.content?.[0]?.text || "Erro ao gerar treino";
+    const texto = response.choices[0].message.content || "Erro ao gerar treino";
 
     return NextResponse.json({ treino: texto });
 
   } catch (error) {
-    console.error("🔥 ERRO GERAL:", error);
+    console.error("🔥 ERRO GERAL NO GERADOR DE TREINOS:", error);
     return NextResponse.json(
-      { error: "Erro interno no servidor" },
+      { error: error.message || "Erro interno no servidor" },
       { status: 500 }
     );
   }

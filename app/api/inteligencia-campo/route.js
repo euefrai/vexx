@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 export async function POST(req) {
   try {
     const { historico } = await req.json(); 
+
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: "API KEY não configurada no servidor." },
+        { status: 500 }
+      );
+    }
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     // 🧠 OTIMIZAÇÃO: Mantém apenas as últimas 15 mensagens para economizar tokens
     // e garantir que a IA foque no contexto mais recente.
@@ -27,7 +34,7 @@ export async function POST(req) {
 
     return NextResponse.json({ resposta: response.choices[0].message.content });
   } catch (err) {
-    console.error("ERRO OPENAI:", err);
-    return NextResponse.json({ error: "Falha na comunicação com a base." }, { status: 500 });
+    console.error("ERRO GERAL NA INTELIGÊNCIA DE CAMPO:", err);
+    return NextResponse.json({ error: "Falha na comunicação com a base de inteligência." }, { status: 500 });
   }
 }

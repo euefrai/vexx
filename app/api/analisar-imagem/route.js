@@ -20,6 +20,12 @@ export async function POST(req) {
       return NextResponse.json({ error: "API Key não configurada no servidor." }, { status: 500 });
     }
 
+    // 🧭 Garante o cabeçalho do Base64 MIME adequado para o Vision da OpenAI
+    let formattedImage = image;
+    if (image && !image.startsWith("data:")) {
+      formattedImage = `data:image/jpeg;base64,${image}`;
+    }
+
     // 1. Definição do Prompt de Sistema baseado no modo
     const systemPrompt =
       tipo === "rotulo"
@@ -58,7 +64,7 @@ export async function POST(req) {
             {
               type: "image_url",
               image_url: {
-                url: image, // A imagem base64 vinda do frontend
+                url: formattedImage, // A imagem base64 formatada
               },
             },
           ],
