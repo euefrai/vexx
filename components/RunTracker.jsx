@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo } from "react";
-import { Play, Pause, RotateCcw, TrendingUp, Gauge } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Play, Pause, RotateCcw, Lock, Unlock, PlayCircle, Eye, Flame, ShieldAlert, Cpu } from "lucide-react";
 import RunChart from "./RunChart";
 import RunStats from "./RunStats";
 
@@ -16,21 +17,83 @@ export default function RunTracker({
   resetTracking,
   currentSpeed = 0,
   avgSpeed = 0,
-  maxSpeed = 0,
   isGPSConnected = true,
+  isSimulando = false,
+  onToggleSimulado = null,
 }) {
-  // Memoize cálculos para evitar re-renderings desnecessários
-  const metrics = useMemo(() => {
-    return {
-      avgSpeedKmh: avgSpeed > 0 ? avgSpeed.toFixed(1) : "0",
-      currentSpeedKmh: currentSpeed > 0 ? currentSpeed.toFixed(1) : "0",
-      maxSpeedKmh: maxSpeed > 0 ? maxSpeed.toFixed(1) : "0",
-    };
-  }, [avgSpeed, currentSpeed, maxSpeed]);
+  const [isLocked, setIsLocked] = useState(false);
+  const [dragProgress, setDragProgress] = useState(0);
+
+  // Manipular drag do cadeado slide-to-unlock
+  const handleDrag = (event, info) => {
+    // A pista de drag tem 180px de largura
+    const x = Math.max(0, Math.min(180, info.point.x - event.target.getBoundingClientRect().left));
+    const progress = x / 180;
+    setDragProgress(progress);
+    
+    if (x >= 170) {
+      setIsLocked(false);
+      setDragProgress(0);
+    }
+  };
 
   return (
-    <div className="w-full h-full flex flex-col justify-between space-y-3 sm:space-y-4">
-      {/* ESTATÍSTICAS EM TEMPO REAL */}
+    <div className="w-full h-full relative flex flex-col justify-between space-y-4">
+      {/* 🔒 ACCIDENTAL TOUCH LOCK SHEET (BLOQUEIO DE TELA) */}
+      <AnimatePresence>
+        {isLocked && (
+          <motion.div
+            className="absolute inset-0 bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-3xl z-50 p-6 flex flex-col items-center justify-between"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="text-center mt-8">
+              <div className="w-16 h-16 bg-purple-500/10 border border-purple-500/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                <Lock size={28} className="text-purple-400" />
+              </div>
+              <h4 className="text-white font-black uppercase tracking-wider text-sm">Painel Protegido</h4>
+              <p className="text-[10px] text-zinc-500 font-bold max-w-xs mt-1 leading-relaxed">
+                O bloqueio de toque acidental está ativo para evitar interrupções causadas por suor ou fricção com roupas.
+              </p>
+            </div>
+
+            {/* Slide to Unlock Handle */}
+            <div className="w-full max-w-[240px] h-12 bg-zinc-900 border border-white/5 rounded-full relative flex items-center justify-between p-1 overflow-hidden">
+              {/* Barra de progresso ciano */}
+              <div 
+                className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-purple-500/10 to-purple-500/30 transition-all pointer-events-none" 
+                style={{ width: `${Math.max(12, dragProgress * 100)}%` }} 
+              />
+              
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-[10px] font-black text-purple-300 uppercase tracking-widest animate-pulse">
+                  Deslize para liberar
+                </span>
+              </div>
+
+              {/* Botão de arrastar */}
+              <motion.div
+                drag="x"
+                dragConstraints={{ left: 0, right: 180 }}
+                dragElastic={0.05}
+                onDrag={handleDrag}
+                onDragEnd={() => setDragProgress(0)}
+                className="w-10 h-10 bg-gradient-to-br from-purple-500 to-fuchsia-600 rounded-full flex items-center justify-center shadow-lg cursor-grab active:cursor-grabbing z-10 hover:scale-105 active:scale-95 transition-transform"
+              >
+                <Unlock size={16} className="text-white" />
+              </motion.div>
+            </div>
+
+            <div className="mb-4 text-[9px] text-zinc-600 font-extrabold uppercase tracking-widest">
+              VEXX SQUAD SHIELD
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* METRICAS PRINCIPAIS */}
       <RunStats 
         distance={distance} 
         time={time} 
@@ -40,85 +103,102 @@ export default function RunTracker({
         avgSpeed={avgSpeed}
       />
 
-      {/* STATUS DO GPS */}
-      {!isGPSConnected && (
-        <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2">
-          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-          <span className="text-xs text-red-400 font-semibold">⚠️ GPS Desconectado</span>
+      {/* GRÁFICO TELEMETRIA */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between items-center px-1">
+          <p className="text-[9px] text-zinc-500 tracking-widest uppercase font-black">CURVA VELOCIDADE</p>
+          {positions.length > 0 && (
+            <span className="text-[9px] text-emerald-400 font-black animate-pulse flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+              Rastreando
+            </span>
+          )}
         </div>
-      )}
-
-      {/* GRÁFICO */}
-      <div className="pt-2 sm:pt-3 border-t border-slate-700/30">
-        <p className="text-xs text-slate-400 mb-2 tracking-widest uppercase font-bold">📈 Velocidade em Tempo Real</p>
         <RunChart positions={positions} />
       </div>
 
-      {/* VELOCIDADES */}
-      {distance > 0 && (
-        <div className="grid grid-cols-2 gap-2">
-          {/* Velocidade Atual */}
-          <div className="flex items-center justify-between p-2 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-600/30 hover:border-cyan-500/50 rounded-lg transition-all group">
-            <div className="flex items-center gap-2">
-              <Gauge size={12} className="text-cyan-400" />
-              <span className="text-xs text-slate-300 font-medium">Vel. Atual</span>
-            </div>
-            <span className="text-sm font-black text-cyan-300">
-              {metrics.currentSpeedKmh} km/h
-            </span>
-          </div>
+      {/* PAINEL DE CONTROLES TÁTEIS */}
+      <div className="flex flex-col gap-3 pt-3 border-t border-white/5">
+        
+        {/* Controles de Ação de Corrida */}
+        <div className="flex items-center justify-center gap-4">
+          
+          {/* Botão Reset / Reiniciar */}
+          {distance > 0 && (
+            <motion.button
+              onClick={resetTracking}
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              className="p-3.5 bg-zinc-900 border border-white/5 text-zinc-400 hover:text-red-400 hover:border-red-500/20 transition-all rounded-full"
+              title="Finalizar Treino"
+            >
+              <RotateCcw size={16} />
+            </motion.button>
+          )}
 
-          {/* Velocidade Média */}
-          <div className="flex items-center justify-between p-2 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border border-blue-600/30 hover:border-blue-500/50 rounded-lg transition-all group">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={12} className="text-blue-400" />
-              <span className="text-xs text-slate-300 font-medium">Vel. Média</span>
-            </div>
-            <span className="text-sm font-black text-blue-300">
-              {metrics.avgSpeedKmh} km/h
-            </span>
-          </div>
+          {/* Botão Start / Pause Principal (Gigante Circular) */}
+          {!isActive ? (
+            <motion.button
+              onClick={startTracking}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              disabled={!isGPSConnected && !isSimulando}
+              className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all ${
+                isGPSConnected || isSimulando
+                  ? "bg-gradient-to-r from-emerald-400 to-teal-500 text-zinc-950 shadow-emerald-500/25 hover:shadow-emerald-500/45"
+                  : "bg-zinc-800 text-zinc-500 border border-white/5 cursor-not-allowed"
+              }`}
+            >
+              <Play size={20} fill="currentColor" className="ml-1" />
+            </motion.button>
+          ) : (
+            <motion.button
+              onClick={pauseTracking}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="w-14 h-14 bg-gradient-to-r from-amber-400 to-orange-500 text-zinc-950 rounded-full flex items-center justify-center shadow-2xl shadow-orange-500/25 hover:shadow-orange-500/45"
+            >
+              <Pause size={20} fill="currentColor" />
+            </motion.button>
+          )}
+
+          {/* Botão Lock Screen */}
+          {isActive && (
+            <motion.button
+              onClick={() => setIsLocked(true)}
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              className="p-3.5 bg-zinc-900 border border-white/5 text-zinc-400 hover:text-purple-400 hover:border-purple-500/20 transition-all rounded-full"
+              title="Proteger Tela"
+            >
+              <Lock size={16} />
+            </motion.button>
+          )}
         </div>
-      )}
 
-      {/* CONTROLES */}
-      <div className="flex justify-center items-center gap-2 sm:gap-3 pt-2 sm:pt-3 border-t border-slate-700/30">
-        {/* Reset */}
-        <button
-          onClick={resetTracking}
-          className="p-2.5 sm:p-3 bg-slate-800/60 hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-all rounded-full border border-slate-700 hover:border-red-500/30 transform hover:scale-110 active:scale-95"
-          title="Reiniciar"
-        >
-          <RotateCcw size={14} className="sm:size-[16px]" />
-        </button>
+        {/* ⚙️ SIMULADOR E STATUS */}
+        <div className="flex items-center justify-between text-[10px] text-zinc-500 font-extrabold uppercase tracking-wider px-1 bg-zinc-950/45 p-2 rounded-2xl border border-white/5">
+          {/* Status GPS */}
+          <div className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${isGPSConnected ? "bg-emerald-400 animate-pulse" : "bg-red-500"}`} />
+            <span>GPS: {isGPSConnected ? "Ativo" : "Offline"}</span>
+          </div>
 
-        {/* Start / Pause */}
-        {!isActive ? (
-          <button
-            onClick={startTracking}
-            disabled={!isGPSConnected}
-            className={`flex items-center gap-2 ${
-              isGPSConnected
-                ? 'bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950'
-                : 'bg-slate-600/50 text-slate-400 cursor-not-allowed'
-            } px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-black shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] uppercase tracking-tight text-xs sm:text-sm transform hover:-translate-y-1 active:translate-y-0 transition-all`}
-          >
-            <Play size={12} fill="currentColor" className="sm:size-[14px]" />
-            <span className="hidden sm:inline">Iniciar</span>
-            <span className="sm:hidden">Ir</span>
-          </button>
-        ) : (
-          <button
-            onClick={pauseTracking}
-            className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-black shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_30px_rgba(245,158,11,0.6)] uppercase tracking-tight text-xs sm:text-sm transform hover:-translate-y-1 active:translate-y-0 transition-all"
-          >
-            <Pause size={12} fill="currentColor" className="sm:size-[14px]" />
-            <span className="hidden sm:inline">Pausar</span>
-            <span className="sm:hidden">Stop</span>
-          </button>
-        )}
-
-        <div className="flex-shrink-0 w-0 sm:w-8" />
+          {/* Interruptor Simulador */}
+          {onToggleSimulado && (
+            <button
+              onClick={onToggleSimulado}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl transition-all border ${
+                isSimulando
+                  ? "bg-purple-500/10 border-purple-500/35 text-purple-300 font-black"
+                  : "bg-transparent border-white/5 hover:border-white/10 text-zinc-400"
+              }`}
+            >
+              <Cpu size={11} className={isSimulando ? "animate-spin" : ""} />
+              <span>Simulador {isSimulando ? "ON" : "OFF"}</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

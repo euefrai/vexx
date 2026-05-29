@@ -6,14 +6,13 @@ import { getRoute } from "@/utils/getRoute";
 import "leaflet/dist/leaflet.css";
 
 /**
- * MapUber - Componente de mapa estilo Uber que segue o usuário
+ * MapUber - Componente de mapa premium de corrida
  * Características:
- * - Mapa sempre centralizado no usuário (como Uber) - SEM FLICKER
- * - Rotaciona com a orientação do usuário (bearing)
- * - Zoom adaptativo baseado em velocidade
- * - Mostra rota até destino com ETA
- * - Cache de última posição como fallback
- * - Responsivo e fluido
+ * - Mapa sempre centralizado no usuário com bearing suave
+ * - Linha de corrida com efeito neon duplo (glow + brilho ciano)
+ * - Indicador de usuário com múltiplos anéis de radar pulsante de satélite
+ * - Overlays e filtros de clima dinâmicos (Dia, Noite, Chuva, Nublado)
+ * - Modo replay progressivo pós-corrida
  */
 const MapUber = ({ 
   positions = [], 
@@ -23,10 +22,13 @@ const MapUber = ({
   currentSpeed = 0,
   onDestinationSelect,
   showRouteInfo = true,
+  clima = "sol", // "sol" | "noite" | "chuva" | "nublado"
+  triggerReplay = false,
 }) => {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const polylineRef = useRef(null);
+  const polylineGlowRef = useRef(null); // Linha larga inferior para brilho
   const routeRef = useRef(null);
   const destinationMarkerRef = useRef(null);
   const mapContainerRef = useRef(null);
@@ -39,16 +41,18 @@ const MapUber = ({
   
   // Cache de última posição conhecida (para fallback)
   const lastKnownPositionRef = useRef(null);
-  // Throttle de atualizações (evita flicker)
   const lastMapUpdateRef = useRef(0);
-  const MIN_UPDATE_INTERVAL = 200; // ms
-  // Estado de carregamento
+  const MIN_UPDATE_INTERVAL = 150; // ms (mais responsivo)
   const isInitializedRef = useRef(false);
 
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [eta, setEta] = useState(null);
   const [distanceToDestination, setDistanceToDestination] = useState(null);
+
+  // Estados do Replay Progressivo
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [replayPositions, setReplayPositions] = useState([]);
   
   // Usar última posição conhecida como fallback
   const effectivePosition = useMemo(() => {
@@ -59,74 +63,94 @@ const MapUber = ({
     return lastKnownPositionRef.current;
   }, [currentPosition]);
 
-  // 🎯 Criar ícone do usuário com seta MUITO VISÍVEL
+  // 🎯 Criar ícone do usuário com radar de alta precisão (Pulsante e Futurista)
   const createUserIcon = useCallback((L) => {
     return L.divIcon({
       html: `
         <div class="uber-avatar-wrapper" style="
-          width: 60px;
-          height: 60px;
+          width: 70px;
+          height: 70px;
           display: flex;
           justify-content: center;
           align-items: center;
           transform: rotate(0deg);
           transition: transform 0.1s linear;
-          filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
         ">
-          <!-- Círculo externo (halo) -->
+          <!-- Anéis de Radar Concêntricos Pulsantes (Estilo GPS Satélite) -->
+          <div class="radar-pulse-ring active-day active-night" style="
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            border: 2px solid #00ff9f;
+            border-radius: 50%;
+            opacity: 0;
+            animation: radar-pulse 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+          "></div>
+          <div class="radar-pulse-ring active-night active-rain" style="
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            border: 2px solid #00e0ff;
+            border-radius: 50%;
+            opacity: 0;
+            animation: radar-pulse 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+            animation-delay: 1s;
+          "></div>
+          <div class="radar-pulse-ring active-rain active-nublado" style="
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            border: 2px solid #a855f7;
+            border-radius: 50%;
+            opacity: 0;
+            animation: radar-pulse 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+            animation-delay: 2s;
+          "></div>
+
+          <!-- Glow Central -->
           <div style="
             position: absolute;
-            width: 60px;
-            height: 60px;
-            background: radial-gradient(circle, rgba(0, 255, 159, 0.3), rgba(0, 255, 159, 0.1));
+            width: 32px;
+            height: 32px;
+            background: radial-gradient(circle, rgba(0, 255, 159, 0.4), transparent);
             border-radius: 50%;
-            border: 2px solid #00ff9f;
-            opacity: 0.8;
-            animation: pulse-user 2s infinite;
+            z-index: 2;
           "></div>
           
-          <!-- Círculo interno branco -->
+          <!-- Círculo interno branco brilhante -->
           <div style="
             position: absolute;
-            width: 40px;
-            height: 40px;
-            background: white;
+            width: 24px;
+            height: 24px;
+            background: #ffffff;
+            border: 2.5px solid #0f172a;
             border-radius: 50%;
             opacity: 0.95;
             z-index: 5;
+            box-shadow: 0 0 10px rgba(0, 255, 159, 0.8);
           "></div>
           
-          <!-- Seta verde (GRANDE E VISÍVEL) -->
+          <!-- Seta verde esportiva ciano de direção -->
           <div style="
             position: relative;
             z-index: 10;
             width: 0;
             height: 0;
-            border-left: 14px solid transparent;
-            border-right: 14px solid transparent;
-            border-bottom: 28px solid #00ff9f;
-            filter: drop-shadow(0 0 6px rgba(0, 255, 159, 1)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
-          "></div>
-          
-          <!-- Sombra interior (mais definição) -->
-          <div style="
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent);
-            border-radius: 50%;
-            opacity: 0.6;
-            z-index: 4;
+            border-left: 9px solid transparent;
+            border-right: 9px solid transparent;
+            border-bottom: 20px solid #00ff9f;
+            filter: drop-shadow(0 0 5px rgba(0, 255, 159, 0.8)) drop-shadow(0 1.5px 3px rgba(0, 0, 0, 0.5));
+            transform: translateY(-4px);
           "></div>
         </div>
       `,
-      className: "uber-user-marker",
-      iconSize: [60, 60],
-      iconAnchor: [30, 30],
+      className: "uber-user-marker-glow",
+      iconSize: [70, 70],
+      iconAnchor: [35, 35],
     });
   }, []);
 
-  // 🎯 Criar ícone de destino (tipo Uber)
+  // 🎯 Criar ícone de destino estilo Garmin/NRC
   const createDestinationIcon = useCallback((L) => {
     return L.divIcon({
       html: `
@@ -139,19 +163,18 @@ const MapUber = ({
           <!-- Círculo externo pulsante -->
           <div style="
             position: absolute;
-            width: 32px;
-            height: 32px;
-            background: radial-gradient(circle, #ff6b6b, #e63946);
+            width: 28px;
+            height: 28px;
+            background: radial-gradient(circle, #ff3366, #e63946);
             border-radius: 50%;
-            filter: drop-shadow(0 0 12px rgba(255, 107, 107, 0.8));
-            border: 4px solid white;
-            box-shadow: 0 0 0 8px rgba(255, 107, 107, 0.2);
+            filter: drop-shadow(0 0 10px rgba(255, 51, 102, 0.8));
+            border: 3.5px solid white;
+            box-shadow: 0 0 0 6px rgba(255, 51, 102, 0.25);
           "></div>
-          <!-- Pin central -->
           <div style="
             position: relative;
-            width: 12px;
-            height: 12px;
+            width: 8px;
+            height: 8px;
             background: white;
             border-radius: 50%;
             z-index: 10;
@@ -159,51 +182,57 @@ const MapUber = ({
         </div>
       `,
       className: "uber-destination-marker",
-      iconSize: [48, 48],
-      iconAnchor: [24, 24],
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
     });
   }, []);
 
-  // 1️⃣ Inicializar Mapa
+  // 1️⃣ Inicializar Mapa com tema escuro e polilinhas neon duplo
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || mapError) return;
 
     (async () => {
       try {
-        console.debug("[MapUber] Importando Leaflet...");
+        console.debug("[MapUber] Carregando Leaflet...");
         const L = (await import("leaflet")).default;
         LRef.current = L;
 
-        // Corrigir ícones padrão do Leaflet
         delete L.Icon.Default.prototype._getIconUrl;
         L.Icon.Default.mergeOptions({
-          iconRetinaUrl:
-            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+          iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
           iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
           shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
         });
 
-        console.debug("[MapUber] Inicializando mapa...");
-
-        // Criar mapa com rotação ativada (Leaflet 1.9+)
+        // Configurar mapa
         mapRef.current = L.map(mapContainerRef.current, {
           zoomControl: false,
           attributionControl: false,
           tap: true,
-          bearing: 0, // Suporta rotação
+          bearing: 0,
         }).setView([-15.78, -47.92], 16);
 
-        // Tile layer escuro
+        // Tile layer escuro premium
         L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
           maxZoom: 20,
           attribution: "",
         }).addTo(mapRef.current);
 
-        // Polyline para o rastro da corrida
-        polylineRef.current = L.polyline([], {
+        // 1. Camada inferior de brilho neon (mais larga e com menos opacidade)
+        polylineGlowRef.current = L.polyline([], {
           color: "#00ff9f",
-          weight: 6,
-          opacity: 0.8,
+          weight: 12,
+          opacity: 0.35,
+          lineCap: "round",
+          lineJoin: "round",
+          bubblingMouseEvents: false,
+        }).addTo(mapRef.current);
+
+        // 2. Camada superior de brilho ciano (mais fina e intensa)
+        polylineRef.current = L.polyline([], {
+          color: "#00e0ff",
+          weight: 4.5,
+          opacity: 0.9,
           lineCap: "round",
           lineJoin: "round",
           bubblingMouseEvents: false,
@@ -211,9 +240,7 @@ const MapUber = ({
 
         mapInstanceRef.current = mapRef.current;
         setIsMapReady(true);
-        console.debug("[MapUber] ✅ Mapa inicializado");
 
-        // Listener para cliques no mapa (selecionar destino)
         mapRef.current.on("click", (e) => {
           if (onDestinationSelect && !destination) {
             onDestinationSelect({
@@ -224,12 +251,11 @@ const MapUber = ({
           }
         });
 
-        // Corrigir tamanho do mapa
         setTimeout(() => {
           if (mapRef.current) mapRef.current.invalidateSize();
-        }, 200);
+        }, 300);
       } catch (error) {
-        console.error("[MapUber] ❌ Erro ao carregar Leaflet:", error);
+        console.error("[MapUber] Erro ao instanciar mapa:", error);
         setMapError(true);
       }
     })();
@@ -243,61 +269,50 @@ const MapUber = ({
     };
   }, [onDestinationSelect, destination, mapError]);
 
-  // 2️⃣ Rota Dinâmica com Cache
+  // 2️⃣ Traçar Rota Dinâmica
   useEffect(() => {
     const L = LRef.current;
     if (!mapRef.current || !currentPosition || !destination || !L || !isMapReady) return;
 
-    // Se destino é a mesma, usar cache
     if (
       lastDestinationRef.current &&
       lastDestinationRef.current.lat === destination.lat &&
       lastDestinationRef.current.lng === destination.lng &&
       routeCacheRef.current
     ) {
-      console.debug("[MapUber] 📍 Usando rota em cache");
       return;
     }
 
     async function drawRoute() {
       try {
         const route = await getRoute(currentPosition, destination);
+        if (!route || route.length === 0) return;
 
-        if (!route || route.length === 0) {
-          console.warn("[MapUber] Rota vazia");
-          return;
-        }
-
-        // Armazenar em cache
         routeCacheRef.current = route;
         lastDestinationRef.current = { ...destination };
 
-        // Remover rota anterior
         if (routeRef.current) {
           mapRef.current.removeLayer(routeRef.current);
         }
 
-        // Desenhar nova rota
         routeRef.current = L.polyline(route, {
-          color: "#00e0ff",
+          color: "#a855f7",
           weight: 4,
-          opacity: 0.6,
+          opacity: 0.7,
           lineCap: "round",
           lineJoin: "round",
-          dashArray: "5, 5",
+          dashArray: "6, 8",
           bubblingMouseEvents: false,
         }).addTo(mapRef.current);
-
-        console.debug(`[MapUber] ✅ Rota com ${route.length} pontos`);
       } catch (error) {
-        console.error("[MapUber] Erro ao traçar rota:", error);
+        console.error("[MapUber] Rota falhou:", error);
       }
     }
 
     drawRoute();
   }, [destination, currentPosition, isMapReady]);
 
-  // 3️⃣ Seguir Usuário com Rotation (Estilo Uber) - SEM FLICKER
+  // 3️⃣ Seguir Atleta e Bearing Suave (Sem flicker)
   useEffect(() => {
     const L = LRef.current;
     if (!mapRef.current || !effectivePosition || !L || !isMapReady) return;
@@ -305,36 +320,27 @@ const MapUber = ({
     const { lat, lng } = effectivePosition;
     const latlng = [lat, lng];
 
-    // Primeira inicialização: usar setView (sem animação)
     if (!isInitializedRef.current && currentPosition) {
-      console.debug("[MapUber] 🗺️ Primeira inicialização no mapa");
       mapRef.current.setView(latlng, 18);
       isInitializedRef.current = true;
       lastMapUpdateRef.current = Date.now();
     }
 
-    // Throttle: só atualizar a cada 200ms (evita flicker)
     const now = Date.now();
-    if (now - lastMapUpdateRef.current < MIN_UPDATE_INTERVAL) {
-      return;
-    }
+    if (now - lastMapUpdateRef.current < MIN_UPDATE_INTERVAL) return;
     lastMapUpdateRef.current = now;
 
-    // 🔄 Animar rotação suavemente
-    if (rotationAnimationRef.current) {
-      cancelAnimationFrame(rotationAnimationRef.current);
-    }
+    if (rotationAnimationRef.current) cancelAnimationFrame(rotationAnimationRef.current);
 
     const targetRotation = heading || 0;
     const currentRot = currentRotationRef.current;
-    let startTime = Date.now();
-    const animationDuration = 200; // Mais rápido
+    const startTime = Date.now();
+    const duration = 200;
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / animationDuration, 1);
+      const progress = Math.min(elapsed / duration, 1);
 
-      // Encontrar menor caminho entre ângulos
       let diff = targetRotation - currentRot;
       if (diff > 180) diff -= 360;
       if (diff < -180) diff += 360;
@@ -342,17 +348,13 @@ const MapUber = ({
       const newRotation = currentRot + diff * progress;
       currentRotationRef.current = newRotation;
 
-      // Atualizar bearing do mapa
       if (mapRef.current && mapRef.current.setBearing) {
         mapRef.current.setBearing(newRotation);
       }
 
-      // NOVO: Atualizar rotação do avatar diretamente no DOM para evitar flicker
       if (markerRef.current && markerRef.current._icon) {
-        const avatarDiv = markerRef.current._icon.querySelector('.uber-avatar-wrapper');
-        if (avatarDiv) {
-          avatarDiv.style.transform = `rotate(${newRotation}deg)`;
-        }
+        const wrapper = markerRef.current._icon.querySelector('.uber-avatar-wrapper');
+        if (wrapper) wrapper.style.transform = `rotate(${newRotation}deg)`;
       }
 
       if (progress < 1) {
@@ -362,7 +364,6 @@ const MapUber = ({
 
     animate();
 
-    // Atualizar marcador do usuário
     if (!markerRef.current) {
       markerRef.current = L.marker(latlng, {
         icon: createUserIcon(L),
@@ -370,30 +371,23 @@ const MapUber = ({
       }).addTo(mapRef.current);
     } else {
       markerRef.current.setLatLng(latlng);
-      // REMOVIDO: setIcon() repetitivo. Ele destruía e recriava a DOM do avatar, causando flashes.
     }
 
-    // Adaptative Zoom baseado em velocidade
-    let targetZoom = 16;
-    if (currentSpeed > 15) targetZoom = 16; // Rápido: zoom out
-    else if (currentSpeed > 8) targetZoom = 17; // Médio: normal
-    else if (currentSpeed > 2) targetZoom = 18; // Lento: zoom ligeiramente in
-    else targetZoom = 18; // Parado: manter zoom
+    // Zoom dinâmico inteligente
+    let zoomTarget = 18;
+    if (currentSpeed > 16) zoomTarget = 16;
+    else if (currentSpeed > 8) zoomTarget = 17;
 
-    // Atualizar zoom sem animação (suave e sem flicker)
-    if (mapRef.current.getZoom() !== targetZoom) {
-      mapRef.current.setZoom(targetZoom);
+    if (mapRef.current.getZoom() !== zoomTarget) {
+      mapRef.current.setZoom(zoomTarget);
     }
 
-    // Atualizar view sem flyTo agressivo (move suave)
-    // Se é primeira vez, já foi feito acima
     if (isInitializedRef.current && currentPosition) {
-      // Usar setView sem zoom para apenas mover (muito mais suave)
       mapRef.current.panTo(latlng, { animate: false });
     }
   }, [effectivePosition, heading, currentSpeed, isMapReady, createUserIcon, currentPosition]);
 
-  // 4️⃣ Marcador de Destino
+  // 4️⃣ Marcadores de Destino
   useEffect(() => {
     const L = LRef.current;
     if (!mapRef.current || !destination || !L || !isMapReady) return;
@@ -407,7 +401,6 @@ const MapUber = ({
       { icon: createDestinationIcon(L) }
     ).addTo(mapRef.current);
 
-    // Calcular distância até destino
     if (currentPosition) {
       const dist = getDistanceSimple(
         currentPosition.lat,
@@ -417,25 +410,71 @@ const MapUber = ({
       );
       setDistanceToDestination(dist);
 
-      // Calcular ETA (aproximado: dist / velocidade média)
       if (currentSpeed > 0) {
-        const etaHours = dist / currentSpeed;
-        const etaMins = Math.round(etaHours * 60);
-        setEta(etaMins);
+        setEta(Math.round((dist / currentSpeed) * 60));
       }
     }
   }, [destination, isMapReady, createDestinationIcon, currentPosition, currentSpeed]);
 
-  // 5️⃣ Atualizar Rastro
+  // 5️⃣ Atualizar Rastro Neon (Suporta Replay e Tempo Real)
   useEffect(() => {
-    if (!polylineRef.current || !positions || positions.length < 2) return;
-    const latLngs = positions.map((p) => [p.lat, p.lng]);
+    if (!polylineRef.current) return;
+    
+    const activePositions = isReplaying ? replayPositions : positions;
+    if (!activePositions || activePositions.length < 2) {
+      polylineRef.current.setLatLngs([]);
+      if (polylineGlowRef.current) polylineGlowRef.current.setLatLngs([]);
+      return;
+    }
+
+    const latLngs = activePositions.map((p) => [p.lat, p.lng]);
     polylineRef.current.setLatLngs(latLngs);
+    if (polylineGlowRef.current) {
+      polylineGlowRef.current.setLatLngs(latLngs);
+    }
+  }, [positions, replayPositions, isReplaying]);
+
+  // 🔄 Executar Replay da Rota
+  const runReplayAnimation = useCallback(() => {
+    if (positions.length < 2) return;
+    setIsReplaying(true);
+    setReplayPositions([positions[0]]);
+    
+    let index = 1;
+    const speedMs = Math.max(30, Math.min(150, 1500 / positions.length));
+    
+    const interval = setInterval(() => {
+      if (index >= positions.length) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setIsReplaying(false);
+        }, 3000);
+        return;
+      }
+      
+      setReplayPositions((prev) => [...prev, positions[index]]);
+      
+      // Mover câmera suavemente seguindo o replay
+      if (mapRef.current) {
+        const pt = positions[index];
+        mapRef.current.panTo([pt.lat, pt.lng], { animate: true, duration: speedMs / 1000 });
+      }
+      
+      index++;
+    }, speedMs);
   }, [positions]);
 
-  // 🎮 Controles do Mapa
+  // Assistir Gatilho do Replay
+  useEffect(() => {
+    if (triggerReplay && !isReplaying && positions.length >= 2) {
+      runReplayAnimation();
+    }
+  }, [triggerReplay, runReplayAnimation, isReplaying, positions]);
+
+  // Controles
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
+  
   const centerMap = useCallback(() => {
     if (currentPosition && mapRef.current) {
       mapRef.current.flyTo([currentPosition.lat, currentPosition.lng], 18, {
@@ -452,122 +491,138 @@ const MapUber = ({
   }, []);
 
   return (
-    <div className="w-full h-full relative z-0 bg-slate-900 overflow-hidden group">
+    <div className="w-full h-full relative z-0 bg-zinc-950 overflow-hidden group">
+      {/* 🌪️ FILTROS AMBIENTAIS E OVERLAYS DE CLIMA */}
+      <div className={`absolute inset-0 pointer-events-none z-[101] transition-all duration-[1500ms] ${
+        clima === "noite" ? "bg-blue-950/15 mix-blend-color-dodge shadow-[inset_0_0_150px_rgba(0,10,30,0.6)]" :
+        clima === "chuva" ? "bg-indigo-950/25 mix-blend-multiply rain-effect" :
+        clima === "nublado" ? "bg-slate-700/10 mix-blend-overlay" :
+        "bg-transparent"
+      }`} />
+      
+      {/* Vinheta Premium nas Bordas para aumentar imersão e foco */}
+      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.65)] z-[102]" />
+
       <style>{`
         @keyframes pulse-destination {
+          0% { filter: drop-shadow(0 0 6px rgba(255, 51, 102, 0.7)); }
+          50% { filter: drop-shadow(0 0 14px rgba(255, 51, 102, 1)); }
+          100% { filter: drop-shadow(0 0 6px rgba(255, 51, 102, 0.7)); }
+        }
+
+        @keyframes radar-pulse {
           0% {
-            filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.8));
+            transform: scale(0.3);
+            opacity: 0.8;
           }
           50% {
-            filter: drop-shadow(0 0 16px rgba(255, 107, 107, 1));
+            opacity: 0.4;
           }
           100% {
-            filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.8));
+            transform: scale(1.6);
+            opacity: 0;
           }
         }
 
-        @keyframes pulse-user {
-          0% {
-            box-shadow: 0 0 0 0 rgba(0, 255, 159, 0.7);
-          }
-          70% {
-            box-shadow: 0 0 0 15px rgba(0, 255, 159, 0);
-          }
-          100% {
-            box-shadow: 0 0 0 0 rgba(0, 255, 159, 0);
-          }
+        /* Efeito sutil de chuva caindo no mapa */
+        @keyframes falling-rain {
+          0% { background-position: 0px 0px; }
+          100% { background-position: 250px 1000px; }
         }
 
-        .uber-user-marker {
-          filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+        .rain-effect {
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='200' viewBox='0 0 100 200'%3E%3Cpath d='M12 25 L8 45 M50 90 L46 110 M85 150 L81 170 M92 20 L88 40 M20 130 L16 150' stroke='rgba(0, 224, 255, 0.25)' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+          animation: falling-rain 0.85s linear infinite;
         }
 
-        .uber-destination-marker {
-          filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.4));
+        .leaflet-container {
+          cursor: crosshair !important;
         }
       `}</style>
 
+      {/* Container Leaflet */}
       <div
         ref={mapContainerRef}
         className="w-full h-full"
-        style={{ height: "100%", background: "#0f172a" }}
+        style={{ height: "100%", background: "#0a0a0f" }}
       />
 
-      {/* ERRO DO MAPA */}
+      {/* TELA DE ERRO */}
       {mapError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur z-[999]">
-          <div className="text-center">
-            <p className="text-red-400 font-bold mb-2">❌ Erro ao carregar mapa</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-[999]">
+          <div className="text-center p-6 bg-zinc-900 border border-red-500/30 rounded-2xl max-w-sm">
+            <p className="text-red-400 font-bold text-lg mb-2">❌ Erro no Mapa GPS</p>
+            <p className="text-slate-400 text-xs mb-4">Falha ao iniciar as dependências do Leaflet no navegador.</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-emerald-500 text-black font-bold rounded-lg"
+              className="px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95"
             >
-              🔄 Recarregar
+              🔄 Recarregar Página
             </button>
           </div>
         </div>
       )}
 
-      {/* LOADING */}
+      {/* TELA DE CARREGAMENTO */}
       {!isMapReady && !mapError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-slate-900/80 to-black/80 backdrop-blur z-[998]">
+        <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 z-[998]">
           <div className="text-center">
-            <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-slate-300 font-semibold">Inicializando mapa...</p>
+            <div className="w-10 h-10 border-2 border-emerald-500/20 border-t-emerald-400 rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-slate-400 font-medium text-xs tracking-wider uppercase">Sincronizando Satélites...</p>
           </div>
         </div>
       )}
 
-      {/* VINHETA */}
-      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.5)] z-[100]" />
+      {/* INDICADOR HUD DO REPLAY */}
+      {isReplaying && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-600/90 to-blue-600/90 border border-purple-500/40 px-4 py-2 rounded-full z-[401] shadow-lg shadow-purple-500/20 flex items-center gap-2 animate-bounce">
+          <div className="w-2.5 h-2.5 bg-white rounded-full animate-ping" />
+          <span className="text-white text-xs font-black uppercase tracking-widest">Replay de Corrida</span>
+        </div>
+      )}
 
-      {/* STATUS GPS */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 bg-slate-900/90 backdrop-blur border border-emerald-500/30 px-3 py-2 rounded-full z-[401] text-xs">
-        <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-        <span className="text-slate-300 font-medium">GPS Ativo</span>
-      </div>
-
-      {/* INFO DE DESTINO (ETA) */}
-      {destination && showRouteInfo && (
-        <div className="absolute top-20 left-4 bg-slate-900/95 backdrop-blur border border-emerald-500/30 px-4 py-3 rounded-xl z-[401] shadow-lg max-w-xs">
-          <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-2">
-            🎯 Destino
+      {/* INFO DE ROTA ATIVA (ETA) */}
+      {destination && showRouteInfo && !isReplaying && (
+        <div className="absolute top-20 left-4 bg-zinc-950/85 backdrop-blur-md border border-white/10 px-4 py-3.5 rounded-2xl z-[401] shadow-2xl shadow-black/85 max-w-xs transition-all duration-300">
+          <p className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse" />
+            Rastreamento de Destino
           </p>
-          <p className="text-sm font-semibold text-white mb-2">{destination.name}</p>
+          <p className="text-xs font-bold text-white mb-2 truncate">{destination.name}</p>
           {distanceToDestination !== null && (
-            <div className="flex items-center justify-between text-xs text-slate-400">
+            <div className="flex items-center justify-between text-[11px] text-zinc-400 border-t border-white/5 pt-2">
               <span>📍 {distanceToDestination.toFixed(2)} km</span>
-              {eta !== null && <span>⏱️ ~{eta} min</span>}
+              {eta !== null && <span className="text-purple-300">⏱️ ~{eta} min</span>}
             </div>
           )}
         </div>
       )}
 
-      {/* CONTROLES DO MAPA */}
-      <div className="absolute bottom-6 right-4 sm:right-6 flex flex-col gap-2 z-[401]">
-        {/* Botão Reset Rotation */}
+      {/* CONTROLES TÁTEIS FLUTUANTES DO MAPA */}
+      <div className="absolute bottom-6 right-4 sm:right-6 flex flex-col gap-2.5 z-[401]">
+        {/* Reset Bearing */}
         <button
           onClick={resetRotation}
-          className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-slate-800/80 hover:bg-slate-700 text-cyan-400 rounded-full shadow-lg border border-slate-700/50 transition-all hover:scale-110 active:scale-95"
-          title="Resetar rotação"
+          className="flex items-center justify-center w-11 h-11 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full shadow-2xl border border-white/5 backdrop-blur-md transition-all active:scale-90"
+          title="Resetar Bússola"
         >
           <Compass size={18} />
         </button>
 
-        {/* Botão Localização Atual */}
+        {/* Centralizar Usuário */}
         <button
           onClick={centerMap}
-          className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white rounded-full shadow-lg hover:shadow-emerald-500/50 transition-all hover:scale-110 active:scale-95"
-          title="Minha localização"
+          className="flex items-center justify-center w-11 h-11 bg-gradient-to-br from-emerald-500 to-teal-600 hover:scale-105 text-zinc-950 rounded-full shadow-2xl shadow-emerald-500/20 transition-all active:scale-90"
+          title="Centralizar Câmera"
         >
-          <Navigation size={18} />
+          <Navigation size={18} fill="currentColor" />
         </button>
 
         {/* Zoom In */}
         <button
           onClick={zoomIn}
-          className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-slate-800/80 hover:bg-slate-700 text-white rounded-full shadow-lg border border-slate-700/50 transition-all hover:scale-110 active:scale-95"
-          title="Aumentar zoom"
+          className="flex items-center justify-center w-11 h-11 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full shadow-2xl border border-white/5 backdrop-blur-md transition-all active:scale-90"
+          title="Zoom In"
         >
           <ZoomIn size={18} />
         </button>
@@ -575,24 +630,24 @@ const MapUber = ({
         {/* Zoom Out */}
         <button
           onClick={zoomOut}
-          className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-slate-800/80 hover:bg-slate-700 text-white rounded-full shadow-lg border border-slate-700/50 transition-all hover:scale-110 active:scale-95"
-          title="Diminuir zoom"
+          className="flex items-center justify-center w-11 h-11 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full shadow-2xl border border-white/5 backdrop-blur-md transition-all active:scale-90"
+          title="Zoom Out"
         >
           <ZoomOut size={18} />
         </button>
       </div>
 
-      {/* Instrução de clique */}
-      {!destination && (
-        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-amber-500/20 border border-amber-500/50 px-3 py-2 rounded-full text-amber-400 text-xs font-semibold animate-bounce z-[401]">
-          👆 Clique no mapa para definir destino
+      {/* Balão Indicativo */}
+      {!destination && !isReplaying && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-4 py-2 rounded-full text-purple-300 text-[10px] font-black uppercase tracking-wider animate-pulse z-[401] shadow-lg shadow-purple-950/20 backdrop-blur-sm">
+          📍 Toque no mapa para traçar destino
         </div>
       )}
     </div>
   );
 };
 
-// Função auxiliar para calcular distância
+// Fórmula Haversine simples
 function getDistanceSimple(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
