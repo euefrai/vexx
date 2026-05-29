@@ -7,7 +7,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import NotificationBell from "@/components/notifications/NotificationBell"
 import MobileDrawer from "@/components/MobileDrawer"
-import { Menu } from "lucide-react"
+import { Home, Dumbbell, Activity, Search, Menu } from "lucide-react"
 
 // Cache para dados do usuário para evitar chamadas repetidas
 const userDataCache = new Map()
@@ -68,9 +68,9 @@ function Navbar() {
   // 📍 Memoizar função isActive
   const isActive = useCallback((path) => {
     if (pathname.startsWith(path)) {
-      return "text-green-400 scale-110"
+      return "text-emerald-400 scale-105"
     }
-    return "text-zinc-500"
+    return "text-zinc-500 hover:text-zinc-300"
   }, [pathname])
 
   // 🎯 Memoizar função que tira drawer
@@ -89,7 +89,7 @@ function Navbar() {
       <img
         src={fotoPerfil || "/avatar-padrao.png"}
         alt="Perfil"
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover rounded-full"
       />
     )
   }, [fotoPerfil])
@@ -106,12 +106,12 @@ function Navbar() {
             drag
             dragConstraints={constraintsRef}
             dragElastic={0.1}
-            whileTap={{ scale: 0.9, cursor: "grabbing" }}
+            whileTap={{ scale: 0.95, cursor: "grabbing" }}
             className="pointer-events-auto absolute bottom-24 right-6"
           >
             <Link href="/admin">
-              <button className="bg-red-600 border-2 border-red-400 text-white text-[10px] font-black px-3 py-2 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.6)] animate-pulse uppercase flex items-center justify-center gap-1 hover:scale-110 transition-transform">
-                <span className="text-xs">🚨</span> QG
+              <button className="bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold px-3.5 py-1.5 rounded-full flex items-center justify-center gap-1.5 shadow-lg shadow-red-950/20 cursor-pointer backdrop-blur hover:bg-red-500/25 transition-all">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> PAINEL QG
               </button>
             </Link>
           </motion.div>
@@ -119,59 +119,59 @@ function Navbar() {
       )}
 
       <nav className="fixed bottom-0 left-0 right-0 z-50">
-        <div className="bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-800 px-4 py-3">
-          <div className="max-w-md mx-auto flex justify-between items-center gap-3">
+        <div className="bg-zinc-950/75 backdrop-blur-xl border-t border-zinc-900/60 px-4 py-2">
+          <div className="max-w-md mx-auto flex justify-between items-center gap-2">
 
             {/* HOME/FEED */}
             <Link href="/feed" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/feed')}`}>
-              <span className="text-2xl">🏠</span>
-              <span className="text-[8px] font-black uppercase tracking-tighter text-inherit">Feed</span>
+              <Home size={20} />
+              <span className="text-[9px] font-bold uppercase tracking-wider text-inherit">Feed</span>
             </Link>
 
             {/* TREINO */}
             <Link href="/novo-treino" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/novo-treino')}`}>
-              <span className="text-2xl">🏋️</span>
-              <span className="text-[8px] font-black uppercase tracking-tighter text-inherit">Treino</span>
+              <Dumbbell size={20} />
+              <span className="text-[9px] font-bold uppercase tracking-wider text-inherit">Treino</span>
             </Link>
 
             {/* RUN - DESTAQUE */}
             <Link href="/run" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/run')}`}>
               <motion.div
-                animate={{ scale: isActive('/run') ? [1, 1.1, 1] : 1 }}
-                transition={{ duration: 0.5, repeat: isActive('/run') ? Infinity : 0 }}
-                className="text-3xl drop-shadow-lg"
+                animate={{ scale: isActive('/run') ? [1, 1.05, 1] : 1 }}
+                transition={{ duration: 1.5, repeat: isActive('/run') ? Infinity : 0 }}
+                className="text-emerald-400"
               >
-                🏃
+                <Activity size={20} />
               </motion.div>
-              <span className="text-[8px] font-black uppercase tracking-tighter text-inherit">Run</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-inherit">Run</span>
             </Link>
 
             {/* EXPLORAR */}
             <Link href="/explorar" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/explorar')}`}>
-              <span className="text-2xl">🔍</span>
-              <span className="text-[8px] font-black uppercase tracking-tighter text-inherit">Explorar</span>
+              <Search size={20} />
+              <span className="text-[9px] font-bold uppercase tracking-wider text-inherit">Explorar</span>
             </Link>
 
             {/* PERFIL */}
             <Link href="/perfil" className={`flex flex-col items-center gap-1 transition-all duration-200 ${isActive('/perfil')}`}>
               <div
-                style={{ width: '28px', height: '28px' }}
-                className={`rounded-full overflow-hidden border-2 transition-all duration-300 flex items-center justify-center ${
-                  pathname === '/perfil' ? 'border-green-400 shadow-lg shadow-green-400/50' : 'border-zinc-700'
+                style={{ width: '22px', height: '22px' }}
+                className={`rounded-full overflow-hidden border transition-all duration-300 flex items-center justify-center ${
+                  pathname === '/perfil' ? 'border-emerald-400 shadow-md shadow-emerald-950/50' : 'border-zinc-700'
                 }`}
               >
                 {AvatarImage}
               </div>
-              <span className="text-[8px] font-black uppercase tracking-tighter text-inherit">Perfil</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-inherit">Perfil</span>
             </Link>
 
             {/* MENU / MAIS */}
             <button
               onClick={handleDrawerOpen}
-              className="flex flex-col items-center gap-1 transition-all duration-200 hover:text-green-400 text-zinc-500"
+              className="flex flex-col items-center gap-1 transition-all duration-200 hover:text-emerald-400 text-zinc-500 cursor-pointer"
             >
-              <Menu size={24} />
-              <span className="text-[8px] font-black uppercase tracking-tighter">Menu</span>
+              <Menu size={20} />
+              <span className="text-[9px] font-bold uppercase tracking-wider">Menu</span>
             </button>
 
           </div>
@@ -184,7 +184,7 @@ function Navbar() {
           )}
         </div>
         {/* Safe Area */}
-        <div className="h-4 bg-zinc-950/80 backdrop-blur-xl"></div>
+        <div className="h-4 bg-zinc-950/75 backdrop-blur-xl"></div>
       </nav>
     </>
   )

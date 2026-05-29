@@ -2,21 +2,21 @@
 
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
-import { X } from "lucide-react"
+import { X, LayoutDashboard, Flame, FlaskConical, MessageSquare, Users, Trophy, ShieldAlert } from "lucide-react"
 import { usePathname } from "next/navigation"
 
 export default function MobileDrawer({ isOpen, onClose, isAdmin, userId }) {
   const pathname = usePathname()
 
-  const isActive = (path) => pathname.startsWith(path) ? "text-green-400 font-black" : "text-zinc-300"
+  const isActive = (path) => pathname.startsWith(path) ? "text-emerald-400 font-bold bg-emerald-500/5 border-l-2 border-emerald-500" : "text-zinc-400"
 
   const menuItems = [
-    { href: "/dashboard", icon: "📊", label: "Dashboard" },
-    { href: "/curiosidades", icon: "📈", label: "Curiosidades" },
-    { href: "/lab", icon: "🧪", label: "Laboratório" },
-    { href: "/forum", icon: "💬", label: "Fórum" },
-    { href: "/social", icon: "📱", label: "Social" },
-    { href: "/ranking", icon: "🏆", label: "Ranking Semanal" },
+    { href: "/dashboard", icon: <LayoutDashboard size={18} />, label: "Dashboard" },
+    { href: "/curiosidades", icon: <Flame size={18} />, label: "Curiosidades" },
+    { href: "/lab", icon: <FlaskConical size={18} />, label: "Laboratório" },
+    { href: "/forum", icon: <MessageSquare size={18} />, label: "Fórum" },
+    { href: "/social", icon: <Users size={18} />, label: "Social" },
+    { href: "/ranking", icon: <Trophy size={18} />, label: "Ranking Semanal" },
   ]
 
   return (
@@ -29,7 +29,7 @@ export default function MobileDrawer({ isOpen, onClose, isAdmin, userId }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[40]"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[40]"
           />
 
           {/* Drawer */}
@@ -37,50 +37,50 @@ export default function MobileDrawer({ isOpen, onClose, isAdmin, userId }) {
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 120 }}
-            className="fixed left-0 top-0 bottom-0 w-64 bg-zinc-950 border-r border-zinc-800 z-[50] overflow-y-auto"
+            transition={{ type: "spring", damping: 26, stiffness: 140 }}
+            className="fixed left-0 top-0 bottom-0 w-64 bg-zinc-950/95 backdrop-blur-xl border-r border-zinc-900/60 z-[50] overflow-y-auto"
           >
             {/* Header */}
-            <div className="sticky top-0 p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950/80 backdrop-blur">
-              <h2 className="text-lg font-black text-green-400 italic">VEXX SQUAD</h2>
-              <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
-                <X size={20} className="text-zinc-400" />
+            <div className="sticky top-0 p-5 border-b border-zinc-900/60 flex justify-between items-center bg-zinc-950/80 backdrop-blur-md">
+              <h2 className="text-md font-extrabold text-emerald-400 uppercase tracking-widest">VEXX SQUAD</h2>
+              <button onClick={onClose} className="p-1.5 hover:bg-zinc-900 rounded-xl transition-colors cursor-pointer text-zinc-400 hover:text-zinc-200">
+                <X size={18} />
               </button>
             </div>
 
             {/* Menu Items */}
-            <div className="p-4 space-y-2">
+            <div className="p-4 space-y-1.5">
               {menuItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={onClose}
-                  className={`block px-4 py-3 rounded-lg transition-all duration-200 hover:bg-zinc-800 flex items-center gap-3 ${isActive(item.href)}`}
+                  className={`flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-zinc-900/60 font-semibold text-xs tracking-wider uppercase border border-transparent ${isActive(item.href)}`}
                 >
-                  <span className="text-xl">{item.icon}</span>
-                  <span className="text-sm uppercase font-bold tracking-tight">{item.label}</span>
+                  <span className="flex items-center justify-center">{item.icon}</span>
+                  <span>{item.label}</span>
                 </Link>
               ))}
 
               {/* Divisor */}
-              <div className="h-px bg-zinc-800 my-4" />
+              <div className="h-px bg-zinc-900/60 my-4" />
 
               {/* Admin */}
               {isAdmin && (
                 <Link
                   href="/admin"
                   onClick={onClose}
-                  className="px-4 py-3 rounded-lg transition-all duration-200 hover:bg-red-900/30 flex items-center gap-3 text-red-400 font-black uppercase text-sm"
+                  className="px-4 py-3 rounded-xl transition-all duration-200 hover:bg-red-950/20 border border-transparent hover:border-red-900/20 flex items-center gap-3.5 text-red-400 font-bold uppercase text-xs tracking-wider"
                 >
-                  <span className="text-lg">🚨</span>
+                  <span className="flex items-center justify-center"><ShieldAlert size={18} /></span>
                   <span>Painel Admin</span>
                 </Link>
               )}
 
               {/* Sobre */}
-              <div className="px-4 py-4 text-xs text-zinc-500 mt-4 pt-4 border-t border-zinc-800">
-                <p className="font-bold mb-1">VEXX SQUAD v2.0</p>
-                <p>"Treino difícil, combate fácil." © 2026</p>
+              <div className="px-4 py-4 text-[10px] text-zinc-600 mt-6 pt-4 border-t border-zinc-900/60 font-medium">
+                <p className="font-bold mb-1 text-zinc-500">VEXX ATHLETICS v2.0</p>
+                <p>Consistência supera intensidade. © 2026</p>
               </div>
             </div>
           </motion.div>

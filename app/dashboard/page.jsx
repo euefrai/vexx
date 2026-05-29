@@ -211,29 +211,31 @@ export default function Dashboard() {
     : 100;
 
   return (
-    <div className="pb-24 bg-black min-h-screen">
+    <div className="pb-24 bg-zinc-950 min-h-screen text-zinc-100 relative">
+      <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
+
       <PageHeader icon="📊" title="Dashboard" subtitle="Acompanhe seu progresso" color="blue" />
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 z-10 relative">
         {/* STREAK */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/50 rounded-lg p-6"
+          className="bg-gradient-to-br from-orange-500/10 to-amber-500/5 border border-orange-500/20 rounded-xl p-5"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-400 flex items-center gap-2">
-                <Flame className="w-4 h-4" /> Streak Atual
+              <p className="text-zinc-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Flame className="w-4 h-4 text-orange-500" /> Consistência
               </p>
-              <p className="text-4xl font-bold text-orange-400 mt-2">{streak} dias</p>
+              <p className="text-3xl font-extrabold text-orange-400 mt-2">{streak} dias seguidos</p>
             </div>
-            <div className="text-6xl">🔥</div>
+            <div className="text-4xl text-orange-500/80 animate-pulse">🔥</div>
           </div>
-          <p className="text-xs text-gray-400 mt-3">
+          <p className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mt-3">
             {streak > 0
-              ? "Continue assim! Mantenha a consistência"
-              : "Complete uma corrida hoje para começar seu streak"}
+              ? "Excelente progresso! Mantenha a consistência diária."
+              : "Complete um treino hoje para iniciar sua sequência de fogo."}
           </p>
         </motion.div>
 
@@ -243,24 +245,24 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/50 rounded-lg p-4"
+            className="bg-gradient-to-br from-purple-500/10 to-indigo-500/5 border border-purple-500/20 rounded-xl p-4.5"
           >
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-purple-300 font-semibold flex items-center gap-2">
-                <Target className="w-4 h-4" /> Próximo Objetivo
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="text-purple-300 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-purple-400" /> Próxima Meta
               </p>
-              <span className="text-sm bg-purple-500/30 px-2 py-1 rounded">
+              <span className="text-[10px] font-bold bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-lg text-purple-400">
                 {progressoMilestone}%
               </span>
             </div>
-            <div className="w-full bg-gray-700/50 rounded-full h-3 overflow-hidden">
+            <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-purple-500 to-pink-500 h-full transition-all"
+                className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full transition-all duration-500"
                 style={{ width: `${progressoMilestone}%` }}
               />
             </div>
-            <p className="text-xs text-gray-300 mt-2">
-              {proximoMilestone.meta}: {proximoMilestone.valor}/{proximoMilestone.alvo}
+            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-2.5">
+              {proximoMilestone.meta}: {proximoMilestone.valor} / {proximoMilestone.alvo}
             </p>
           </motion.div>
         )}
@@ -270,27 +272,27 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-2 gap-3"
+          className="grid grid-cols-2 gap-3.5"
         >
-          <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-4">
-            <TrendingUp className="w-5 h-5 text-green-400 mb-2" />
-            <p className="text-xs text-gray-400">KM este mês</p>
-            <p className="text-2xl font-bold text-green-400">{stats.kmMes}</p>
+          <div className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-900 rounded-xl p-4">
+            <TrendingUp className="w-4 h-4 text-emerald-400 mb-2" />
+            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Distância Mês</p>
+            <p className="text-xl font-extrabold text-emerald-400 mt-1">{stats.kmMes} KM</p>
           </div>
-          <div className="bg-cyan-500/20 border border-cyan-500/50 rounded-lg p-4">
-            <Zap className="w-5 h-5 text-cyan-400 mb-2" />
-            <p className="text-xs text-gray-400">Calorias</p>
-            <p className="text-2xl font-bold text-cyan-400">{stats.calorias}</p>
+          <div className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-900 rounded-xl p-4">
+            <Zap className="w-4 h-4 text-cyan-400 mb-2" />
+            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Energia Gasta</p>
+            <p className="text-xl font-extrabold text-cyan-400 mt-1">{stats.calorias} kcal</p>
           </div>
-          <div className="bg-blue-500/20 border border-blue-500/50 rounded-lg p-4">
-            <Calendar className="w-5 h-5 text-blue-400 mb-2" />
-            <p className="text-xs text-gray-400">Corridas</p>
-            <p className="text-2xl font-bold text-blue-400">{stats.corridasMes}</p>
+          <div className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-900 rounded-xl p-4">
+            <Calendar className="w-4 h-4 text-blue-400 mb-2" />
+            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Corridas Registradas</p>
+            <p className="text-xl font-extrabold text-blue-400 mt-1">{stats.corridasMes}</p>
           </div>
-          <div className="bg-pink-500/20 border border-pink-500/50 rounded-lg p-4">
-            <Trophy className="w-5 h-5 text-pink-400 mb-2" />
-            <p className="text-xs text-gray-400">Treinos</p>
-            <p className="text-2xl font-bold text-pink-400">{stats.treinos}</p>
+          <div className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-900 rounded-xl p-4">
+            <Trophy className="w-4 h-4 text-rose-400 mb-2" />
+            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Treinos Completados</p>
+            <p className="text-xl font-extrabold text-rose-400 mt-1">{stats.treinos}</p>
           </div>
         </motion.div>
 
@@ -300,22 +302,26 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-gray-900/50 border border-gray-700 rounded-lg p-4"
+            className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-900 rounded-xl p-4"
           >
-            <h3 className="text-sm font-semibold text-white mb-3">Atividade - Últimos 7 dias</h3>
-            <ResponsiveContainer width="100%" height={200}>
+            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-4">Progresso Recente (Últimos 7 dias)</h3>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="data" stroke="#999" style={{ fontSize: "12px" }} />
-                <YAxis stroke="#999" style={{ fontSize: "12px" }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" vertical={false} />
+                <XAxis dataKey="data" stroke="#4b5563" style={{ fontSize: "9px", fontWeight: "bold" }} tickLine={false} />
+                <YAxis stroke="#4b5563" style={{ fontSize: "9px", fontWeight: "bold" }} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #333",
-                    borderRadius: "4px",
+                    backgroundColor: "#090d16",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderRadius: "12px",
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    color: "#f3f4f6"
                   }}
+                  cursor={{ fill: 'rgba(255, 255, 255, 0.01)' }}
                 />
-                <Bar dataKey="km" fill="#22c55e" name="KM" />
+                <Bar dataKey="km" fill="#10b981" name="KM" radius={[4, 4, 0, 0]} maxBarSize={24} />
               </BarChart>
             </ResponsiveContainer>
           </motion.div>
@@ -326,35 +332,45 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="space-y-2"
+          className="space-y-3"
         >
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Trophy className="w-4 h-4" /> Conquistas ({badges.length})
+          <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5 mt-2">
+            <Trophy className="w-4 h-4 text-amber-400" /> Conquistas Desbloqueadas ({badges.length})
           </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {badges.map((badgeId) => {
-              const badge = BADGES[badgeId];
-              return (
-                <div key={badgeId} className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3">
-                  <p className="text-2xl text-center mb-1">{badge.icon}</p>
-                  <p className="text-xs font-semibold text-yellow-300 text-center">{badge.nome}</p>
-                  <p className="text-xs text-gray-400 text-center mt-1">+{badge.reward} XP</p>
-                </div>
-              );
-            })}
-          </div>
+          
+          {badges.length === 0 ? (
+            <div className="bg-zinc-900/10 border border-zinc-900 rounded-xl p-6 text-center">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Nenhuma conquista desbloqueada ainda.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {badges.map((badgeId) => {
+                const badge = BADGES[badgeId];
+                return (
+                  <div key={badgeId} className="bg-zinc-900/20 border border-amber-500/10 rounded-xl p-4 flex flex-col items-center justify-center">
+                    <p className="text-3xl mb-2">{badge.icon}</p>
+                    <p className="text-xs font-bold text-amber-400 text-center uppercase tracking-wide leading-none">{badge.nome}</p>
+                    <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider text-center mt-2">+{badge.reward} XP</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* BADGES PRÓXIMAS */}
           <div className="mt-4">
-            <p className="text-xs text-gray-400 mb-2">Desbloqueie também:</p>
-            <div className="grid grid-cols-2 gap-2">
+            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-3">Próximos Objetivos:</p>
+            <div className="grid grid-cols-2 gap-3">
               {Object.entries(BADGES)
                 .filter(([id]) => !badges.includes(id))
                 .slice(0, 4)
                 .map(([id, badge]) => (
-                  <div key={id} className="bg-gray-800 border border-gray-700 rounded-lg p-3 opacity-50">
-                    <p className="text-lg text-center mb-1">{badge.icon}</p>
-                    <p className="text-xs text-gray-400 text-center">{badge.nome}</p>
+                  <div key={id} className="bg-zinc-900/10 border border-zinc-900/60 rounded-xl p-3.5 opacity-40 flex items-center gap-3">
+                    <p className="text-2xl">{badge.icon}</p>
+                    <div className="flex flex-col">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide leading-none">{badge.nome}</p>
+                      <p className="text-[8px] text-zinc-600 font-semibold uppercase tracking-wider mt-1">+{badge.reward} XP</p>
+                    </div>
                   </div>
                 ))}
             </div>

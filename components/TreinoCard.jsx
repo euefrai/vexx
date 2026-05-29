@@ -5,7 +5,8 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { useGamificacao } from "@/hooks/useGamificacao"
-import { registrarAtividade } from "@/lib/logger" // Importe unificado
+import { registrarAtividade } from "@/lib/logger"
+import { Heart, MessageSquare, Pencil, Send } from "lucide-react"
 
 export default function TreinoCard({ treino }) {
   const router = useRouter()
@@ -132,84 +133,83 @@ export default function TreinoCard({ treino }) {
   }
 
   return (
-    <div className="relative mb-8 group">
-      {/* AURA DINÂMICA */}
+    <div className="relative mb-6 group">
+      {/* AURA DINÂMICA SUTIL - APENAS UM BRILHO EXTERNO SUAVE */}
       <AnimatePresence>
         {possuiAura && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ 
-              opacity: [0.15, 0.35, 0.15],
-              scale: [1, 1.02, 1],
+              opacity: [0.03, 0.08, 0.03],
             }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
             style={{ backgroundColor: corAura }}
-            className="absolute -inset-1 rounded-xl blur-2xl z-0 pointer-events-none"
+            className="absolute -inset-0.5 rounded-2xl blur-xl z-0 pointer-events-none"
           />
         )}
       </AnimatePresence>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         style={{ 
           borderLeftColor: corAura,
-          boxShadow: possuiAura ? `0 0 25px ${corAura}22` : '10px 10px 0px 0px rgba(0,0,0,1)' 
+          boxShadow: possuiAura ? `0 0 20px ${corAura}11` : 'none' 
         }}
-        className="relative z-10 bg-zinc-900 overflow-hidden border-l-4"
+        className="relative z-10 bg-zinc-900/40 backdrop-blur-md border border-zinc-900 rounded-2xl overflow-hidden border-l-3"
       >
         {/* HEADER */}
-        <div className="p-5 flex justify-between items-start border-b border-zinc-800">
-          <div className="flex gap-4">
+        <div className="p-4 flex justify-between items-center border-b border-zinc-900/50">
+          <div className="flex items-center gap-3">
             <div className="relative">
               <img 
-                src={autor?.foto || "https://via.placeholder.com/150"} 
+                src={autor?.foto || "/avatar-padrao.png"} 
                 alt="Avatar"
-                className="w-12 h-12 rounded-none grayscale border-2 object-cover"
+                className="w-10 h-10 rounded-full object-cover border"
                 style={{ borderColor: corAura }}
               />
               <div 
                 style={{ backgroundColor: corAura }}
-                className="absolute -bottom-2 -right-2 text-black text-[10px] font-black px-1 uppercase italic"
+                className="absolute -bottom-1 -right-1 text-zinc-950 text-[9px] font-extrabold w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-md"
               >
                 {rankDoAutor?.icone || "🎖️"}
               </div>
             </div>
             <div>
-              <p style={{ color: corAura }} className="text-sm font-black italic tracking-tighter uppercase">
+              <p style={{ color: corAura }} className="text-xs font-bold uppercase tracking-wider">
                 {autor?.username || "OPERADOR"}
               </p>
-              <span className="inline-block bg-zinc-800 text-zinc-400 text-[9px] font-black px-2 py-0.5 mt-1 uppercase border border-zinc-700">
+              <span className="inline-block text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5">
                 {rankDoAutor?.nome || "RECRUTA"} • {treino.grupo}
               </span>
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
             {userId === treino.usuario_id && (
-              <button onClick={() => router.push(`/novo-treino?id=${treino.id}`)} className="text-zinc-500 hover:text-white transition uppercase text-[10px] font-bold">
-                [Editar]
+              <button 
+                onClick={() => router.push(`/novo-treino?id=${treino.id}`)} 
+                className="text-zinc-500 hover:text-emerald-400 transition-colors uppercase text-[9px] font-bold tracking-wider cursor-pointer flex items-center gap-1 border border-zinc-800 px-2 py-1 rounded-lg hover:border-emerald-500/20 bg-zinc-900/30"
+              >
+                <Pencil size={10} /> Editar
               </button>
             )}
-            <button onClick={() => setMostrarComentarios(!mostrarComentarios)} className="text-zinc-100 font-black text-xs">
-              MSG: {comentarios.length}
-            </button>
           </div>
         </div>
 
         {/* CORPO */}
-        <div className="p-5 bg-gradient-to-b from-transparent to-black/20">
-          <h2 className="text-2xl font-black mb-4 uppercase italic tracking-tighter leading-none text-white">
+        <div className="p-5 bg-gradient-to-b from-transparent to-zinc-950/20">
+          <h2 className="text-xl font-bold mb-3.5 uppercase tracking-wide text-zinc-100 leading-snug">
             {treino.titulo}
           </h2>
 
-          <div className="bg-zinc-950 p-4 border border-zinc-800 space-y-2">
+          <div className="bg-zinc-950/60 p-4 rounded-xl border border-zinc-900/50 space-y-2.5">
             {treino.descricao?.split("\n").map((ex, i) => (
               ex.trim() && (
-                <div key={i} className="flex items-start gap-2 group/item">
-                  <span className="text-green-500 font-black text-xs mt-1">/&gt;</span>
-                  <p className="text-sm text-zinc-400 font-medium group-hover/item:text-white transition-colors">
-                    {ex.trim().toUpperCase()}
+                <div key={i} className="flex items-start gap-2.5 group/item">
+                  <span className="text-emerald-500 font-extrabold text-[10px] mt-1 select-none">/&gt;</span>
+                  <p className="text-xs text-zinc-400 font-medium tracking-wide leading-relaxed uppercase group-hover/item:text-zinc-200 transition-colors">
+                    {ex.trim()}
                   </p>
                 </div>
               )
@@ -218,21 +218,25 @@ export default function TreinoCard({ treino }) {
         </div>
 
         {/* FOOTER AÇÕES */}
-        <div className="p-0 bg-zinc-800/30 flex justify-between items-stretch border-t border-zinc-800 h-14">
+        <div className="p-0 bg-zinc-900/20 flex justify-between items-stretch border-t border-zinc-900/50 h-12">
           <button 
             onClick={handleLike}
             disabled={loadingLike}
-            className={`flex-1 flex items-center justify-center gap-2 transition-all active:scale-110 ${jaCurtiu ? 'text-red-600 bg-red-600/5' : 'text-zinc-500 hover:text-white'}`}
+            className={`flex-1 flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
+              jaCurtiu 
+                ? 'text-rose-500 bg-rose-500/5 font-bold' 
+                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/10'
+            }`}
           >
-            <span className="text-xl">{jaCurtiu ? '☣️' : '🔘'}</span>
-            <span className="font-black italic text-sm">{likes}</span>
+            <Heart size={16} className={jaCurtiu ? 'fill-rose-500' : ''} />
+            <span className="font-bold text-xs tracking-wider">{likes}</span>
           </button>
 
           <button 
             onClick={() => setMostrarComentarios(!mostrarComentarios)}
-            className="flex-1 bg-green-500 text-black font-black text-[10px] uppercase italic tracking-widest hover:bg-white transition"
+            className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold text-xs uppercase tracking-wider transition-all duration-300 border-l border-zinc-900/50 cursor-pointer"
           >
-            {mostrarComentarios ? "Fechar Relatório" : "Acessar Protocolo"}
+            {mostrarComentarios ? "Fechar Comentários" : `Comentários (${comentarios.length})`}
           </button>
         </div>
 
@@ -240,34 +244,40 @@ export default function TreinoCard({ treino }) {
         <AnimatePresence>
           {mostrarComentarios && (
             <motion.div 
-              initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-              className="overflow-hidden bg-black border-t border-zinc-800"
+              initial={{ height: 0 }} 
+              animate={{ height: 'auto' }} 
+              exit={{ height: 0 }}
+              className="overflow-hidden bg-zinc-950/70 border-t border-zinc-900/50"
             >
-              <div className="p-5 space-y-4">
-                <div className="max-h-40 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
-                  {comentarios.map(c => (
-                    <div key={c.id} className="border-l-2 border-zinc-800 pl-3">
-                      <p className="text-[10px] text-green-500 font-black uppercase tracking-widest">
-                        @{c.usuarios?.username}
-                      </p>
-                      <p className="text-xs text-zinc-300 font-medium">{c.texto}</p>
-                    </div>
-                  ))}
+              <div className="p-4 space-y-3.5">
+                <div className="max-h-40 overflow-y-auto space-y-2.5 pr-2 scrollbar-thin scrollbar-thumb-zinc-900">
+                  {comentarios.length === 0 ? (
+                    <p className="text-[10px] text-zinc-600 uppercase tracking-wider text-center py-2">Sem mensagens registradas.</p>
+                  ) : (
+                    comentarios.map(c => (
+                      <div key={c.id} className="border-l border-zinc-800 pl-3 py-0.5">
+                        <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">
+                          @{c.usuarios?.username}
+                        </p>
+                        <p className="text-[11px] text-zinc-400 font-medium mt-0.5">{c.texto}</p>
+                      </div>
+                    ))
+                  )}
                 </div>
 
-                <div className="flex gap-2 mt-4">
+                <div className="flex gap-2 mt-2">
                   <input
                     value={novoComentario}
                     onChange={(e) => setNovoComentario(e.target.value)}
-                    placeholder="DIGITE SUA MENSAGEM..."
-                    className="flex-1 bg-zinc-900 border border-zinc-800 p-3 text-[10px] font-bold text-white uppercase outline-none focus:border-green-500"
+                    placeholder="Escreva um comentário..."
+                    className="flex-1 bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3 text-[11px] font-semibold text-zinc-200 outline-none focus:border-emerald-500/50 placeholder:text-zinc-600 transition-colors"
                   />
                   <button
                     onClick={enviarComentario}
                     disabled={enviandoComentario}
-                    className="bg-zinc-100 text-black px-4 font-black text-[10px] uppercase hover:bg-green-500 transition-colors"
+                    className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 cursor-pointer flex items-center justify-center gap-1.5"
                   >
-                    {enviandoComentario ? "..." : "SEND"}
+                    {enviandoComentario ? "..." : <><Send size={12} /> Enviar</>}
                   </button>
                 </div>
               </div>

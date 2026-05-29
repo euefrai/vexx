@@ -15,51 +15,52 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col justify-between items-center px-6 py-12 font-sans overflow-hidden relative">
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col justify-between items-center px-6 py-16 font-sans overflow-hidden relative">
       
-      {/* Efeito de luz de fundo */}
-      <div className="absolute top-[-10%] left-[-10%] w-72 h-72 bg-green-500/10 blur-[120px] rounded-full" />
+      {/* Efeito de luz de fundo sutil */}
+      <div className="absolute top-[-10%] left-[5%] w-80 h-80 bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[5%] w-80 h-80 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none" />
 
       <div className="flex-1 flex flex-col justify-center items-center w-full max-w-sm z-10">
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-10"
+          transition={{ duration: 0.6 }}
+          className="text-center mb-8"
         >
-          <h1 className="text-6xl font-black italic uppercase tracking-tighter text-green-500 leading-none mb-2">
-            ELITE<br/>SQUAD
+          <h1 className="text-5xl font-extrabold uppercase tracking-[0.15em] bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent leading-none mb-3">
+            VEXX
           </h1>
-          <div className="h-1 w-20 bg-white mx-auto mb-4" />
-          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em]">
-            Operação Fitness • Vol. 01
+          <p className="text-zinc-400 text-xs font-semibold uppercase tracking-[0.35em] mb-4">
+            ATHLETICS SQUAD
           </p>
+          <div className="h-0.5 w-12 bg-emerald-500/50 mx-auto" />
         </motion.div>
 
         <motion.p 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-zinc-400 text-center text-sm font-medium mb-12 leading-relaxed"
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="text-zinc-400 text-center text-sm font-normal mb-12 leading-relaxed max-w-[280px]"
         >
-          A rede social definitiva para quem não aceita desculpas. 
-          Registre missões, suba de nível e domine o ranking.
+          A rede social definitiva de treinamento de alta performance. Registre suas atividades, analise seus dados e evolua na squad.
         </motion.p>
 
-        <div className="flex flex-col gap-4 w-full">
+        <div className="flex flex-col gap-3.5 w-full">
           <motion.button
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.98 }}
             onClick={irLogin}
-            className="bg-green-500 hover:bg-green-400 text-black font-black py-5 rounded-[2rem] uppercase italic text-lg shadow-[0_10px_40px_rgba(34,197,94,0.3)] transition-all"
+            className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold py-4 rounded-xl uppercase text-xs tracking-wider transition-all shadow-lg shadow-emerald-950/20 duration-300 cursor-pointer"
           >
-            INICIAR SESSÃO
+            Iniciar Sessão
           </motion.button>
 
           <motion.button
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.98 }}
             onClick={irCadastro}
-            className="border-2 border-zinc-800 hover:border-zinc-600 py-5 rounded-[2rem] font-black uppercase italic text-sm tracking-widest transition-all"
+            className="border border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 hover:bg-zinc-900/80 py-4 rounded-xl font-bold uppercase text-xs tracking-wider transition-all duration-300 cursor-pointer"
           >
-            RECRUTAR NOVA CONTA
+            Recrutar Nova Conta
           </motion.button>
         </div>
 
@@ -67,18 +68,18 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="text-zinc-600 text-[10px] font-black uppercase mt-12 tracking-widest text-center italic"
+          className="text-zinc-500 text-[10px] font-medium uppercase mt-12 tracking-[0.2em] text-center"
         >
-          "Treino difícil, combate fácil."
+          Consistência supera intensidade.
         </motion.p>
       </div>
 
       {/* RODAPÉ DE COPYRIGHT */}
-      <footer className="mt-auto pt-10 text-center z-10">
-        <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-[0.2em]">
-          © 2026 @eu.efrai - Todos os direitos reservados.
+      <footer className="mt-auto pt-8 text-center z-10">
+        <p className="text-[9px] text-zinc-600 font-medium uppercase tracking-[0.25em]">
+          © 2026 VEXX SQUAD. Todos os direitos reservados.
         </p>
       </footer>
     </div>
   )
-}
+}
