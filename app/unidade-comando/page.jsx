@@ -56,30 +56,57 @@ export default function UnidadeComando() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        const { data: runs } = await supabase
-          .from("runs")
-          .select("*")
-          .eq("usuario_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(5)
+        let runs = [];
+        try {
+          const { data, error } = await supabase
+            .from("runs")
+            .select("*")
+            .or(`user_id.eq.${user.id},usuario_id.eq.${user.id}`)
+            .order("created_at", { ascending: false })
+            .limit(5);
+          
+          if (error) throw error;
+          runs = data || [];
+        } catch (dbErr) {
+          console.log("Unidade de Comando carregando stats locais (fallback)...");
+          const localRuns = JSON.parse(localStorage.getItem("vexx_runs") || "[]");
+          runs = localRuns.filter(r => r.user_id === user.id || r.usuario_id === user.id).slice(0, 5);
+        }
 
         if (runs && runs.length > 0) {
-          const totalKm = runs.reduce((acc, r) => acc + (r.distancia || 0), 0)
-          const avgPace = runs.reduce((acc, r) => acc + (r.pace || 0), 0) / runs.length
+          const totalKm = runs.reduce((acc, r) => acc + (r.distancia || 0), 0);
+          
+          // Calcular pace médio de corrida com segurança
+          let paces = [];
+          runs.forEach(r => {
+            if (r.pace) {
+              if (typeof r.pace === "string" && r.pace.includes(":")) {
+                const [m, s] = r.pace.split(":").map(Number);
+                if (!isNaN(m) && !isNaN(s)) paces.push(m + s/60);
+              } else {
+                const pVal = parseFloat(r.pace);
+                if (!isNaN(pVal)) paces.push(pVal);
+              }
+            }
+          });
+          const avgPace = paces.length > 0 ? (paces.reduce((a, b) => a + b, 0) / paces.length) : 0;
+          const mins = Math.floor(avgPace);
+          const secs = Math.round((avgPace - mins) * 60);
+
           setUserStats({
             ultimasCoridas: runs.length,
             kmSemana: totalKm,
-            paceMedia: avgPace.toFixed(1),
+            paceMedia: avgPace > 0 ? `${mins}:${secs.toString().padStart(2, "0")}` : "0:00",
             ultimoTreino: new Date(runs[0].created_at).toLocaleDateString()
-          })
+          });
         }
       } catch (err) {
-        console.log("Erro ao carregar stats:", err)
+        console.log("Erro ao carregar stats:", err);
       }
-    }
+    };
 
-    carregarStats()
-  }, [])
+    carregarStats();
+  }, []);
 
   // 🧠 MEMÓRIA LONGA: Carrega o histórico ao abrir a página
   useEffect(() => {

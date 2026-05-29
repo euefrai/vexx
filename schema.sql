@@ -53,11 +53,23 @@ CREATE TABLE IF NOT EXISTS public.squad_mensagens (
     texto TEXT NOT NULL
 );
 
+-- 6. TABELA DE CORRIDAS ESTRUTURADAS (RUNS)
+CREATE TABLE IF NOT EXISTS public.runs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    distancia FLOAT NOT NULL,
+    calorias INT NOT NULL,
+    tempo TEXT NOT NULL,
+    pace TEXT NOT NULL
+);
+
 -- Criar índices de busca rápida para otimização de performance
 CREATE INDEX IF NOT EXISTS idx_squad_members_user ON public.squad_members(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_squad_members_squad ON public.squad_members(squad_id);
 CREATE INDEX IF NOT EXISTS idx_squad_mensagens_squad ON public.squad_mensagens(squad_id);
 CREATE INDEX IF NOT EXISTS idx_stories_expiry ON public.stories(expires_at);
+CREATE INDEX IF NOT EXISTS idx_runs_user ON public.runs(user_id);
 
 -- Habilitar replicação em tempo real para mensagens de esquadrão
 ALTER publication supabase_realtime ADD TABLE public.squad_mensagens;

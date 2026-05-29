@@ -17,11 +17,21 @@ export default function Curiosidades() {
         const agora = new Date();
         const umaSemanaatrás = new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-        // Total de km da semana
-        const { data: runs } = await supabase
-          .from("runs")
-          .select("distancia, calorias")
-          .gte("created_at", umaSemanaatrás.toISOString());
+        // Total de km da semana com fallback local
+        let runsData = [];
+        try {
+          const { data, error } = await supabase
+            .from("runs")
+            .select("distancia, calorias, created_at")
+            .gte("created_at", umaSemanaatrás.toISOString());
+          
+          if (error) throw error;
+          runsData = data || [];
+        } catch (err) {
+          console.log("Tabela 'runs' offline. Carregando dados locais para curiosidades...");
+          const localRuns = JSON.parse(localStorage.getItem("vexx_runs") || "[]");
+          runsData = localRuns.filter(r => new Date(r.created_at) >= umaSemanaatrás);
+        }
 
         // Total de usuários ativos
         const { data: usuariosAtivos } = await supabase
@@ -36,22 +46,22 @@ export default function Curiosidades() {
           .gte("created_at", umaSemanaatrás.toISOString());
 
         // Top corrida
-        const topRun = runs && runs.length > 0 ? runs.reduce((max, r) => (r.distancia > max.distancia ? r : max)) : null;
+        const topRun = runsData && runsData.length > 0 ? runsData.reduce((max, r) => (r.distancia > max.distancia ? r : max)) : null;
 
         // Calcular
-        const totalKm = runs ? runs.reduce((sum, r) => sum + (r.distancia || 0), 0) : 0;
-        const totalCalorias = runs ? runs.reduce((sum, r) => sum + (r.calorias || 0), 0) : 0;
+        const totalKm = runsData ? runsData.reduce((sum, r) => sum + (r.distancia || 0), 0) : 0;
+        const totalCalorias = runsData ? runsData.reduce((sum, r) => sum + (r.calorias || 0), 0) : 0;
         const numAtivos = new Set(usuariosAtivos?.map(u => u.usuario_id) || []).size;
         const numTreinos = treinos ? treinos.length : 0;
 
         setStats({
           totalKm: Math.round(totalKm),
           totalCalorias: Math.round(totalCalorias),
-          usuariosAtivos: numAtivos,
-          numTreinos,
+          usuariosAtivos: numAtivos > 0 ? numAtivos : 1, // Fallback se sem conexao
+          numTreinos: numTreinos > 0 ? numTreinos : runsData.length,
           topRun: topRun ? Math.round(topRun.distancia) : 0,
-          mediaKmPorPessoa: numAtivos > 0 ? Math.round(totalKm / numAtivos * 10) / 10 : 0,
-          totalCorridas: runs ? runs.length : 0,
+          mediaKmPorPessoa: (numAtivos > 0 ? numAtivos : 1) > 0 ? Math.round(totalKm / (numAtivos > 0 ? numAtivos : 1) * 10) / 10 : 0,
+          totalCorridas: runsData ? runsData.length : 0,
         });
       } catch (error) {
         console.error("Erro ao carregar curiosidades:", error);

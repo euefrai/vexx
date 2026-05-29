@@ -36,10 +36,20 @@ export default function Ranking() {
         inicioSemana.setDate(agora.getDate() - agora.getDay())
         inicioSemana.setHours(0, 0, 0, 0)
 
-        const { data: runs } = await supabase
-          .from("runs")
-          .select("user_id, distancia")
-          .gte("created_at", inicioSemana.toISOString())
+        let runs = [];
+        try {
+          const { data, error } = await supabase
+            .from("runs")
+            .select("user_id, distancia")
+            .gte("created_at", inicioSemana.toISOString());
+          
+          if (error) throw error;
+          runs = data || [];
+        } catch (dbErr) {
+          console.log("Ranking Semanal carregando dados locais (fallback)...");
+          const localRuns = JSON.parse(localStorage.getItem("vexx_runs") || "[]");
+          runs = localRuns.filter(r => new Date(r.created_at) >= inicioSemana);
+        }
 
         const kmPorUsuario = {}
         if (runs) {

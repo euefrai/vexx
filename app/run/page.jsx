@@ -306,6 +306,38 @@ export default function RunPage() {
 
       if (error) throw error;
 
+      // 1.2. Inserir na tabela estruturada runs (para rankings e dashboards) com fallback seguro
+      try {
+        await supabase
+          .from("runs")
+          .insert({
+            user_id: user.id,
+            distancia: Number(activeDistance.toFixed(2)),
+            calorias: calorias,
+            tempo: tempoFormatado,
+            pace: activePace
+          });
+      } catch (runErr) {
+        console.warn("Tabela 'runs' inexistente no banco remoto. Utilizando fallback local...", runErr.message);
+      }
+
+      // 1.3. Gravar backup imediato em LocalStorage para resiliência offline total
+      try {
+        const localRuns = JSON.parse(localStorage.getItem("vexx_runs") || "[]");
+        const novaCorrida = {
+          id: `run-${Date.now()}`,
+          user_id: user.id,
+          created_at: new Date().toISOString(),
+          distancia: Number(activeDistance.toFixed(2)),
+          calorias: calorias,
+          tempo: tempoFormatado,
+          pace: activePace
+        };
+        localStorage.setItem("vexx_runs", JSON.stringify([novaCorrida, ...localRuns]));
+      } catch (localErr) {
+        console.error("Falha ao salvar backup no LocalStorage:", localErr);
+      }
+
       // 2. Adicionar XP real de Atleta (+500 XP)
       if (adicionarXP) {
         await adicionarXP(user.id, 500);

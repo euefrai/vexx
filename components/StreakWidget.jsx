@@ -10,18 +10,28 @@ export function StreakWidget({ userId, tamanho = "lg" }) {
   useEffect(() => {
     const calcularStreak = async () => {
       try {
-        const { data: allRuns } = await supabase
-          .from("runs")
-          .select("created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false });
+        let runsData = [];
+        try {
+          const { data, error } = await supabase
+            .from("runs")
+            .select("created_at")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false });
+          
+          if (error) throw error;
+          runsData = data || [];
+        } catch (dbErr) {
+          console.log("StreakWidget carregando dados de fallback local...");
+          const localRuns = JSON.parse(localStorage.getItem("vexx_runs") || "[]");
+          runsData = localRuns.filter(r => r.user_id === userId);
+        }
 
-        if (!allRuns || allRuns.length === 0) {
+        if (!runsData || runsData.length === 0) {
           setStreak(0);
           return;
         }
 
-        const datas = allRuns.map((r) => new Date(r.created_at).toDateString());
+        const datas = runsData.map((r) => new Date(r.created_at).toDateString());
         const datasUnicas = [...new Set(datas)];
 
         let streakCount = 0;

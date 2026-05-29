@@ -55,17 +55,35 @@ export default function AdminMaster() {
   async function carregarMetricasGlobais() {
     setLoadingMetricas(true)
     try {
-      const [uRes, sRes, rRes, cRes] = await Promise.all([
-        supabase.from("usuarios").select("id", { count: "exact", head: true }),
-        supabase.from("squads").select("id", { count: "exact", head: true }),
-        supabase.from("runs").select("id", { count: "exact", head: true }),
-        supabase.from("challenges").select("id", { count: "exact", head: true })
-      ])
+      const uCountPromise = supabase.from("usuarios").select("id", { count: "exact", head: true }).then(r => r.count || 0).catch(() => 0);
+      
+      const sCountPromise = supabase.from("squads").select("id", { count: "exact", head: true }).then(r => r.count || 0).catch(() => {
+        const local = JSON.parse(localStorage.getItem("vexx_squads") || "[]");
+        return local.length;
+      });
+      
+      const rCountPromise = supabase.from("runs").select("id", { count: "exact", head: true }).then(r => r.count || 0).catch(() => {
+        const local = JSON.parse(localStorage.getItem("vexx_runs") || "[]");
+        return local.length;
+      });
+      
+      const cCountPromise = supabase.from("challenges").select("id", { count: "exact", head: true }).then(r => r.count || 0).catch(() => {
+        const local = JSON.parse(localStorage.getItem("vexx_challenges") || "[]");
+        return local.length;
+      });
+
+      const [usuarios, squads, corridas, desafios] = await Promise.all([
+        uCountPromise,
+        sCountPromise,
+        rCountPromise,
+        cCountPromise
+      ]);
+
       setMetricas({
-        usuarios: uRes.count || 0,
-        squads: sRes.count || 0,
-        corridas: rRes.count || 0,
-        desafios: cRes.count || 0
+        usuarios,
+        squads,
+        corridas,
+        desafios
       })
     } catch (err) {
       console.error("Erro ao carregar metricas:", err)

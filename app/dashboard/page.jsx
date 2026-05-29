@@ -92,12 +92,23 @@ export default function Dashboard() {
         const agora = new Date();
         const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
 
-        const { data: runs } = await supabase
-          .from("runs")
-          .select("*")
-          .eq("user_id", user.id)
-          .gte("created_at", inicioMes.toISOString())
-          .order("created_at", { ascending: false });
+        // 1. Carregar corridas estruturadas com fallback local
+        let runs = [];
+        try {
+          const { data, error } = await supabase
+            .from("runs")
+            .select("*")
+            .eq("user_id", user.id)
+            .gte("created_at", inicioMes.toISOString())
+            .order("created_at", { ascending: false });
+          
+          if (error) throw error;
+          runs = data || [];
+        } catch (dbErr) {
+          console.log("Dashboard carregando dados de corridas locais (fallback)...");
+          const localRuns = JSON.parse(localStorage.getItem("vexx_runs") || "[]");
+          runs = localRuns.filter(r => r.user_id === user.id && new Date(r.created_at) >= inicioMes);
+        }
 
         let totKm = 0;
         let totCalorias = 0;
@@ -122,17 +133,29 @@ export default function Dashboard() {
           setChartData(ultimos7);
         }
 
+        // 2. Carregar treinos - CORREÇÃO DE COLUNA: usuario_id
         const { data: treinos } = await supabase
           .from("treinos")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("usuario_id", user.id)
           .gte("created_at", inicioMes.toISOString());
 
-        const { data: allRuns } = await supabase
-          .from("runs")
-          .select("created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+        // 3. Carregar histórico total de corridas com fallback local
+        let allRuns = [];
+        try {
+          const { data, error } = await supabase
+            .from("runs")
+            .select("created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false });
+          
+          if (error) throw error;
+          allRuns = data || [];
+        } catch (dbErr) {
+          console.log("Dashboard carregando todos os runs locais (fallback)...");
+          const localRuns = JSON.parse(localStorage.getItem("vexx_runs") || "[]");
+          allRuns = localRuns.filter(r => r.user_id === user.id);
+        }
 
         let streakCount = 0;
         if (allRuns && allRuns.length > 0) {
