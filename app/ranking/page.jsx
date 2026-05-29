@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import Navbar from "@/components/Navbar"
 import PageHeader from "@/components/PageHeader"
+import { Trophy, Flame, Zap, Shield, Sparkles, Activity, ShieldAlert, AlertCircle } from "lucide-react"
+import { motion } from "framer-motion"
 
 export default function Ranking() {
   const [usuarios, setUsuarios] = useState([])
@@ -16,12 +18,12 @@ export default function Ranking() {
 
   // Lógica de Patentes do Esquadrão
   function getPatente(xp = 0) {
-    if (xp >= 8000) return { nome: "aura", cor: "text-red-500", icon: "⚡" }
-    if (xp >= 4000) return { nome: "no have enemies", cor: "text-purple-500", icon: "🛡️" }
-    if (xp >= 2000) return { nome: "high cortisol", cor: "text-blue-500", icon: "🦅" }
-    if (xp >= 1000) return { nome: "beta", cor: "text-yellow-500", icon: "⚔️" }
-    if (xp >= 500) return { nome: "frango", cor: "text-green-500", icon: "🎖️" }
-    return { nome: "RECRUTA", cor: "text-zinc-500", icon: "🔰" }
+    if (xp >= 8000) return { nome: "aura", cor: "text-rose-400", icon: Zap }
+    if (xp >= 4000) return { nome: "no enemies", cor: "text-purple-400", icon: Shield }
+    if (xp >= 2000) return { nome: "high cortisol", cor: "text-blue-400", icon: Activity }
+    if (xp >= 1000) return { nome: "beta", cor: "text-amber-400", icon: Sparkles }
+    if (xp >= 500) return { nome: "frango", cor: "text-emerald-400", icon: Trophy }
+    return { nome: "recruta", cor: "text-zinc-500", icon: ShieldAlert }
   }
 
   async function carregarRanking() {
@@ -32,6 +34,7 @@ export default function Ranking() {
         const agora = new Date()
         const inicioSemana = new Date(agora)
         inicioSemana.setDate(agora.getDate() - agora.getDay())
+        inicioSemana.setHours(0, 0, 0, 0)
 
         const { data: runs } = await supabase
           .from("runs")
@@ -79,7 +82,7 @@ export default function Ranking() {
           .order("xp", { ascending: false })
           .limit(20)
         if (error) throw error
-        setUsuarios(data)
+        setUsuarios(data || [])
       } else {
         const { data: registros, error: errorReg } = await supabase
           .from("registros_treino")
@@ -112,13 +115,19 @@ export default function Ranking() {
           .slice(0, 20)
 
         const idsUsuarios = rankingPesos.map(r => r.usuario_id)
+        if (idsUsuarios.length === 0) {
+          setUsuarios([])
+          setLoading(false)
+          return
+        }
+
         const { data: infoUsuarios, error: errorUser } = await supabase
           .from("usuarios")
           .select("id, username, foto, xp")
           .in("id", idsUsuarios)
 
         const formatado = rankingPesos.map(item => {
-          const user = infoUsuarios.find(u => u.id === item.usuario_id)
+          const user = infoUsuarios?.find(u => u.id === item.usuario_id)
           return {
             username: user?.username || "Recruta",
             foto: user?.foto,
@@ -137,81 +146,120 @@ export default function Ranking() {
   }
 
   return (
-    <div className="max-w-md mx-auto p-4 pb-24 min-h-screen bg-black text-white font-sans">
-      <PageHeader icon="🏆" title="Ranking" subtitle="Os elite squads do VEXX" color="orange" />
+    <div className="max-w-md mx-auto p-4 pb-32 min-h-screen bg-zinc-950 text-zinc-100 font-sans relative">
+      <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-orange-500/5 to-transparent pointer-events-none" />
+
+      <PageHeader 
+        icon={<Trophy className="w-7 h-7 text-orange-400" />} 
+        title="Ranking" 
+        subtitle="Os atletas de elite do VEXX" 
+        color="orange" 
+      />
 
       {/* TABS */}
-      <div className="flex gap-1.5 mb-8 overflow-x-auto pb-2">
+      <div className="flex gap-2.5 mb-6 overflow-x-auto pb-2 scrollbar-none">
         <button 
           onClick={() => setAbaAtiva("semanal")}
-          className={`px-4 py-2 rounded-full font-black text-xs uppercase whitespace-nowrap transition-all duration-300 ${abaAtiva === 'semanal' ? 'bg-green-500 text-black shadow-lg' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
+          className={`px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wider whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 border ${
+            abaAtiva === 'semanal' 
+              ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' 
+              : 'bg-zinc-900/40 text-zinc-400 border-zinc-900/80 hover:bg-zinc-900'
+          }`}
         >
-          🔥 Esta Semana
+          <Flame className="w-3.5 h-3.5" /> Semanal (KM)
         </button>
         <button 
           onClick={() => setAbaAtiva("level")}
-          className={`px-4 py-2 rounded-full font-black text-xs uppercase whitespace-nowrap transition-all duration-300 ${abaAtiva === 'level' ? 'bg-green-500 text-black shadow-lg' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
+          className={`px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wider whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 border ${
+            abaAtiva === 'level' 
+              ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' 
+              : 'bg-zinc-900/40 text-zinc-400 border-zinc-900/80 hover:bg-zinc-900'
+          }`}
         >
-          ⚡ Ranking XP
+          <Zap className="w-3.5 h-3.5" /> Geral (XP)
         </button>
         <button 
           onClick={() => setAbaAtiva("peso")}
-          className={`px-4 py-2 rounded-full font-black text-xs uppercase whitespace-nowrap transition-all duration-300 ${abaAtiva === 'peso' ? 'bg-green-500 text-black shadow-lg' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
+          className={`px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wider whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 border ${
+            abaAtiva === 'peso' 
+              ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' 
+              : 'bg-zinc-900/40 text-zinc-400 border-zinc-900/80 hover:bg-zinc-900'
+          }`}
         >
-          💪 Força Bruta
+          <Activity className="w-3.5 h-3.5" /> Força Bruta (KG)
         </button>
       </div>
 
       {abaAtiva === 'semanal' && (
-        <div className="mb-6 p-3 rounded-lg bg-gradient-to-r from-orange-500/20 to-green-500/20 border border-orange-500/30 text-center">
-          <p className="text-xs font-bold text-orange-300">🔥 Desafio da Semana: Quem vai fechar mais KM?</p>
-          <p className="text-[11px] text-gray-400 mt-1">Complete uma corrida hoje e apareça no ranking!</p>
+        <div className="mb-6 p-4 rounded-xl bg-orange-500/5 border border-orange-500/10 text-center">
+          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Desafio Semanal de Distância</p>
+          <p className="text-[11px] text-zinc-400 mt-1">Registre suas corridas esta semana para subir na classificação e liderar o esquadrão.</p>
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3.5">
         {loading ? (
           <div className="flex justify-center py-20">
-            <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : usuarios.length === 0 ? (
+          <div className="bg-zinc-900/20 border border-zinc-900/60 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-2">
+            <AlertCircle className="w-5 h-5 text-zinc-500" />
+            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Nenhuma atividade registrada ainda nesta categoria.</p>
           </div>
         ) : (
           usuarios.map((user, index) => {
             const patente = getPatente(user.xp || 0)
             const nivel = Math.floor((user.xp || 0) / 500) + 1
+            const PatenteIcon = patente.icon
 
             return (
               <div 
                 key={index} 
-                className={`relative flex items-center justify-between p-4 rounded-[2rem] border overflow-hidden ${
-                  index === 0 ? 'bg-gradient-to-r from-green-500/20 to-zinc-900 border-green-500/40' : 'bg-zinc-900/30 border-zinc-800'
+                className={`relative flex items-center justify-between p-4 rounded-xl border ${
+                  index === 0 
+                    ? 'bg-gradient-to-r from-orange-500/10 to-zinc-900/40 border-orange-500/30 shadow-lg shadow-orange-500/5 scale-[1.01]' 
+                    : 'bg-zinc-900/20 border-zinc-900/60'
                 }`}
               >
                 <div className="flex items-center gap-4">
                   <div className="relative">
-                    <div className={`w-12 h-12 rounded-full border-2 overflow-hidden bg-zinc-800 ${index === 0 ? 'border-green-500 scale-110 shadow-lg' : 'border-zinc-700'}`}>
-                      {user.foto ? <img src={user.foto} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center">👤</div>}
+                    <div className={`w-11 h-11 rounded-full border-2 overflow-hidden bg-zinc-950 ${
+                      index === 0 ? 'border-orange-500' : 'border-zinc-800'
+                    }`}>
+                      {user.foto ? (
+                        <img src={user.foto} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-600 text-xs">U</div>
+                      )}
                     </div>
-                    <span className="absolute -bottom-1 -right-1 bg-black rounded-full px-1.5 py-0.5 text-[8px] font-black border border-zinc-800">
+                    <span className="absolute -bottom-1 -right-1 bg-zinc-950 text-white rounded-lg px-1.5 py-0.5 text-[8px] font-black border border-zinc-900">
                       {index + 1}º
                     </span>
                   </div>
 
                   <div>
-                    <h4 className="font-black text-xs uppercase italic tracking-wide flex items-center gap-2 text-white">
+                    <h4 className="font-extrabold text-xs uppercase tracking-wide flex items-center gap-1.5 text-zinc-200">
                       {user.username}
-                      <span className="text-[10px]">{patente.icon}</span>
+                      <PatenteIcon className={`w-3.5 h-3.5 ${patente.cor}`} />
                     </h4>
-                    <p className={`text-[8px] font-black tracking-[0.15em] ${patente.cor}`}>
-                      {patente.nome} • NIVEL {nivel}
+                    <p className={`text-[8px] font-bold uppercase tracking-wider ${patente.cor}`}>
+                      {patente.nome} • NÍVEL {nivel}
                     </p>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <p className="text-white font-black text-xs italic">
-                    {abaAtiva === 'semanal' ? `${user.valor || 0} km` : abaAtiva === 'level' ? `${user.xp || 0} XP` : `${user.valor || 0} KG`}
+                  <p className="text-zinc-100 font-extrabold text-xs uppercase tracking-wide">
+                    {abaAtiva === 'semanal' 
+                      ? `${user.valor || 0} km` 
+                      : abaAtiva === 'level' 
+                        ? `${user.xp || 0} XP` 
+                        : `${user.valor || 0} kg`}
                   </p>
-                  <p className="text-zinc-600 text-[8px] font-bold uppercase">{abaAtiva === 'semanal' ? '🔥 QUEIMANDO' : 'ARSENAL'}</p>
+                  <p className="text-zinc-600 text-[8px] font-bold uppercase tracking-wider">
+                    {abaAtiva === 'semanal' ? 'Volume' : abaAtiva === 'level' ? 'Pontuação' : 'Carga Total'}
+                  </p>
                 </div>
               </div>
             )
@@ -219,14 +267,7 @@ export default function Ranking() {
         )}
       </div>
 
-      {/* RODAPÉ DE COPYRIGHT */}
-      <footer className="mt-12 mb-6 text-center">
-        <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
-          © 2026 @eu.efrai - Todos os direitos reservados.
-        </p>
-      </footer>
-
       <Navbar />
     </div>
   )
-}
+}

@@ -3,49 +3,50 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import PageHeader from "@/components/PageHeader";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Flame, Trophy, Target, TrendingUp, Zap, Calendar } from "lucide-react";
+import Navbar from "@/components/Navbar";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Flame, Trophy, Target, TrendingUp, Zap, Calendar, Activity, Sparkles, Award } from "lucide-react";
 import { motion } from "framer-motion";
 
 const BADGES = {
   "primeira-corrida": {
-    icon: "🏃",
+    icon: Trophy,
     nome: "Debutante",
     descricao: "Completar primeira corrida",
     reward: 50,
   },
   "streak-7": {
-    icon: "🔥",
+    icon: Flame,
     nome: "Semana de Fogo",
     descricao: "7 dias seguidos com atividade",
     reward: 100,
   },
   "streak-30": {
-    icon: "🌟",
+    icon: Award,
     nome: "Mês de Ouro",
     descricao: "30 dias de streak",
     reward: 500,
   },
   "km-100": {
-    icon: "🚀",
-    nome: "Centistas",
+    icon: Target,
+    nome: "Centista",
     descricao: "Completar 100 km totais",
     reward: 200,
   },
   "km-1000": {
-    icon: "💎",
+    icon: Zap,
     nome: "Lenda",
     descricao: "Completar 1000 km",
     reward: 1000,
   },
   "treino-10": {
-    icon: "💪",
+    icon: Activity,
     nome: "Musculação",
     descricao: "Completar 10 treinos",
     reward: 150,
   },
   "compartilhamento": {
-    icon: "📱",
+    icon: Sparkles,
     nome: "Influenciador",
     descricao: "Compartilhar 5 vezes",
     reward: 75,
@@ -78,7 +79,6 @@ export default function Dashboard() {
 
         setUserId(user.id);
 
-        // Buscam dados do usuário
         const { data: userProfile } = await supabase
           .from("usuarios")
           .select("*")
@@ -89,7 +89,6 @@ export default function Dashboard() {
           setUserData(userProfile);
         }
 
-        // Buscar runs do mês
         const agora = new Date();
         const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
 
@@ -100,14 +99,12 @@ export default function Dashboard() {
           .gte("created_at", inicioMes.toISOString())
           .order("created_at", { ascending: false });
 
-        // Calcular stats
         let totKm = 0;
         let totCalorias = 0;
         if (runs && runs.length > 0) {
           totKm = runs.reduce((sum, r) => sum + (r.distancia || 0), 0);
           totCalorias = runs.reduce((sum, r) => sum + (r.calorias || 0), 0);
 
-          // Preparar data para gráfico (últimos 7 dias)
           const ultimos7 = [];
           for (let i = 6; i >= 0; i--) {
             const data = new Date(agora);
@@ -125,14 +122,12 @@ export default function Dashboard() {
           setChartData(ultimos7);
         }
 
-        // Buscar treinos do mês
         const { data: treinos } = await supabase
           .from("treinos")
           .select("*")
           .eq("user_id", user.id)
           .gte("created_at", inicioMes.toISOString());
 
-        // Calcular streak
         const { data: allRuns } = await supabase
           .from("runs")
           .select("created_at")
@@ -168,7 +163,6 @@ export default function Dashboard() {
 
         setStreak(streakCount);
 
-        // Calcular badges desbloqueados
         const badgesDesbloqueados = [];
         if (runs && runs.length > 0) {
           badgesDesbloqueados.push("primeira-corrida");
@@ -192,9 +186,9 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="pb-24 bg-black min-h-screen">
-        <PageHeader icon="📊" title="Dashboard" subtitle="Acompanhe seu progresso" color="blue" />
-        <div className="p-4 text-center text-gray-400">Carregando...</div>
+      <div className="pb-24 bg-zinc-950 min-h-screen text-zinc-100 flex flex-col items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Carregando painel de progresso...</p>
       </div>
     );
   }
@@ -211,13 +205,17 @@ export default function Dashboard() {
     : 100;
 
   return (
-    <div className="pb-24 bg-zinc-950 min-h-screen text-zinc-100 relative">
+    <div className="pb-32 bg-zinc-950 min-h-screen text-zinc-100 relative">
       <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
 
-      <PageHeader icon="📊" title="Dashboard" subtitle="Acompanhe seu progresso" color="blue" />
+      <PageHeader 
+        icon={<Activity className="w-7 h-7 text-blue-400" />} 
+        title="Dashboard" 
+        subtitle="Acompanhe seu progresso individual" 
+        color="blue" 
+      />
 
       <div className="p-4 space-y-4 z-10 relative">
-        {/* STREAK */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -230,7 +228,7 @@ export default function Dashboard() {
               </p>
               <p className="text-3xl font-extrabold text-orange-400 mt-2">{streak} dias seguidos</p>
             </div>
-            <div className="text-4xl text-orange-500/80 animate-pulse">🔥</div>
+            <Flame className="w-8 h-8 text-orange-500 animate-pulse" />
           </div>
           <p className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mt-3">
             {streak > 0
@@ -239,7 +237,6 @@ export default function Dashboard() {
           </p>
         </motion.div>
 
-        {/* PRÓXIMO MILESTONE */}
         {proximoMilestone && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -267,7 +264,6 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* STATS DO MÊS */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -296,8 +292,7 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* GRÁFICO DE ATIVIDADE */}
-        {chartData.length > 0 && (
+        {chartData.length > 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -325,9 +320,17 @@ export default function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-zinc-900/10 border border-zinc-900/80 rounded-xl p-6 text-center"
+          >
+            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Nenhuma corrida registrada nos últimos 7 dias.</p>
+          </motion.div>
         )}
 
-        {/* BADGES */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -346,9 +349,11 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 gap-3">
               {badges.map((badgeId) => {
                 const badge = BADGES[badgeId];
+                if (!badge) return null;
+                const BadgeIcon = badge.icon;
                 return (
                   <div key={badgeId} className="bg-zinc-900/20 border border-amber-500/10 rounded-xl p-4 flex flex-col items-center justify-center">
-                    <p className="text-3xl mb-2">{badge.icon}</p>
+                    <BadgeIcon className="w-8 h-8 text-amber-400 mb-2" />
                     <p className="text-xs font-bold text-amber-400 text-center uppercase tracking-wide leading-none">{badge.nome}</p>
                     <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider text-center mt-2">+{badge.reward} XP</p>
                   </div>
@@ -357,26 +362,30 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* BADGES PRÓXIMAS */}
           <div className="mt-4">
             <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-3">Próximos Objetivos:</p>
             <div className="grid grid-cols-2 gap-3">
               {Object.entries(BADGES)
                 .filter(([id]) => !badges.includes(id))
                 .slice(0, 4)
-                .map(([id, badge]) => (
-                  <div key={id} className="bg-zinc-900/10 border border-zinc-900/60 rounded-xl p-3.5 opacity-40 flex items-center gap-3">
-                    <p className="text-2xl">{badge.icon}</p>
-                    <div className="flex flex-col">
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide leading-none">{badge.nome}</p>
-                      <p className="text-[8px] text-zinc-600 font-semibold uppercase tracking-wider mt-1">+{badge.reward} XP</p>
+                .map(([id, badge]) => {
+                  const BadgeIcon = badge.icon;
+                  return (
+                    <div key={id} className="bg-zinc-900/10 border border-zinc-900/60 rounded-xl p-3.5 opacity-40 flex items-center gap-3">
+                      <BadgeIcon className="w-6 h-6 text-zinc-500" />
+                      <div className="flex flex-col">
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide leading-none">{badge.nome}</p>
+                        <p className="text-[8px] text-zinc-600 font-semibold uppercase tracking-wider mt-1">+{badge.reward} XP</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </div>
         </motion.div>
       </div>
+
+      <Navbar />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import PageHeader from "@/components/PageHeader";
+import Navbar from "@/components/Navbar";
 import { TrendingUp, Users, Zap, Target, Sparkles, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -25,7 +26,7 @@ export default function Curiosidades() {
         // Total de usuários ativos
         const { data: usuariosAtivos } = await supabase
           .from("registros_treino")
-          .select("usuario_id", { distinct: true })
+          .select("usuario_id")
           .gte("created_at", umaSemanaatrás.toISOString());
 
         // Total de treinos
@@ -64,96 +65,98 @@ export default function Curiosidades() {
 
   if (loading) {
     return (
-      <div className="pb-24 bg-black min-h-screen">
-        <PageHeader icon="📈" title="Curiosidades" subtitle="Dados incríveis da semana" color="orange" />
-        <div className="p-4 text-center text-gray-400">Carregando...</div>
+      <div className="pb-24 bg-zinc-950 min-h-screen text-zinc-100 flex flex-col items-center justify-center">
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Carregando métricas da squad...</p>
       </div>
     );
   }
 
   const cards = [
     {
-      icon: "🏃",
       titulo: "Total de KM",
       valor: stats?.totalKm,
       unidade: "km",
-      cor: "from-emerald-500/20 to-green-500/20 border-emerald-500/50",
+      cor: "border-emerald-500/20 bg-emerald-500/5 text-emerald-400",
       icone: TrendingUp,
     },
     {
-      icon: "🔥",
       titulo: "Calorias Queimadas",
       valor: stats?.totalCalorias,
       unidade: "kcal",
-      cor: "from-orange-500/20 to-red-500/20 border-orange-500/50",
+      cor: "border-orange-500/20 bg-orange-500/5 text-orange-400",
       icone: Zap,
     },
     {
-      icon: "👥",
       titulo: "Usuários Ativos",
       valor: stats?.usuariosAtivos,
       unidade: "pessoas",
-      cor: "from-blue-500/20 to-cyan-500/20 border-blue-500/50",
+      cor: "border-blue-500/20 bg-blue-500/5 text-blue-400",
       icone: Users,
     },
     {
-      icon: "💪",
       titulo: "Treinos Realizados",
       valor: stats?.numTreinos,
       unidade: "treinos",
-      cor: "from-purple-500/20 to-pink-500/20 border-purple-500/50",
+      cor: "border-purple-500/20 bg-purple-500/5 text-purple-400",
       icone: Sparkles,
     },
     {
-      icon: "🎯",
       titulo: "Maior Corrida",
       valor: stats?.topRun,
       unidade: "km",
-      cor: "from-yellow-500/20 to-orange-500/20 border-yellow-500/50",
+      cor: "border-yellow-500/20 bg-yellow-500/5 text-yellow-400",
       icone: Target,
     },
     {
-      icon: "📊",
       titulo: "Média por Pessoa",
       valor: stats?.mediaKmPorPessoa,
       unidade: "km",
-      cor: "from-violet-500/20 to-indigo-500/20 border-violet-500/50",
+      cor: "border-violet-500/20 bg-violet-500/5 text-violet-400",
       icone: Trophy,
     },
   ];
 
   return (
-    <div className="pb-24 bg-black min-h-screen">
-      <PageHeader icon="📈" title="Curiosidades" subtitle="Dados incríveis da semana" color="orange" />
+    <div className="pb-24 bg-zinc-950 min-h-screen text-zinc-100 relative">
+      <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-orange-500/5 to-transparent pointer-events-none" />
 
-      <div className="p-4 space-y-3">
-        {/* MENSAGEM MOTIVADORA */}
+      <PageHeader 
+        icon={<TrendingUp className="w-7 h-7 text-orange-400" />} 
+        title="Curiosidades" 
+        subtitle="Dados de performance da semana" 
+        color="orange" 
+      />
+
+      <div className="p-4 space-y-4 z-10 relative">
+        {/* INFORMAÇÃO GERAL */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-green-500/30 to-cyan-500/30 border border-green-500/50 rounded-lg p-4 text-center"
+          className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 text-center"
         >
-          <p className="text-sm font-bold text-green-300 mb-1">🔥 Semana Espetacular!</p>
-          <p className="text-xs text-gray-300">A squad está em forma. Continue assim e suba de nível!</p>
+          <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-1">Desempenho da Squad</p>
+          <p className="text-[11px] text-zinc-400 font-medium">A squad está ativa e em constante evolução. Continue superando seus limites.</p>
         </motion.div>
 
         {/* CARDS DE STATS */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3.5">
           {cards.map((card, idx) => (
             <motion.div
               key={idx}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: idx * 0.05 }}
-              className={`bg-gradient-to-br ${card.cor} border rounded-lg p-4`}
+              className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-900/80 rounded-xl p-4 flex flex-col justify-between"
             >
-              <div className="flex items-start justify-between mb-2">
-                <p className="text-2xl">{card.icon}</p>
-                <card.icone className="w-4 h-4 text-gray-400" />
+              <div className="flex items-center justify-between mb-3">
+                <card.icone className={`w-5 h-5 ${card.cor.split(' ')[2]}`} />
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{card.unidade}</span>
               </div>
-              <p className="text-xs text-gray-400 mb-1">{card.titulo}</p>
-              <p className="text-2xl font-bold text-white">{card.valor}</p>
-              <p className="text-xs text-gray-500 mt-1">{card.unidade}</p>
+              <div>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">{card.titulo}</p>
+                <p className="text-2xl font-extrabold text-white">{card.valor}</p>
+              </div>
             </motion.div>
           ))}
         </div>
@@ -163,27 +166,31 @@ export default function Curiosidades() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 space-y-3 mt-4"
+          className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-900 rounded-xl p-5 space-y-4"
         >
-          <h3 className="font-bold text-white flex items-center gap-2">
-            💡 Insights da Semana
+          <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-emerald-400" /> Insights de Desempenho
           </h3>
           
-          <div className="space-y-2 text-sm">
-            <p className="text-gray-300">
-              ✨ <span className="text-yellow-400 font-semibold">{stats?.usuariosAtivos}</span> pessoas se movimentaram esta semana!
-            </p>
-            <p className="text-gray-300">
-              🚀 Média de <span className="text-green-400 font-semibold">{stats?.mediaKmPorPessoa} km</span> por atleta
-            </p>
-            {stats?.topRun && (
-              <p className="text-gray-300">
-                🏆 Melhor corrida individual: <span className="text-cyan-400 font-semibold">{stats?.topRun} km</span>
-              </p>
+          <div className="space-y-3 text-[11px] font-semibold uppercase tracking-wider">
+            <div className="flex justify-between items-center border-b border-zinc-900 pb-2.5">
+              <span className="text-zinc-500">Atletas Ativos</span>
+              <span className="text-emerald-400">{stats?.usuariosAtivos} membros</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-zinc-900 pb-2.5">
+              <span className="text-zinc-500">Média de Distância</span>
+              <span className="text-blue-400">{stats?.mediaKmPorPessoa} km por atleta</span>
+            </div>
+            {stats?.topRun > 0 && (
+              <div className="flex justify-between items-center border-b border-zinc-900 pb-2.5">
+                <span className="text-zinc-500">Melhor Corrida Individual</span>
+                <span className="text-amber-400">{stats?.topRun} km</span>
+              </div>
             )}
-            <p className="text-gray-300">
-              💪 Total de <span className="text-purple-400 font-semibold">{stats?.numTreinos}</span> treinos feitos
-            </p>
+            <div className="flex justify-between items-center pb-1">
+              <span className="text-zinc-500">Total de Sessões</span>
+              <span className="text-purple-400">{stats?.numTreinos} treinos</span>
+            </div>
           </div>
         </motion.div>
 
@@ -192,17 +199,20 @@ export default function Curiosidades() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-gradient-to-r from-pink-500/20 to-red-500/20 border border-pink-500/30 rounded-lg p-4 text-center"
+          className="bg-gradient-to-r from-rose-500/10 to-orange-500/5 border border-rose-500/20 rounded-xl p-5 text-center"
         >
-          <p className="text-sm font-bold text-pink-300 mb-2">🎯 Desafio Próxima Semana</p>
-          <p className="text-xs text-gray-300 mb-3">
-            Consegue bater o recorde semanal? O top 3 ganha badges extras!
+          <p className="text-xs font-bold text-rose-400 uppercase tracking-widest mb-1.5">Meta da Próxima Semana</p>
+          <p className="text-[11px] text-zinc-400 mb-4">
+            Superar o recorde de distância acumulada da squad. O Top 3 ganha badges exclusivos.
           </p>
-          <button className="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 px-4 rounded-lg text-xs transition">
-            ACEITAR DESAFIO
+          <button className="w-full bg-rose-500 hover:bg-rose-600 text-black font-extrabold py-2.5 px-4 rounded-xl text-[10px] uppercase tracking-wider transition duration-300">
+            Aceitar Desafio
           </button>
         </motion.div>
       </div>
+
+      <Navbar />
     </div>
   );
 }
+
