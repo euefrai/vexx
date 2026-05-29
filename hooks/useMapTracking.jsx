@@ -4,31 +4,31 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { getDistance } from "@/utils/haversine";
 
 /**
- * Hook unificado para rastreamento de corrida tipo Uber
- * Combina GPS tracking, cálculo de bearing, rota e métricas em um único place
+ * Hook unificado para rastreamento de corrida de alta fidelidade
+ * Características:
+ * - Separação entre posicionamento do marcador (tempo real sensível) e cálculo de rota (filtrado anti-ruído)
+ * - Tolerância de precisão calibrada para navegadores web móveis/desktops (150m)
+ * - Auto-recuperação de conexão GPS
  */
 export function useMapTracking() {
-  // ▶️ ESTADO PRINCIPAL
   const [isActive, setIsActive] = useState(false);
   const [distance, setDistance] = useState(0);
   const [time, setTime] = useState(0);
   const [currentPosition, setCurrentPosition] = useState(null);
-  const [heading, setHeading] = useState(0); // Para rotação do mapa
-  const [currentSpeed, setCurrentSpeed] = useState(0); // Velocidade em tempo real
+  const [heading, setHeading] = useState(0);
+  const [currentSpeed, setCurrentSpeed] = useState(0);
   const [avgSpeed, setAvgSpeed] = useState(0);
   const [isGPSConnected, setIsGPSConnected] = useState(false);
   const [gpsAccuracy, setGpsAccuracy] = useState(null);
 
-  // 🔄 REFS (não causam re-render)
   const positionsRef = useRef([]);
   const watchIdRef = useRef(null);
   const timerIdRef = useRef(null);
   const speedHistoryRef = useRef([]);
   const lastUpdateRef = useRef(0);
   const gpsRetryRef = useRef(0);
-  const maxGpsRetriesRef = useRef(3);
+  const maxGpsRetriesRef = useRef(4);
 
-  // 🧭 Cálculo de Bearing (Direção entre dois pontos)
   const calculateBearing = useCallback((lat1, lng1, lat2, lng2) => {
     const toRad = (deg) => (deg * Math.PI) / 180;
     const toDeg = (rad) => (rad * 180) / Math.PI;
@@ -42,65 +42,60 @@ export function useMapTracking() {
     return (toDeg(Math.atan2(y, x)) + 360) % 360;
   }, []);
 
-  // 📊 Cálculo de velocidade média
   const calculateAverageSpeed = useCallback((totalDistance, totalTime) => {
     if (totalTime <= 0 || totalDistance <= 0) return 0;
-    return totalDistance / (totalTime / 3600); // km/h
+    return totalDistance / (totalTime / 3600);
   }, []);
 
-  // 📍 Inicialização - Pega localização inicial com retry
-  useEffect(() => {
-    if (!("geolocation" in navigator)) {
-      console.error("[MapTracking] ❌ Geolocation não disponível");
-      return;
-    }
+  // Obter localização inicial e centralizar marcador
+  const queryInitialLocation = useCallback(() => {
+    if (!("geolocation" in navigator)) return;
 
-    const getInitialPosition = () => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          console.debug(`[MapTracking] ✅ Posição inicial: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        const initialPos = {
+          lat: latitude,
+          lng: longitude,
+          timestamp: Date.now(),
+          heading: 0,
+          speed: 0,
+        };
 
-          const initialPos = {
-            lat: latitude,
-            lng: longitude,
-            timestamp: Date.now(),
-            heading: 0,
-            speed: 0,
-          };
-
+        if (positionsRef.current.length === 0) {
           positionsRef.current = [initialPos];
-          setCurrentPosition(initialPos);
-          setGpsAccuracy(accuracy);
-          setIsGPSConnected(true);
-          gpsRetryRef.current = 0;
-        },
-        (error) => {
-          console.warn(`[MapTracking] ⚠️ Erro posição inicial: ${error.message}`);
-          if (gpsRetryRef.current < maxGpsRetriesRef.current) {
-            gpsRetryRef.current++;
-            console.log(`[MapTracking] Retry ${gpsRetryRef.current}/${maxGpsRetriesRef.current}...`);
-            setTimeout(getInitialPosition, 2000);
-          }
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0,
         }
-      );
-    };
-
-    getInitialPosition();
+        
+        setCurrentPosition(initialPos);
+        setGpsAccuracy(accuracy);
+        setIsGPSConnected(true);
+        gpsRetryRef.current = 0;
+      },
+      (error) => {
+        console.warn(`[GPS Init] Falha na obtenção da localização inicial: ${error.message}`);
+        if (gpsRetryRef.current < maxGpsRetriesRef.current) {
+          gpsRetryRef.current++;
+          setTimeout(queryInitialLocation, 2500);
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
   }, []);
 
-  // ⏱️ Timer para cronômetro
+  useEffect(() => {
+    queryInitialLocation();
+  }, [queryInitialLocation]);
+
+  // Cronômetro de treino
   useEffect(() => {
     if (isActive) {
       timerIdRef.current = setInterval(() => {
         setTime((prev) => {
           const newTime = prev + 1;
-          // Atualizar velocidade média a cada segundo
           setAvgSpeed(calculateAverageSpeed(distance, newTime));
           return newTime;
         });
@@ -114,56 +109,72 @@ export function useMapTracking() {
     };
   }, [isActive, distance, calculateAverageSpeed]);
 
-  // 🎯 Iniciar rastreamento com watchPosition
+  // Rastreamento Contínuo
   const startTracking = useCallback(() => {
-    if (!("geolocation" in navigator)) {
-      console.error("[MapTracking] ❌ Geolocation não disponível");
-      return;
-    }
+    if (!("geolocation" in navigator)) return;
 
-    console.debug("[MapTracking] ▶️ Iniciando rastreamento...");
     setIsActive(true);
+    setIsGPSConnected(true);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude, speed: gpsSpeed, accuracy, heading: gpsHeading } = pos.coords;
         const now = Date.now();
 
-        // Throttle: processar a cada 1000ms no máximo
+        // Throttle para poupar processador
         if (now - lastUpdateRef.current < 1000) return;
 
-        // FILTRO DE PRECISÃO: Evitar "pulos" malucos do GPS
-        if (accuracy > 30) {
-          console.debug(`[MapTracking] ⚠️ Ponto ignorado: precisão ruim (${accuracy}m)`);
+        // Filtro calibrado: Ignorar apenas anomalias críticas (>150 metros)
+        if (accuracy > 150) {
+          console.warn(`[GPS Noise] Ponto ignorado devido a baixa precisão (${accuracy}m)`);
           return;
         }
 
         lastUpdateRef.current = now;
 
         try {
+          const freshSpeed = gpsSpeed !== null && gpsSpeed !== undefined
+            ? Math.max(0, gpsSpeed * 3.6)
+            : 0;
+
+          const freshPos = {
+            lat: latitude,
+            lng: longitude,
+            timestamp: now,
+            heading: gpsHeading ?? heading ?? 0,
+            speed: freshSpeed,
+            accuracy,
+          };
+
+          // 🎯 ATUALIZAÇÃO IMEDIATA DO MARCADOR DO MAPA (Sem atraso ou filtro anti-ruído)
+          setCurrentPosition(freshPos);
+          setGpsAccuracy(accuracy);
+          setIsGPSConnected(true);
+          gpsRetryRef.current = 0;
+
           const lastPos = positionsRef.current[positionsRef.current.length - 1];
 
           if (lastPos) {
             const dist = getDistance(lastPos.lat, lastPos.lng, latitude, longitude);
             const timeDiffSeconds = (now - lastPos.timestamp) / 1000;
 
-            // Cálculo de velocidade: Prioriza GPS
             const velocity = gpsSpeed !== null && gpsSpeed !== undefined
-              ? gpsSpeed * 3.6  // m/s -> km/h
+              ? gpsSpeed * 3.6
               : dist > 0
                 ? (dist / (timeDiffSeconds / 3600))
                 : 0;
 
-            // Cálculo de bearing
-            const calculatedBearing = dist > 0.005
+            const calculatedBearing = dist > 0.003
               ? calculateBearing(lastPos.lat, lastPos.lng, latitude, longitude)
               : (gpsHeading ?? lastPos.heading ?? 0);
 
-            // Filtro anti-ruído: só registra se mover mais de 5 metros
-            if (dist > 0.005) {
+            // 📍 FILTRO DE ROTA: Apenas insere no traçado se houver movimento (>3m) e o treino estiver rodando
+            if (dist > 0.003 && isActive) {
               setDistance((prev) => prev + dist);
+              setHeading(calculatedBearing);
+              setCurrentSpeed(Math.max(0, velocity));
 
-              const newPos = {
+              const newPathPos = {
                 lat: latitude,
                 lng: longitude,
                 timestamp: now,
@@ -171,70 +182,49 @@ export function useMapTracking() {
                 speed: Math.max(0, velocity),
               };
 
-              positionsRef.current.push(newPos);
-              setCurrentPosition(newPos);
-              setHeading(calculatedBearing);
-              setCurrentSpeed(Math.max(0, velocity));
-              setGpsAccuracy(accuracy);
-              setIsGPSConnected(true);
-              gpsRetryRef.current = 0;
+              positionsRef.current.push(newPathPos);
 
-              // Log a cada 10 pontos
-              if (positionsRef.current.length % 10 === 0) {
-                console.debug(
-                  `[MapTracking] 📍 ${positionsRef.current.length} pontos | ` +
-                  `dist=${dist.toFixed(3)}km | vel=${velocity.toFixed(1)}km/h | ` +
-                  `bearing=${calculatedBearing.toFixed(0)}° | acc=${accuracy}m`
-                );
-              }
-
-              // Manter histórico de velocidades (últimos 60 segundos)
-              speedHistoryRef.current.push({
-                speed: velocity,
-                timestamp: now,
-              });
-              speedHistoryRef.current = speedHistoryRef.current.filter(
-                (s) => now - s.timestamp < 60000
-              );
+              speedHistoryRef.current.push({ speed: velocity, timestamp: now });
+              speedHistoryRef.current = speedHistoryRef.current.filter((s) => now - s.timestamp < 60000);
+            }
+          } else {
+            // Primeiro ponto da rota de treino ativo
+            if (isActive) {
+              positionsRef.current.push(freshPos);
             }
           }
         } catch (error) {
-          console.error("[MapTracking] Erro ao processar posição:", error);
+          console.error("[GPS Tracking] Erro ao atualizar coordenadas:", error);
         }
       },
       (error) => {
-        console.warn(`[MapTracking] ⚠️ watchPosition error: ${error.message}`);
+        console.warn(`[GPS Watch] Falha ao rastrear: ${error.message}`);
         setIsGPSConnected(false);
 
-        // Retry se falha
+        // Tentativa de reconexão automática
         if (gpsRetryRef.current < maxGpsRetriesRef.current && isActive) {
           gpsRetryRef.current++;
           setTimeout(() => {
-            console.log(`[MapTracking] Retry ${gpsRetryRef.current}/${maxGpsRetriesRef.current}...`);
-            startTracking();
+            if (isActive) startTracking();
           }, 3000);
         }
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 500,
-        timeout: 8000,
+        maximumAge: 0,
+        timeout: 9000,
       }
     );
-  }, [calculateBearing]);
+  }, [isActive, heading, calculateBearing]);
 
-  // ⏸️ Pausar rastreamento
   const pauseTracking = useCallback(() => {
-    console.debug("[MapTracking] ⏸️ Pausando rastreamento...");
     setIsActive(false);
-
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
   }, []);
 
-  // 🔄 Resetar tudo
   const resetTracking = useCallback(() => {
     pauseTracking();
     setDistance(0);
@@ -245,10 +235,8 @@ export function useMapTracking() {
     positionsRef.current = [];
     speedHistoryRef.current = [];
     gpsRetryRef.current = 0;
-    console.debug("[MapTracking] 🔄 Rastreamento resetado");
   }, [pauseTracking]);
 
-  // 📊 Cálculo de Ritmo (Pace)
   const getPace = useCallback(() => {
     if (distance <= 0 || time <= 0) return "0:00";
     const paceDecimal = (time / 60) / distance;
@@ -257,19 +245,16 @@ export function useMapTracking() {
     return min > 59 ? "--:--" : `${min}:${sec.toString().padStart(2, "0")}`;
   }, [distance, time]);
 
-  // 📈 Cálculo de calorias
   const getCalories = useCallback(() => {
-    return Math.round(distance * 63);
+    return Math.round(distance * 68);
   }, [distance]);
 
-  // 🏃 Cálculo de velocidade máxima
   const getMaxSpeed = useCallback(() => {
     if (positionsRef.current.length === 0) return 0;
     return Math.max(...positionsRef.current.map((p) => p.speed || 0));
   }, []);
 
   return {
-    // Estado
     isActive,
     distance,
     time,
@@ -280,18 +265,12 @@ export function useMapTracking() {
     isGPSConnected,
     gpsAccuracy,
     positions: positionsRef.current,
-
-    // Métodos
     startTracking,
     pauseTracking,
     resetTracking,
-
-    // Cálculos
     pace: getPace(),
     calories: getCalories(),
     maxSpeed: getMaxSpeed(),
-
-    // Para debug
     positionCount: positionsRef.current.length,
   };
 }

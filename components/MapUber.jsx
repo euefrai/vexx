@@ -8,11 +8,10 @@ import "leaflet/dist/leaflet.css";
 /**
  * MapUber - Componente de mapa premium de corrida
  * Características:
- * - Mapa sempre centralizado no usuário com bearing suave
- * - Linha de corrida com efeito neon duplo (glow + brilho ciano)
- * - Indicador de usuário com múltiplos anéis de radar pulsante de satélite
- * - Overlays e filtros de clima dinâmicos (Dia, Noite, Chuva, Nublado)
- * - Modo replay progressivo pós-corrida
+ * - Mapa estático e livre de flickers ou flashes (inicialização isolada)
+ * - Rota de destino com setas animadas flutuantes (fluxo ciano móvel)
+ * - Escolha livre de destino clicando em qualquer lugar do mapa ou arrastando o pin
+ * - Força atualização imediata de localização exata por satélite no botão central
  */
 const MapUber = ({ 
   positions = [], 
@@ -22,13 +21,13 @@ const MapUber = ({
   currentSpeed = 0,
   onDestinationSelect,
   showRouteInfo = true,
-  clima = "sol", // "sol" | "noite" | "chuva" | "nublado"
+  clima = "sol",
   triggerReplay = false,
 }) => {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const polylineRef = useRef(null);
-  const polylineGlowRef = useRef(null); // Linha larga inferior para brilho
+  const polylineGlowRef = useRef(null);
   const routeRef = useRef(null);
   const destinationMarkerRef = useRef(null);
   const mapContainerRef = useRef(null);
@@ -39,10 +38,9 @@ const MapUber = ({
   const routeCacheRef = useRef(null);
   const lastDestinationRef = useRef(null);
   
-  // Cache de última posição conhecida (para fallback)
   const lastKnownPositionRef = useRef(null);
   const lastMapUpdateRef = useRef(0);
-  const MIN_UPDATE_INTERVAL = 150; // ms (mais responsivo)
+  const MIN_UPDATE_INTERVAL = 150;
   const isInitializedRef = useRef(false);
 
   const [isMapReady, setIsMapReady] = useState(false);
@@ -53,8 +51,16 @@ const MapUber = ({
   // Estados do Replay Progressivo
   const [isReplaying, setIsReplaying] = useState(false);
   const [replayPositions, setReplayPositions] = useState([]);
+
+  // Estabilizar referências para evitar reconstruir efeitos do mapa (FIM DOS FLASHES!)
+  const onDestinationSelectRef = useRef(onDestinationSelect);
+  const destinationRef = useRef(destination);
+
+  useEffect(() => {
+    onDestinationSelectRef.current = onDestinationSelect;
+    destinationRef.current = destination;
+  }, [onDestinationSelect, destination]);
   
-  // Usar última posição conhecida como fallback
   const effectivePosition = useMemo(() => {
     if (currentPosition) {
       lastKnownPositionRef.current = currentPosition;
@@ -63,7 +69,7 @@ const MapUber = ({
     return lastKnownPositionRef.current;
   }, [currentPosition]);
 
-  // 🎯 Criar ícone do usuário com radar de alta precisão (Pulsante e Futurista)
+  // Ícone do radar de localização pulsante
   const createUserIcon = useCallback((L) => {
     return L.divIcon({
       html: `
@@ -81,7 +87,7 @@ const MapUber = ({
             position: absolute;
             width: 70px;
             height: 70px;
-            border: 2px solid #00ff9f;
+            border: 2.5px solid #00ff9f;
             border-radius: 50%;
             opacity: 0;
             animation: radar-pulse 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
@@ -90,21 +96,11 @@ const MapUber = ({
             position: absolute;
             width: 70px;
             height: 70px;
-            border: 2px solid #00e0ff;
+            border: 2.5px solid #00e0ff;
             border-radius: 50%;
             opacity: 0;
             animation: radar-pulse 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
             animation-delay: 1s;
-          "></div>
-          <div class="radar-pulse-ring active-rain active-nublado" style="
-            position: absolute;
-            width: 70px;
-            height: 70px;
-            border: 2px solid #a855f7;
-            border-radius: 50%;
-            opacity: 0;
-            animation: radar-pulse 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
-            animation-delay: 2s;
           "></div>
 
           <!-- Glow Central -->
@@ -112,7 +108,7 @@ const MapUber = ({
             position: absolute;
             width: 32px;
             height: 32px;
-            background: radial-gradient(circle, rgba(0, 255, 159, 0.4), transparent);
+            background: radial-gradient(circle, rgba(0, 255, 159, 0.45), transparent);
             border-radius: 50%;
             z-index: 2;
           "></div>
@@ -127,7 +123,7 @@ const MapUber = ({
             border-radius: 50%;
             opacity: 0.95;
             z-index: 5;
-            box-shadow: 0 0 10px rgba(0, 255, 159, 0.8);
+            box-shadow: 0 0 12px rgba(0, 255, 159, 0.95);
           "></div>
           
           <!-- Seta verde esportiva ciano de direção -->
@@ -139,7 +135,7 @@ const MapUber = ({
             border-left: 9px solid transparent;
             border-right: 9px solid transparent;
             border-bottom: 20px solid #00ff9f;
-            filter: drop-shadow(0 0 5px rgba(0, 255, 159, 0.8)) drop-shadow(0 1.5px 3px rgba(0, 0, 0, 0.5));
+            filter: drop-shadow(0 0 6px rgba(0, 255, 159, 0.9)) drop-shadow(0 1.5px 3px rgba(0, 0, 0, 0.5));
             transform: translateY(-4px);
           "></div>
         </div>
@@ -150,7 +146,6 @@ const MapUber = ({
     });
   }, []);
 
-  // 🎯 Criar ícone de destino estilo Garmin/NRC
   const createDestinationIcon = useCallback((L) => {
     return L.divIcon({
       html: `
@@ -160,16 +155,15 @@ const MapUber = ({
           align-items: center;
           animation: pulse-destination 2s infinite;
         ">
-          <!-- Círculo externo pulsante -->
           <div style="
             position: absolute;
             width: 28px;
             height: 28px;
             background: radial-gradient(circle, #ff3366, #e63946);
             border-radius: 50%;
-            filter: drop-shadow(0 0 10px rgba(255, 51, 102, 0.8));
+            filter: drop-shadow(0 0 12px rgba(255, 51, 102, 0.9));
             border: 3.5px solid white;
-            box-shadow: 0 0 0 6px rgba(255, 51, 102, 0.25);
+            box-shadow: 0 0 0 6px rgba(255, 51, 102, 0.35);
           "></div>
           <div style="
             position: relative;
@@ -187,13 +181,13 @@ const MapUber = ({
     });
   }, []);
 
-  // 1️⃣ Inicializar Mapa com tema escuro e polilinhas neon duplo
+  // 1️⃣ Inicializar Mapa - EXECUTA RIGOROSAMENTE APENAS UMA VEZ NO MONTAGEM DO COMPONENTE
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || mapError) return;
 
     (async () => {
       try {
-        console.debug("[MapUber] Carregando Leaflet...");
+        console.debug("[MapUber] Inicializando Leaflet estático sem flashes...");
         const L = (await import("leaflet")).default;
         LRef.current = L;
 
@@ -204,49 +198,46 @@ const MapUber = ({
           shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
         });
 
-        // Configurar mapa
+        // Instanciar mapa fixo
         mapRef.current = L.map(mapContainerRef.current, {
           zoomControl: false,
           attributionControl: false,
           tap: true,
           bearing: 0,
-        }).setView([-15.78, -47.92], 16);
+        }).setView([-15.7942, -47.8822], 16);
 
-        // Tile layer escuro premium
         L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
           maxZoom: 20,
           attribution: "",
         }).addTo(mapRef.current);
 
-        // 1. Camada inferior de brilho neon (mais larga e com menos opacidade)
+        // Polilinhas neon do percurso
         polylineGlowRef.current = L.polyline([], {
           color: "#00ff9f",
           weight: 12,
           opacity: 0.35,
           lineCap: "round",
           lineJoin: "round",
-          bubblingMouseEvents: false,
         }).addTo(mapRef.current);
 
-        // 2. Camada superior de brilho ciano (mais fina e intensa)
         polylineRef.current = L.polyline([], {
           color: "#00e0ff",
           weight: 4.5,
           opacity: 0.9,
           lineCap: "round",
           lineJoin: "round",
-          bubblingMouseEvents: false,
         }).addTo(mapRef.current);
 
         mapInstanceRef.current = mapRef.current;
         setIsMapReady(true);
 
+        // Click no mapa para ADICIONAR ou ALTERAR destino livremente a qualquer instante
         mapRef.current.on("click", (e) => {
-          if (onDestinationSelect && !destination) {
-            onDestinationSelect({
+          if (onDestinationSelectRef.current) {
+            onDestinationSelectRef.current({
               lat: e.latlng.lat,
               lng: e.latlng.lng,
-              name: "Ponto de destino",
+              name: `Destino: Ponto Selecionado`,
             });
           }
         });
@@ -255,11 +246,12 @@ const MapUber = ({
           if (mapRef.current) mapRef.current.invalidateSize();
         }, 300);
       } catch (error) {
-        console.error("[MapUber] Erro ao instanciar mapa:", error);
+        console.error("[MapUber] Erro ao instanciar mapa Leaflet:", error);
         setMapError(true);
       }
     })();
 
+    // Destruir mapa apenas quando o componente for totalmente desmontado do DOM
     return () => {
       if (mapRef.current) {
         mapRef.current.off();
@@ -267,9 +259,9 @@ const MapUber = ({
         mapRef.current = null;
       }
     };
-  }, [onDestinationSelect, destination, mapError]);
+  }, [mapError]);
 
-  // 2️⃣ Traçar Rota Dinâmica
+  // 2️⃣ Traçar Rota Dinâmica (Ciano Neon Fluido Animado)
   useEffect(() => {
     const L = LRef.current;
     if (!mapRef.current || !currentPosition || !destination || !L || !isMapReady) return;
@@ -295,24 +287,27 @@ const MapUber = ({
           mapRef.current.removeLayer(routeRef.current);
         }
 
+        // Polyline de Rota com Classe CSS animada para criar setas/traços em movimento
         routeRef.current = L.polyline(route, {
-          color: "#a855f7",
-          weight: 4,
-          opacity: 0.7,
+          color: "#00e0ff",
+          weight: 5.5,
+          opacity: 0.85,
           lineCap: "round",
           lineJoin: "round",
-          dashArray: "6, 8",
+          className: "route-path-flow",
           bubblingMouseEvents: false,
         }).addTo(mapRef.current);
+
+        console.debug(`[MapUber] Rota com ${route.length} pontos desenhada`);
       } catch (error) {
-        console.error("[MapUber] Rota falhou:", error);
+        console.error("[MapUber] Erro ao obter rota:", error);
       }
     }
 
     drawRoute();
   }, [destination, currentPosition, isMapReady]);
 
-  // 3️⃣ Seguir Atleta e Bearing Suave (Sem flicker)
+  // 3️⃣ Seguir Atleta com Transição de Bearing (Suavidade Total!)
   useEffect(() => {
     const L = LRef.current;
     if (!mapRef.current || !effectivePosition || !L || !isMapReady) return;
@@ -373,7 +368,6 @@ const MapUber = ({
       markerRef.current.setLatLng(latlng);
     }
 
-    // Zoom dinâmico inteligente
     let zoomTarget = 18;
     if (currentSpeed > 16) zoomTarget = 16;
     else if (currentSpeed > 8) zoomTarget = 17;
@@ -387,7 +381,7 @@ const MapUber = ({
     }
   }, [effectivePosition, heading, currentSpeed, isMapReady, createUserIcon, currentPosition]);
 
-  // 4️⃣ Marcadores de Destino
+  // 4️⃣ Marcador de Destino Dragável (Tactilidade Total)
   useEffect(() => {
     const L = LRef.current;
     if (!mapRef.current || !destination || !L || !isMapReady) return;
@@ -396,10 +390,22 @@ const MapUber = ({
       mapRef.current.removeLayer(destinationMarkerRef.current);
     }
 
+    // Criar marcador arrastável para ajustar destino direto no mapa
     destinationMarkerRef.current = L.marker(
       [destination.lat, destination.lng],
-      { icon: createDestinationIcon(L) }
+      { icon: createDestinationIcon(L), draggable: true }
     ).addTo(mapRef.current);
+
+    destinationMarkerRef.current.on("dragend", (e) => {
+      const pos = e.target.getLatLng();
+      if (onDestinationSelectRef.current) {
+        onDestinationSelectRef.current({
+          lat: pos.lat,
+          lng: pos.lng,
+          name: "Destino: Ponto Selecionado",
+        });
+      }
+    });
 
     if (currentPosition) {
       const dist = getDistanceSimple(
@@ -416,7 +422,7 @@ const MapUber = ({
     }
   }, [destination, isMapReady, createDestinationIcon, currentPosition, currentSpeed]);
 
-  // 5️⃣ Atualizar Rastro Neon (Suporta Replay e Tempo Real)
+  // 5️⃣ Atualizar Rastro Neon
   useEffect(() => {
     if (!polylineRef.current) return;
     
@@ -434,7 +440,7 @@ const MapUber = ({
     }
   }, [positions, replayPositions, isReplaying]);
 
-  // 🔄 Executar Replay da Rota
+  // Replay
   const runReplayAnimation = useCallback(() => {
     if (positions.length < 2) return;
     setIsReplaying(true);
@@ -454,7 +460,6 @@ const MapUber = ({
       
       setReplayPositions((prev) => [...prev, positions[index]]);
       
-      // Mover câmera suavemente seguindo o replay
       if (mapRef.current) {
         const pt = positions[index];
         mapRef.current.panTo([pt.lat, pt.lng], { animate: true, duration: speedMs / 1000 });
@@ -464,22 +469,35 @@ const MapUber = ({
     }, speedMs);
   }, [positions]);
 
-  // Assistir Gatilho do Replay
   useEffect(() => {
     if (triggerReplay && !isReplaying && positions.length >= 2) {
       runReplayAnimation();
     }
   }, [triggerReplay, runReplayAnimation, isReplaying, positions]);
 
-  // Controles
   const zoomIn = () => mapRef.current?.zoomIn();
   const zoomOut = () => mapRef.current?.zoomOut();
   
+  // 🎯 CENTRO DE ALTA PRECISÃO (Força instantâneamente lock via Geolocation real na hora)
   const centerMap = useCallback(() => {
-    if (currentPosition && mapRef.current) {
-      mapRef.current.flyTo([currentPosition.lat, currentPosition.lng], 18, {
-        duration: 0.8,
-      });
+    if (navigator.geolocation && mapRef.current) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          mapRef.current.flyTo([latitude, longitude], 18, { duration: 0.8 });
+          if (markerRef.current) {
+            markerRef.current.setLatLng([latitude, longitude]);
+          }
+        },
+        () => {
+          if (currentPosition && mapRef.current) {
+            mapRef.current.flyTo([currentPosition.lat, currentPosition.lng], 18, { duration: 0.8 });
+          }
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else if (currentPosition && mapRef.current) {
+      mapRef.current.flyTo([currentPosition.lat, currentPosition.lng], 18, { duration: 0.8 });
     }
   }, [currentPosition]);
 
@@ -492,7 +510,6 @@ const MapUber = ({
 
   return (
     <div className="w-full h-full relative z-0 bg-zinc-950 overflow-hidden group">
-      {/* 🌪️ FILTROS AMBIENTAIS E OVERLAYS DE CLIMA */}
       <div className={`absolute inset-0 pointer-events-none z-[101] transition-all duration-[1500ms] ${
         clima === "noite" ? "bg-blue-950/15 mix-blend-color-dodge shadow-[inset_0_0_150px_rgba(0,10,30,0.6)]" :
         clima === "chuva" ? "bg-indigo-950/25 mix-blend-multiply rain-effect" :
@@ -500,7 +517,6 @@ const MapUber = ({
         "bg-transparent"
       }`} />
       
-      {/* Vinheta Premium nas Bordas para aumentar imersão e foco */}
       <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.65)] z-[102]" />
 
       <style>{`
@@ -516,7 +532,7 @@ const MapUber = ({
             opacity: 0.8;
           }
           50% {
-            opacity: 0.4;
+            opacity: 0.45;
           }
           100% {
             transform: scale(1.6);
@@ -524,7 +540,19 @@ const MapUber = ({
           }
         }
 
-        /* Efeito sutil de chuva caindo no mapa */
+        @keyframes route-flow {
+          to {
+            stroke-dashoffset: -24;
+          }
+        }
+
+        /* Setas/Traços móveis que deslizam sobre a rota de destino ciano glow */
+        .route-path-flow {
+          stroke-dasharray: 10, 14;
+          animation: route-flow 1.1s linear infinite;
+          filter: drop-shadow(0 0 5px rgba(0, 224, 255, 0.95));
+        }
+
         @keyframes falling-rain {
           0% { background-position: 0px 0px; }
           100% { background-position: 250px 1000px; }
@@ -540,14 +568,12 @@ const MapUber = ({
         }
       `}</style>
 
-      {/* Container Leaflet */}
       <div
         ref={mapContainerRef}
         className="w-full h-full"
         style={{ height: "100%", background: "#0a0a0f" }}
       />
 
-      {/* TELA DE ERRO */}
       {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-[999]">
           <div className="text-center p-6 bg-zinc-900 border border-red-500/30 rounded-2xl max-w-sm">
@@ -563,7 +589,6 @@ const MapUber = ({
         </div>
       )}
 
-      {/* TELA DE CARREGAMENTO */}
       {!isMapReady && !mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 z-[998]">
           <div className="text-center">
@@ -573,7 +598,6 @@ const MapUber = ({
         </div>
       )}
 
-      {/* INDICADOR HUD DO REPLAY */}
       {isReplaying && (
         <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-600/90 to-blue-600/90 border border-purple-500/40 px-4 py-2 rounded-full z-[401] shadow-lg shadow-purple-500/20 flex items-center gap-2 animate-bounce">
           <div className="w-2.5 h-2.5 bg-white rounded-full animate-ping" />
@@ -581,7 +605,6 @@ const MapUber = ({
         </div>
       )}
 
-      {/* INFO DE ROTA ATIVA (ETA) */}
       {destination && showRouteInfo && !isReplaying && (
         <div className="absolute top-20 left-4 bg-zinc-950/85 backdrop-blur-md border border-white/10 px-4 py-3.5 rounded-2xl z-[401] shadow-2xl shadow-black/85 max-w-xs transition-all duration-300">
           <p className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
@@ -598,9 +621,7 @@ const MapUber = ({
         </div>
       )}
 
-      {/* CONTROLES TÁTEIS FLUTUANTES DO MAPA */}
       <div className="absolute bottom-6 right-4 sm:right-6 flex flex-col gap-2.5 z-[401]">
-        {/* Reset Bearing */}
         <button
           onClick={resetRotation}
           className="flex items-center justify-center w-11 h-11 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full shadow-2xl border border-white/5 backdrop-blur-md transition-all active:scale-90"
@@ -609,16 +630,14 @@ const MapUber = ({
           <Compass size={18} />
         </button>
 
-        {/* Centralizar Usuário */}
         <button
           onClick={centerMap}
-          className="flex items-center justify-center w-11 h-11 bg-gradient-to-br from-emerald-500 to-teal-600 hover:scale-105 text-zinc-950 rounded-full shadow-2xl shadow-emerald-500/20 transition-all active:scale-90"
-          title="Centralizar Câmera"
+          className="flex items-center justify-center w-11 h-11 bg-gradient-to-br from-emerald-500 to-teal-600 hover:scale-105 text-zinc-950 rounded-full shadow-2xl shadow-emerald-500/25 transition-all active:scale-90"
+          title="Centralizar Câmera GPS"
         >
           <Navigation size={18} fill="currentColor" />
         </button>
 
-        {/* Zoom In */}
         <button
           onClick={zoomIn}
           className="flex items-center justify-center w-11 h-11 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full shadow-2xl border border-white/5 backdrop-blur-md transition-all active:scale-90"
@@ -627,7 +646,6 @@ const MapUber = ({
           <ZoomIn size={18} />
         </button>
 
-        {/* Zoom Out */}
         <button
           onClick={zoomOut}
           className="flex items-center justify-center w-11 h-11 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-full shadow-2xl border border-white/5 backdrop-blur-md transition-all active:scale-90"
@@ -637,7 +655,6 @@ const MapUber = ({
         </button>
       </div>
 
-      {/* Balão Indicativo */}
       {!destination && !isReplaying && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-4 py-2 rounded-full text-purple-300 text-[10px] font-black uppercase tracking-wider animate-pulse z-[401] shadow-lg shadow-purple-950/20 backdrop-blur-sm">
           📍 Toque no mapa para traçar destino
@@ -647,7 +664,6 @@ const MapUber = ({
   );
 };
 
-// Fórmula Haversine simples
 function getDistanceSimple(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);

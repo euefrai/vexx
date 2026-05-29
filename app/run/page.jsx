@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import MapUber from "@/components/MapUber";
 import RunTracker from "@/components/RunTracker";
 import LocationSearch from "@/components/LocationSearch";
@@ -8,7 +9,7 @@ import RunSummary from "@/components/RunSummary";
 import { CelebracaoModal } from "@/components/CelebracaoModal";
 import { useMapTracking } from "@/hooks/useMapTracking";
 import Navbar from "@/components/Navbar";
-import { X, MapPin, Zap, Sun, Moon, CloudRain, Cloud, Cpu, Sparkles, ShieldCheck } from "lucide-react";
+import { X, MapPin, Zap, Sun, Moon, CloudRain, Cloud, Cpu, Sparkles, ShieldCheck, Volume2, VolumeX, EyeOff, Eye } from "lucide-react";
 import RunStatus from "@/components/RunStatus";
 import useAuth from "@/hooks/useAuth";
 import { useGamificacao } from "@/hooks/useGamificacao";
@@ -44,7 +45,7 @@ export default function RunPage() {
   const [simSpeed, setSimSpeed] = useState(0);
   const [simHeading, setSimHeading] = useState(0);
 
-  const [clima, setClima] = useState("sol"); // "sol" | "noite" | "chuva" | "nublado"
+  const [clima, setClima] = useState("sol");
   const [destination, setDestination] = useState(null);
   const [showDestinationModal, setShowDestinationModal] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -52,6 +53,12 @@ export default function RunPage() {
   const [username, setUsername] = useState("Atleta VEXX");
   const [savingTreino, setSavingTreino] = useState(false);
   
+  // HUD Collapse/Expand (Painel Ocultável)
+  const [isHudCollapsed, setIsHudCollapsed] = useState(false);
+  
+  // Tactical Audio Coach (Voz tática de campo)
+  const [isAudioCoach, setIsAudioCoach] = useState(true);
+
   // Gatilho para o replay do mapa
   const [triggerReplay, setTriggerReplay] = useState(false);
 
@@ -74,10 +81,21 @@ export default function RunPage() {
     fetchPerfil();
   }, [user]);
 
+  // Sintetizador de voz inteligente (Tactical Audio Coach)
+  const falar = useCallback((texto) => {
+    if (typeof window !== "undefined" && window.speechSynthesis && isAudioCoach) {
+      window.speechSynthesis.cancel(); // Cancelar falas anteriores
+      const utterance = new SpeechSynthesisUtterance(texto);
+      utterance.lang = "pt-BR";
+      utterance.rate = 1.02; // Aceleração leve e tática
+      utterance.pitch = 0.95; // Tom robusto e futurista
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [isAudioCoach]);
+
   // 🚀 LÓGICA DO SIMULADOR DE CORRIDA (MODO LABORATÓRIO)
   useEffect(() => {
     if (isSimulando && isActive) {
-      // Ponto inicial: Brasília ou localização real
       let baseLat = currentPosition?.lat || -15.7942;
       let baseLng = currentPosition?.lng || -47.8822;
 
@@ -90,15 +108,11 @@ export default function RunPage() {
       simIntervalRef.current = setInterval(() => {
         setSimTime((prevTime) => {
           const nextTime = prevTime + 1;
-          
-          // Incrementar distância: ~12 km/h = 3.33 m/s = 0.0033 km/s
           setSimDistance((prevDist) => prevDist + 0.0033);
           
-          // Oscilar velocidade em torno de 12 km/h
           const currentSpeedVal = 11.5 + Math.sin(nextTime / 8) * 1.8;
           setSimSpeed(currentSpeedVal);
 
-          // Rota em espiral suave para desenhar percurso visível no mapa
           const angle = nextTime * 0.08;
           const nextLat = baseLat + Math.sin(angle) * 0.00018 + (nextTime * 0.000008);
           const nextLng = baseLng + Math.cos(angle) * 0.00018 + (nextTime * 0.000008);
@@ -116,6 +130,13 @@ export default function RunPage() {
           setSimPositions((prev) => [...prev, nextPos]);
           setSimCurrentPos(nextPos);
 
+          // Audio Coach Progress Alerts (ex: a cada 0.2 km simulado)
+          const totalDist = simDistance + 0.0033;
+          if (totalDist > 0 && Math.floor(totalDist * 5) > Math.floor(simDistance * 5)) {
+            const distAnuncio = totalDist.toFixed(1).replace(".", " vírgula ");
+            falar(`Atenção atleta: distância parcial, ${distAnuncio} quilômetros.`);
+          }
+
           return nextTime;
         });
       }, 1000);
@@ -129,9 +150,9 @@ export default function RunPage() {
     return () => {
       if (simIntervalRef.current) clearInterval(simIntervalRef.current);
     };
-  }, [isSimulando, isActive, currentPosition]);
+  }, [isSimulando, isActive, currentPosition, simPositions.length, simDistance, falar]);
 
-  // Cálculos do Simulador (Pace e calorias)
+  // Cálculos do Simulador
   const simPace = (() => {
     if (simDistance <= 0 || simTime <= 0) return "0:00";
     const paceDecimal = (simTime / 60) / simDistance;
@@ -152,22 +173,37 @@ export default function RunPage() {
     ? (simDistance > 0 && simTime > 0 ? simDistance / (simTime / 3600) : 0)
     : avgSpeed;
 
-  const handleDestinationSelect = (location) => {
+  // MEMOIZAR SELEÇÃO DE DESTINO (Fim absoluto dos flashes de render de mapa!)
+  const handleDestinationSelect = useCallback((location) => {
     setDestination(location);
     setShowDestinationModal(false);
+    falar("Ponto de destino configurado com sucesso.");
+  }, [falar]);
+
+  const clearDestination = useCallback(() => {
+    setDestination(null);
+    falar("Ponto de destino removido.");
+  }, [falar]);
+
+  // Iniciar Rastreamento
+  const handleStartTracking = () => {
+    falar("Iniciando rastreamento de treino tático. Sensores de satélite ativos.");
+    startTracking();
   };
 
-  const clearDestination = () => {
-    setDestination(null);
+  // Pausar Rastreamento
+  const handlePauseTracking = () => {
+    falar("Atividade pausada temporariamente.");
+    pauseTracking();
   };
 
   // Acionar Modal de Celebração
   const handleTriggerCelebracao = () => {
     if (!celebrando && activeDistance > 0) {
       setCelebrando(true);
-      // Pausa o tracking
+      falar("Objetivo alcançado. Preparando telemetria para comemoração.");
       if (isSimulando) {
-        setIsSimulando(false);
+        // Pausar simulador
       } else {
         pauseTracking();
       }
@@ -197,6 +233,8 @@ export default function RunPage() {
     if (!user) return resetLocalStates();
     
     setSavingTreino(true);
+    falar("Concluindo missão. Telemetria gravada com sucesso. Ótimo trabalho!");
+    
     try {
       const tempoFormatado = `${Math.floor(activeTime / 60)}:${(activeTime % 60).toString().padStart(2, "0")}`;
       const calorias = Math.round(activeDistance * 68);
@@ -235,8 +273,14 @@ export default function RunPage() {
       alert("Pausar a atividade atual antes de alternar os modos.");
       return;
     }
+    const nextState = !isSimulando;
+    if (nextState) {
+      falar("Modo simulador de laboratório ativado.");
+    } else {
+      falar("Modo simulador desativado.");
+    }
     resetLocalStates();
-    setIsSimulando(!isSimulando);
+    setIsSimulando(nextState);
   };
 
   return (
@@ -261,196 +305,244 @@ export default function RunPage() {
       {/* ☀️ SELETOR DE CLIMA HUD (Flutuando no canto superior esquerdo) */}
       <div className="absolute top-20 left-4 z-40 bg-zinc-950/85 backdrop-blur-md border border-white/5 p-2 rounded-2xl flex items-center gap-1.5 shadow-2xl">
         <button
-          onClick={() => setClima("sol")}
+          onClick={() => { setClima("sol"); falar("Efeitos climáticos: ensolarado."); }}
           className={`p-2 rounded-xl transition-all ${clima === "sol" ? "bg-amber-500 text-zinc-950" : "text-zinc-500 hover:text-white"}`}
           title="Modo Dia"
         >
           <Sun size={14} />
         </button>
         <button
-          onClick={() => setClima("noite")}
+          onClick={() => { setClima("noite"); falar("Efeitos climáticos: noturno."); }}
           className={`p-2 rounded-xl transition-all ${clima === "noite" ? "bg-indigo-500 text-white" : "text-zinc-500 hover:text-white"}`}
           title="Modo Noite"
         >
           <Moon size={14} />
         </button>
         <button
-          onClick={() => setClima("chuva")}
+          onClick={() => { setClima("chuva"); falar("Efeitos climáticos: chuva torrencial ativa."); }}
           className={`p-2 rounded-xl transition-all ${clima === "chuva" ? "bg-cyan-500 text-zinc-950" : "text-zinc-500 hover:text-white"}`}
           title="Modo Chuva"
         >
           <CloudRain size={14} />
         </button>
         <button
-          onClick={() => setClima("nublado")}
+          onClick={() => { setClima("nublado"); falar("Efeitos climáticos: nublado."); }}
           className={`p-2 rounded-xl transition-all ${clima === "nublado" ? "bg-zinc-500 text-zinc-950" : "text-zinc-500 hover:text-white"}`}
           title="Modo Nublado"
         >
           <Cloud size={14} />
         </button>
+
+        {/* Tactical Audio Selector */}
+        <div className="w-[1px] h-6 bg-white/10 mx-1" />
+        <button
+          onClick={() => setIsAudioCoach(!isAudioCoach)}
+          className={`p-2 rounded-xl transition-all ${isAudioCoach ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/25" : "text-zinc-500 hover:text-white"}`}
+          title={isAudioCoach ? "Mutar Audio Coach" : "Ativar Audio Coach"}
+        >
+          {isAudioCoach ? <Volume2 size={14} /> : <VolumeX size={14} />}
+        </button>
       </div>
 
-      {/* 📊 FLOATING HUD SIDEBAR (PAINEL DO ATLETA FLUTUANTE) */}
-      <div className="absolute top-20 bottom-24 right-4 z-40 w-full max-w-[390px] hidden lg:flex flex-col bg-zinc-950/75 backdrop-blur-xl border border-white/10 p-5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden">
-        
-        {/* Cabeçalho da Central do Atleta */}
-        <div className="flex items-center justify-between border-b border-white/5 pb-3.5 mb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl text-zinc-950">
-              <Sparkles size={16} />
-            </div>
-            <div>
-              <h2 className="text-xs font-black text-white uppercase tracking-wider">HUD do Atleta</h2>
-              <p className="text-[9px] text-zinc-500 font-extrabold uppercase tracking-widest">{username}</p>
-            </div>
-          </div>
-
-          {/* Simulação Indicator */}
-          {isSimulando && (
-            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[8px] font-black uppercase tracking-wider rounded-lg animate-pulse">
-              Simulação
-            </span>
-          )}
-        </div>
-
-        {/* HUD Dinâmica ou Resumo */}
-        <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pr-1">
-          {/* Caixa de Busca ou Destino */}
-          {!showSummary && (
-            <div className="bg-zinc-900/30 border border-white/5 rounded-2xl p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Navegação GPS</span>
-                {destination && (
-                  <button
-                    onClick={clearDestination}
-                    className="text-[9px] px-2 py-0.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-all font-black uppercase"
-                  >
-                    Limpar
-                  </button>
-                )}
+      {/* 📊 FLOATING HUD SIDEBAR (PAINEL DO ATLETA FLUTUANTE EM DESKTOP) */}
+      <AnimatePresence>
+        {!isHudCollapsed && (
+          <motion.div
+            className="absolute top-20 bottom-24 right-4 z-40 w-full max-w-[390px] hidden lg:flex flex-col bg-zinc-950/75 backdrop-blur-xl border border-white/10 p-5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden"
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ type: "spring", damping: 25, stiffness: 220 }}
+          >
+            {/* Cabeçalho da Central do Atleta */}
+            <div className="flex items-center justify-between border-b border-white/5 pb-3.5 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl text-zinc-950">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h2 className="text-xs font-black text-white uppercase tracking-wider">HUD do Atleta</h2>
+                  <p className="text-[9px] text-zinc-500 font-extrabold uppercase tracking-widest">{username}</p>
+                </div>
               </div>
 
-              {destination ? (
-                <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 flex items-start gap-2.5">
-                  <MapPin size={16} className="text-purple-400 flex-shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-purple-300 truncate leading-none">{destination.name}</p>
-                    {destination.address && (
-                      <p className="text-[9px] text-zinc-500 mt-1 line-clamp-1 leading-none">{destination.address}</p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowDestinationModal(!showDestinationModal)}
-                  className="w-full px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 text-zinc-300 hover:text-white font-bold rounded-xl transition-all text-xs flex items-center justify-center gap-2"
-                >
-                  <MapPin size={14} />
-                  Adicionar Destino
-                </button>
-              )}
-
-              {showDestinationModal && (
-                <div className="bg-zinc-950 border border-white/5 rounded-xl p-2.5">
-                  <LocationSearch onLocationSelect={handleDestinationSelect} currentPosition={activeCurrentPos} />
-                </div>
+              {/* Simulação Indicator */}
+              {isSimulando && (
+                <span className="flex items-center gap-1 px-2.5 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[8px] font-black uppercase tracking-wider rounded-lg animate-pulse">
+                  Simulação
+                </span>
               )}
             </div>
-          )}
 
-          {/* Tracker Principal ou Resumo */}
-          {!showSummary ? (
-            <RunTracker
-              isActive={isActive}
-              distance={activeDistance}
-              time={activeTime}
-              pace={activePace}
-              positions={activePositions}
-              startTracking={isSimulando ? () => setIsSimulando(true) : startTracking}
-              pauseTracking={isSimulando ? () => setIsSimulando(false) : pauseTracking}
-              resetTracking={handleTriggerCelebracao}
-              currentSpeed={activeSpeed}
-              avgSpeed={activeAvgSpeed}
-              isGPSConnected={isGPSConnected}
-              isSimulando={isSimulando}
-              onToggleSimulado={toggleSimulator}
-            />
-          ) : (
-            <RunSummary 
-              distance={activeDistance} 
-              time={activeTime} 
-              pace={activePace} 
-              positions={activePositions} 
-              onTriggerReplay={() => setTriggerReplay(true)}
-            />
-          )}
+            {/* HUD Dinâmica ou Resumo */}
+            <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pr-1">
+              {/* Caixa de Busca ou Destino */}
+              {!showSummary && (
+                <div className="bg-zinc-900/30 border border-white/5 rounded-2xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Navegação GPS</span>
+                    {destination && (
+                      <button
+                        onClick={clearDestination}
+                        className="text-[9px] px-2 py-0.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-all font-black uppercase"
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
 
-          {/* Botão de Resumo Pós-Treino */}
-          {isActive && activeDistance > 0 && (
-            <button
-              onClick={() => setShowSummary(!showSummary)}
-              className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/5 text-white font-bold rounded-2xl transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2 mt-2"
-            >
-              <Zap size={14} />
-              {showSummary ? "Voltar ao Rastreamento" : "Ver Resumo Analítico"}
-            </button>
-          )}
-        </div>
-      </div>
+                  {destination ? (
+                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 flex items-start gap-2.5">
+                      <MapPin size={16} className="text-purple-400 flex-shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-purple-300 truncate leading-none">{destination.name}</p>
+                        {destination.address && (
+                          <p className="text-[9px] text-zinc-500 mt-1 line-clamp-1 leading-none">{destination.address}</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowDestinationModal(!showDestinationModal)}
+                      className="w-full px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 text-zinc-300 hover:text-white font-bold rounded-xl transition-all text-xs flex items-center justify-center gap-2"
+                    >
+                      <MapPin size={14} />
+                      Adicionar Destino
+                    </button>
+                  )}
 
-      {/* 📱 MOBILE BOTTOM DRAWER HUD (Para aparelhos celulares e touch) */}
-      <div className="absolute bottom-20 left-4 right-4 z-40 lg:hidden flex flex-col bg-zinc-950/85 backdrop-blur-xl border border-white/10 p-4 rounded-3xl shadow-2xl max-h-[48vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck size={14} className="text-emerald-400" />
-            <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider">HUD Móvel ({username})</span>
-          </div>
-          
-          {isSimulando && (
-            <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[8px] font-black rounded-lg">Simulação</span>
-          )}
-        </div>
+                  {showDestinationModal && (
+                    <div className="bg-zinc-950 border border-white/5 rounded-xl p-2.5">
+                      <LocationSearch onLocationSelect={handleDestinationSelect} currentPosition={activeCurrentPos} />
+                    </div>
+                  )}
+                </div>
+              )}
 
-        <div className="space-y-3 overflow-y-auto max-h-[40vh] pr-1">
-          {!showSummary ? (
-            <RunTracker
-              isActive={isActive}
-              distance={activeDistance}
-              time={activeTime}
-              pace={activePace}
-              positions={activePositions}
-              startTracking={isSimulando ? () => setIsSimulando(true) : startTracking}
-              pauseTracking={isSimulando ? () => setIsSimulando(false) : pauseTracking}
-              resetTracking={handleTriggerCelebracao}
-              currentSpeed={activeSpeed}
-              avgSpeed={activeAvgSpeed}
-              isGPSConnected={isGPSConnected}
-              isSimulando={isSimulando}
-              onToggleSimulado={toggleSimulator}
-            />
-          ) : (
-            <RunSummary 
-              distance={activeDistance} 
-              time={activeTime} 
-              pace={activePace} 
-              positions={activePositions} 
-              onTriggerReplay={() => setTriggerReplay(true)}
-            />
-          )}
+              {/* Tracker Principal ou Resumo */}
+              {!showSummary ? (
+                <RunTracker
+                  isActive={isActive}
+                  distance={activeDistance}
+                  time={activeTime}
+                  pace={activePace}
+                  positions={activePositions}
+                  startTracking={isSimulando ? () => { falar("Modo simulação iniciado."); startTracking(); } : handleStartTracking}
+                  pauseTracking={isSimulando ? () => { falar("Modo simulação pausado."); pauseTracking(); } : handlePauseTracking}
+                  resetTracking={handleTriggerCelebracao}
+                  currentSpeed={activeSpeed}
+                  avgSpeed={activeAvgSpeed}
+                  isGPSConnected={isGPSConnected}
+                  isSimulando={isSimulando}
+                  onToggleSimulado={toggleSimulator}
+                />
+              ) : (
+                <RunSummary 
+                  distance={activeDistance} 
+                  time={activeTime} 
+                  pace={activePace} 
+                  positions={activePositions} 
+                  onTriggerReplay={() => setTriggerReplay(true)}
+                />
+              )}
 
-          {isActive && activeDistance > 0 && (
-            <button
-              onClick={() => setShowSummary(!showSummary)}
-              className="w-full py-2.5 bg-white/5 border border-white/5 text-white font-bold rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5"
-            >
-              <Zap size={12} />
-              {showSummary ? "Voltar ao Rastreamento" : "Painel Analítico"}
-            </button>
-          )}
-        </div>
-      </div>
+              {/* Botão de Resumo Pós-Treino */}
+              {isActive && activeDistance > 0 && (
+                <button
+                  onClick={() => setShowSummary(!showSummary)}
+                  className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/5 text-white font-bold rounded-2xl transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2 mt-2"
+                >
+                  <Zap size={14} />
+                  {showSummary ? "Voltar ao Rastreamento" : "Ver Resumo Analítico"}
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* FLOAT RECORDING INDICATOR (Canto inferior direito) */}
+      {/* 📱 MOBILE BOTTOM DRAWER HUD (Para aparelhos celulares e touch com AnimatePresence) */}
+      <AnimatePresence>
+        {!isHudCollapsed && (
+          <motion.div
+            className="absolute bottom-20 left-4 right-4 z-40 lg:hidden flex flex-col bg-zinc-950/85 backdrop-blur-xl border border-white/10 p-4 rounded-3xl shadow-2xl max-h-[48vh] overflow-y-auto"
+            initial={{ y: 250, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 250, opacity: 0 }}
+            transition={{ type: "spring", damping: 25 }}
+          >
+            <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider">HUD Móvel ({username})</span>
+              </div>
+              
+              {isSimulando && (
+                <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[8px] font-black rounded-lg">Simulação</span>
+              )}
+            </div>
+
+            <div className="space-y-3 overflow-y-auto max-h-[40vh] pr-1">
+              {!showSummary ? (
+                <RunTracker
+                  isActive={isActive}
+                  distance={activeDistance}
+                  time={activeTime}
+                  pace={activePace}
+                  positions={activePositions}
+                  startTracking={isSimulando ? () => { falar("Modo simulação iniciado."); startTracking(); } : handleStartTracking}
+                  pauseTracking={isSimulando ? () => { falar("Modo simulação pausado."); pauseTracking(); } : handlePauseTracking}
+                  resetTracking={handleTriggerCelebracao}
+                  currentSpeed={activeSpeed}
+                  avgSpeed={activeAvgSpeed}
+                  isGPSConnected={isGPSConnected}
+                  isSimulando={isSimulando}
+                  onToggleSimulado={toggleSimulator}
+                />
+              ) : (
+                <RunSummary 
+                  distance={activeDistance} 
+                  time={activeTime} 
+                  pace={activePace} 
+                  positions={activePositions} 
+                  onTriggerReplay={() => setTriggerReplay(true)}
+                />
+              )}
+
+              {isActive && activeDistance > 0 && (
+                <button
+                  onClick={() => setShowSummary(!showSummary)}
+                  className="w-full py-2.5 bg-white/5 border border-white/5 text-white font-bold rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5"
+                >
+                  <Zap size={12} />
+                  {showSummary ? "Voltar ao Rastreamento" : "Painel Analítico"}
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 👁️ BOTÃO FLOATING PARA RECOLHER/EXPANDIR HUD (Foco 100% no Mapa Fullscreen) */}
+      <button
+        onClick={() => {
+          const nextState = !isHudCollapsed;
+          setIsHudCollapsed(nextState);
+          falar(nextState ? "Painel de telemetria recolhido para visualização de mapa." : "Painel de telemetria ativo.");
+        }}
+        className="absolute bottom-[80px] lg:bottom-[150px] right-4 sm:right-6 z-[402] flex items-center justify-center w-11 h-11 bg-zinc-900/95 hover:bg-zinc-800 text-white rounded-full shadow-2xl border border-white/10 backdrop-blur-md transition-all active:scale-90 hover:scale-105"
+        title={isHudCollapsed ? "Expandir HUD" : "Recolher HUD"}
+      >
+        <motion.div
+          animate={{ rotate: isHudCollapsed ? 180 : 0 }}
+          transition={{ duration: 0.3 }}
+          className="flex items-center justify-center text-emerald-400"
+        >
+          {isHudCollapsed ? <Eye size={18} /> : <EyeOff size={18} />}
+        </motion.div>
+      </button>
+
+      {/* FLOAT RECORDING INDICATOR */}
       <div className="absolute bottom-6 right-6 lg:right-auto lg:left-6 z-50 flex gap-2">
         {isActive && (
           <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-full shadow-2xl animate-pulse">
@@ -463,7 +555,7 @@ export default function RunPage() {
       {/* BANNER STATUS FLUTUANTE */}
       <RunStatus isActive={isActive} distance={activeDistance} isPaused={!isActive && activeDistance > 0} />
 
-      {/* 🏆 CELEBRAÇÃO CINEMATOGRÁFICA (Com fechamento integrado no Supabase + XP) */}
+      {/* CELEBRAÇÃO CINEMATOGRÁFICA */}
       <CelebracaoModal
         isOpen={celebrando}
         onClose={handleSaveTreino}
