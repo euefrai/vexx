@@ -280,7 +280,7 @@ const MapUber = ({
           bearing: 0,
         }).setView([-15.7942, -47.8822], 16);
 
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
           maxZoom: 20,
           attribution: "",
         }).addTo(mapRef.current);
@@ -665,10 +665,6 @@ const MapUber = ({
 
         .leaflet-container {
           cursor: crosshair !important;
-        }
-
-        .leaflet-tile {
-          filter: invert(90%) hue-rotate(180deg) brightness(85%) contrast(100%) saturate(110%);
         }
       `}</style>
 

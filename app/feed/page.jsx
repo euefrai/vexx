@@ -574,7 +574,7 @@ export default function Feed() {
             exit={{ opacity: 0 }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            className="fixed inset-0 bg-black/95 backdrop-blur-md z-[500] flex flex-col justify-between p-4 relative"
+            className="fixed inset-0 bg-black/95 backdrop-blur-md z-[500] flex flex-col justify-between p-4"
           >
             {/* Tap Gestures Overlay (Left 30% goes back, Right 70% goes forward) */}
             <div className="absolute inset-x-0 top-20 bottom-16 z-[501] flex select-none">
