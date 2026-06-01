@@ -262,7 +262,11 @@ export default function ChatSquad() {
       
       const listaAtualizada = [...localMsgs, novaMsg]
       localStorage.setItem(localKey, JSON.stringify(listaAtualizada))
-      setMensagens(listaAtualizada  return (
+      setMensagens(listaAtualizada)
+    }
+  }
+
+  return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-100 font-sans overflow-hidden relative">
       <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none z-15" />
       
@@ -470,8 +474,6 @@ export default function ChatSquad() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  )ePresence>
     </div>
   )
 }

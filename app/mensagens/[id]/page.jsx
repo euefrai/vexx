@@ -501,8 +501,5 @@ export default function ChatPrivado() {
         )}
       </AnimatePresence>
     </div>
-  )   )}
-      </AnimatePresence>
-    </div>
   )
 }
