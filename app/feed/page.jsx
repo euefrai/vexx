@@ -13,6 +13,84 @@ import { useGamificacao } from "@/hooks/useGamificacao"
 import { useRanks } from "@/hooks/useRanks" 
 import { motion, AnimatePresence } from "framer-motion"
 
+const SEED_TREINOS = [
+  {
+    id: "seed-treino-1",
+    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    titulo: "PROTOCOLO PUSH DAY CIÊNCIA DO HIPERTROFIA",
+    grupo: "Push Day",
+    autor: "science_fitness",
+    descricao: "Supino Reto com Barra: 3x6 (Alta Tensão Mecânica)\nDesenvolvimento Militar: 3x8 (Empurrão Vertical)\nSupino Inclinado com Halteres: 3x10 (Sobrecarga Progressiva)\nElevação Lateral com Cabo: 4x12 (Foco em Tensão Constante)\nTríceps Testa com Barra W: 3x10 (Alongamento Muscular)\nTríceps Corda no Pulley: 3x12 (Foco em Contração Máxima)",
+    usuarios: {
+      id: "seed-user-1",
+      username: "science_fitness",
+      foto: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
+      xp: 2400,
+      nivel: 5
+    }
+  },
+  {
+    id: "seed-treino-2",
+    created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+    titulo: "PROTOCOLO ARNOLD CLÁSSICO (PEITO & COSTAS)",
+    grupo: "Peito",
+    autor: "arnold_legacy",
+    descricao: "Supino Reto com Barra: 5x8 (Volume de Choque)\nBarra Fixa Pronada: 5x Falha (Estiramento Dorsal)\nSupino Inclinado com Halteres: 4x10 (Foco Superior)\nRemada Curvada com Barra: 4x10 (Espessura de Tronco)\nCrucifixo Reto: 4x12 (Foco em Contração Isolada)\nPull-Over com Haltere: 4x15 (Expansão Torácica)",
+    usuarios: {
+      id: "seed-user-2",
+      username: "arnold_legacy",
+      foto: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&auto=format&fit=crop&q=80",
+      xp: 4500,
+      nivel: 9
+    }
+  },
+  {
+    id: "seed-treino-3",
+    created_at: new Date(Date.now() - 3600000 * 12).toISOString(),
+    titulo: "PERNAS DO EXTERMINADOR (TOM PLATZ METRIC)",
+    grupo: "Perna",
+    autor: "platz_legs",
+    descricao: "Agachamento Livre com Barra: 5x12 (Volume Extremo Platz)\nLeg Press 45: 4x15 (Sobrecarga Tensional)\nStiff com Barra: 4x10 (Estiramento Isquiotibial)\nFlexora Deitado: 4x12 (Contração Isolada de Posterior)\nExtensora: 3x20 (Exaustão Metabólica Terminal)\nGêmeos em Pé: 5x15 (Foco em Amplitude Completa)",
+    usuarios: {
+      id: "seed-user-3",
+      username: "platz_legs",
+      foto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
+      xp: 3800,
+      nivel: 8
+    }
+  },
+  {
+    id: "seed-treino-4",
+    created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
+    titulo: "PROTOCOLO PULL DAY LATS LENDÁRIOS",
+    grupo: "Pull Day",
+    autor: "yates_hit",
+    descricao: "Levantamento Terra: 3x5 (Poder e Densidade Posterior)\nPuxada Alta com Pegada Supinada: 3x8 (Fibras Inferiores)\nRemada Cavalinho: 3x10 (Espessura Dorsal de Elite)\nCrucifixo Invertido com Halteres: 4x12 (Deltoide Posterior)\nRosca Direta com Barra: 3x8 (Tensão Pura de Bíceps)\nRosca Martelo com Halteres: 3x12 (Braquiorradial)",
+    usuarios: {
+      id: "seed-user-4",
+      username: "yates_hit",
+      foto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80",
+      xp: 5000,
+      nivel: 10
+    }
+  },
+  {
+    id: "seed-treino-5",
+    created_at: new Date(Date.now() - 3600000 * 30).toISOString(),
+    titulo: "CARDIO TÁTICO LISS PARA MÁXIMA QUEIMA",
+    grupo: "Cardio",
+    autor: "cardio_commander",
+    descricao: "Aquecimento em Trote Leve: 5 minutos\nCorrida Aeróbica Zona 2: 45 minutos (65-75% FC Max)\nCaminhada de Desaceleração: 5 minutos\nAbdominal Prancha Estática: 3x60 segundos",
+    usuarios: {
+      id: "seed-user-5",
+      username: "cardio_commander",
+      foto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+      xp: 2900,
+      nivel: 6
+    }
+  }
+];
+
 export default function Feed() {
   const [treinos, setTreinos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -21,6 +99,10 @@ export default function Feed() {
   const [loadingCheckin, setLoadingCheckin] = useState(false)
   const [strike, setStrike] = useState(0)
   const [busca, setBusca] = useState("")
+  const [filtroGrupo, setFiltroGrupo] = useState("Todos")
+  const [filtroIntensidade, setFiltroIntensidade] = useState("Todos")
+  const [filtroPeriodo, setFiltroPeriodo] = useState("Todos")
+  const [showFiltros, setShowFiltros] = useState(false)
 
   // Stories e Desafios
   const [stories, setStories] = useState([])
@@ -84,12 +166,26 @@ export default function Feed() {
 
   // 2. LÓGICA DE DADOS
   async function carregarTreinos() {
-    const { data, error } = await supabase
-      .from("treinos")
-      .select(`*, usuarios (*)`)
-      .order("created_at", { ascending: false })
-    
-    if (!error) setTreinos(data || [])
+    try {
+      const { data, error } = await supabase
+        .from("treinos")
+        .select(`*, usuarios (*)`)
+        .order("created_at", { ascending: false })
+      
+      if (error) throw error
+      
+      // Combinar os treinos do banco com os treinos seed científicos oficiais
+      const todosTreinos = [...(data || []), ...SEED_TREINOS]
+      // Ordenar por data
+      todosTreinos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setTreinos(todosTreinos)
+    } catch (err) {
+      console.log("Banco offline. Carregando treinos locais e treinos seed...", err.message)
+      const localTreinos = JSON.parse(localStorage.getItem("vexx_treinos") || "[]")
+      const todosTreinos = [...localTreinos, ...SEED_TREINOS]
+      todosTreinos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setTreinos(todosTreinos)
+    }
   }
 
   async function carregarStoriesEChallenges(user) {
@@ -349,10 +445,46 @@ export default function Feed() {
     }
   }
 
-  const treinosFiltrados = treinos.filter(t => 
-    t.titulo?.toLowerCase().includes(busca.toLowerCase()) ||
-    t.grupo?.toLowerCase().includes(busca.toLowerCase())
-  )
+  const treinosFiltrados = useMemo(() => {
+    return treinos.filter(t => {
+      // 1. Busca por texto
+      const bateBusca = !busca || 
+        t.titulo?.toLowerCase().includes(busca.toLowerCase()) ||
+        t.grupo?.toLowerCase().includes(busca.toLowerCase()) ||
+        t.descricao?.toLowerCase().includes(busca.toLowerCase()) ||
+        t.usuarios?.username?.toLowerCase().includes(busca.toLowerCase());
+
+      // 2. Filtro de Grupo Muscular / Tipo
+      const bateGrupo = filtroGrupo === "Todos" || t.grupo === filtroGrupo;
+
+      // 3. Filtro de Intensidade
+      // Inferimos a intensidade a partir do tamanho da descrição ou do peso na descrição
+      let intensidadeTreino = "Moderado";
+      const totalItens = t.descricao?.split("\n").length || 1;
+      if (totalItens <= 3) intensidadeTreino = "Leve";
+      else if (totalItens >= 6) intensidadeTreino = "Intenso";
+      
+      const bateIntensidade = filtroIntensidade === "Todos" || intensidadeTreino === filtroIntensidade;
+
+      // 4. Filtro de Período (Dia)
+      let batePeriodo = true;
+      if (filtroPeriodo !== "Todos") {
+        const dataTreino = new Date(t.created_at);
+        const agora = new Date();
+        const diferencaDias = (agora - dataTreino) / (1000 * 60 * 60 * 24);
+        
+        if (filtroPeriodo === "Hoje") {
+          batePeriodo = diferencaDias < 1;
+        } else if (filtroPeriodo === "3dias") {
+          batePeriodo = diferencaDias <= 3;
+        } else if (filtroPeriodo === "semana") {
+          batePeriodo = diferencaDias <= 7;
+        }
+      }
+
+      return bateBusca && bateGrupo && bateIntensidade && batePeriodo;
+    });
+  }, [treinos, busca, filtroGrupo, filtroIntensidade, filtroPeriodo]);
 
   // --- NAVEGAÇÃO DOS STORIES (ESTILO INSTAGRAM/WHATSAPP) ---
   const nextStory = useCallback(() => {
@@ -539,15 +671,120 @@ export default function Feed() {
           )}
         </div>
 
-        {/* BUSCA */}
-        <div className="relative mb-6">
-          <input 
-            type="text" 
-            placeholder="Localizar operação..." 
-            value={busca} 
-            onChange={(e) => setBusca(e.target.value)}
-            className="w-full bg-zinc-900/30 border border-zinc-900 rounded-xl py-3.5 px-4 text-xs font-semibold tracking-wide text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-emerald-500/30 focus:bg-zinc-900/50 transition-all placeholder:font-medium placeholder:uppercase" 
-          />
+        {/* BUSCA E FILTROS PREMIUM */}
+        <div className="space-y-3 mb-6">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input 
+                type="text" 
+                placeholder="Localizar operação..." 
+                value={busca} 
+                onChange={(e) => setBusca(e.target.value)}
+                className="w-full bg-zinc-900/30 border border-zinc-900 rounded-xl py-3.5 px-4 text-xs font-semibold tracking-wide text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-emerald-500/30 focus:bg-zinc-900/50 transition-all placeholder:font-medium placeholder:uppercase" 
+              />
+            </div>
+            <button 
+              onClick={() => setShowFiltros(prev => !prev)}
+              className={`px-4 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                showFiltros || filtroGrupo !== "Todos" || filtroIntensidade !== "Todos" || filtroPeriodo !== "Todos"
+                  ? "bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                  : "bg-zinc-900/30 border-zinc-900 text-zinc-400 hover:bg-zinc-900"
+              }`}
+            >
+              Filtros {showFiltros ? "▲" : "▼"}
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {showFiltros && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25 }}
+                className="overflow-hidden bg-zinc-900/20 border border-zinc-900 rounded-2xl p-4 space-y-4"
+              >
+                {/* Filtro 1: Grupo Muscular (Tipo) */}
+                <div>
+                  <label className="text-[7.5px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Foco Operacional (Tipo)</label>
+                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                    {["Todos", "Full Body", "Push Day", "Pull Day", "Cardio", "Peito", "Costas", "Ombro", "Perna", "Bíceps", "Tríceps"].map((grupo) => (
+                      <button
+                        key={grupo}
+                        onClick={() => setFiltroGrupo(grupo)}
+                        className={`px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-wider shrink-0 transition-all cursor-pointer ${
+                          filtroGrupo === grupo
+                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-400"
+                            : "bg-zinc-950/60 border-zinc-850 text-zinc-450 hover:bg-zinc-900"
+                        }`}
+                      >
+                        {grupo}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Filtro 2: Intensidade */}
+                <div>
+                  <label className="text-[7.5px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Intensidade Científica</label>
+                  <div className="flex gap-2">
+                    {["Todos", "Leve", "Moderado", "Intenso"].map((int) => (
+                      <button
+                        key={int}
+                        onClick={() => setFiltroIntensidade(int)}
+                        className={`flex-1 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          filtroIntensidade === int
+                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-400"
+                            : "bg-zinc-950/60 border-zinc-850 text-zinc-450 hover:bg-zinc-900"
+                        }`}
+                      >
+                        {int}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Filtro 3: Período (Dia) */}
+                <div>
+                  <label className="text-[7.5px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Período de Atividade</label>
+                  <div className="flex gap-2">
+                    {[
+                      { id: "Todos", label: "Qualquer Data" },
+                      { id: "Hoje", label: "Hoje" },
+                      { id: "3dias", label: "3 Dias" },
+                      { id: "semana", label: "7 Dias" }
+                    ].map((per) => (
+                      <button
+                        key={per.id}
+                        onClick={() => setFiltroPeriodo(per.id)}
+                        className={`flex-1 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          filtroPeriodo === per.id
+                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-400"
+                            : "bg-zinc-950/60 border-zinc-850 text-zinc-450 hover:bg-zinc-900"
+                        }`}
+                      >
+                        {per.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Botão Limpar Filtros */}
+                {(filtroGrupo !== "Todos" || filtroIntensidade !== "Todos" || filtroPeriodo !== "Todos") && (
+                  <button
+                    onClick={() => {
+                      setFiltroGrupo("Todos");
+                      setFiltroIntensidade("Todos");
+                      setFiltroPeriodo("Todos");
+                    }}
+                    className="w-full py-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-black rounded-xl text-[8px] font-black uppercase tracking-widest transition duration-300 cursor-pointer"
+                  >
+                    Resetar Filtros Táticos
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* FEED */}
