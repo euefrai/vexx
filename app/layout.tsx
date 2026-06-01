@@ -4,6 +4,7 @@ import "./globals.css";
 import InstallPrompt from "@/components/InstallPrompt";
 import UpdatePrompt from "@/components/UpdatePrompt";
 import RegisterSW from "@/components/RegisterSW";
+import OfflineSyncManager from "@/components/OfflineSyncManager";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -45,6 +46,7 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <RegisterSW />
+        <OfflineSyncManager />
         <UpdatePrompt />
         <main>{children}</main>
         <InstallPrompt />

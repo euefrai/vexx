@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { offlineManager } from "@/lib/offlineManager"
 import PageHeader from "@/components/PageHeader"
 import Navbar from "@/components/Navbar"
 import { Users, Sparkles, Trophy, Plus, LogOut, CheckCircle, ShieldAlert, Send } from "lucide-react"
@@ -32,6 +33,22 @@ export default function SocialPage() {
       carregarSquadMemberships(user?.id)
     }
     init()
+  }, [])
+
+  useEffect(() => {
+    const handleSyncComplete = async () => {
+      console.log("[Social] Evento de sincronização offline recebido. Atualizando esquadrões...")
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        carregarStories()
+        carregarChallenges()
+        carregarSquads()
+        carregarSquadMemberships(user.id)
+      }
+    }
+
+    window.addEventListener("vexx_offline_sync_complete", handleSyncComplete)
+    return () => window.removeEventListener("vexx_offline_sync_complete", handleSyncComplete)
   }, [])
 
   async function carregarStories() {
@@ -99,9 +116,7 @@ export default function SocialPage() {
       const memberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${usrId}`) || "[]")
       setSquadMemberships(memberships)
     }
-  }
-
-  async function publicarStory() {
+  }  async function publicarStory() {
     if (!user) return setError("Faça login para publicar um story")
     if (!storyText.trim()) return setError("Escreva algo para o story")
 
@@ -124,12 +139,20 @@ export default function SocialPage() {
         media_url: storyMedia || null,
         created_at: new Date().toISOString(),
         expires_at: expires,
-        usuarios: { username: user.email.split("@")[0], foto: null }
+        usuarios: { username: user.email?.split("@")[0] || "atleta", foto: null }
       }
       
       const atualizados = [novoItem, ...localStories]
       localStorage.setItem("vexx_stories", JSON.stringify(atualizados))
       setStories(atualizados.filter(s => new Date(s.expires_at) > new Date()))
+
+      // Enfileirar mutação na fila unificada
+      offlineManager.addMutation("stories", "insert", {
+        usuario_id: user.id,
+        text: storyText,
+        media_url: storyMedia || null,
+        expires_at: expires
+      })
       
       setStoryText("")
       setStoryMedia("")
@@ -155,12 +178,22 @@ export default function SocialPage() {
         owner_id: user.id,
         status: "open",
         created_at: new Date().toISOString(),
-        usuarios: { username: user.email.split("@")[0], foto: null }
+        usuarios: { username: user.email?.split("@")[0] || "atleta", foto: null }
       }
       
       const atualizados = [novoItem, ...localChallenges]
       localStorage.setItem("vexx_challenges", JSON.stringify(atualizados))
       setChallenges(atualizados.filter(c => c.status === "open"))
+
+      // Enfileirar mutação offline
+      offlineManager.addMutation("challenges", "insert", {
+        title: challenge.title,
+        description: challenge.description,
+        goal: challenge.goal,
+        reward: challenge.reward,
+        owner_id: user.id,
+        status: "open"
+      })
       
       setChallenge({ title: "", description: "", goal: "", reward: "" })
       setError("")
@@ -181,11 +214,16 @@ export default function SocialPage() {
     } catch (err) {
       console.log("Salvando squad localmente no social...")
       const localSquads = JSON.parse(localStorage.getItem("vexx_squads") || "[]")
-      const squadId = `squad-${Date.now()}`
       
+      // Gerar UUID de cliente real para preservar a chave estrangeira na fila offline
+      const squadUuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+
       const novoItem = {
         ...squad,
-        id: squadId,
+        id: squadUuid,
         owner_id: user.id,
         created_at: new Date().toISOString(),
         squad_members: [{ usuario_id: user.id }]
@@ -194,10 +232,23 @@ export default function SocialPage() {
       const atualizados = [novoItem, ...localSquads]
       localStorage.setItem("vexx_squads", JSON.stringify(atualizados))
       
-      // Adicionar membro
+      // Adicionar membro local
       const localMemberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${user.id}`) || "[]")
-      const membershipsAtualizado = [...localMemberships, squadId]
+      const membershipsAtualizado = [...localMemberships, squadUuid]
       localStorage.setItem(`vexx_squad_members_${user.id}`, JSON.stringify(membershipsAtualizado))
+
+      // Enfileirar mutações táticas correlacionadas
+      offlineManager.addMutation("squads", "insert", {
+        id: squadUuid,
+        name: squad.name,
+        description: squad.description,
+        capacity: squad.capacity,
+        owner_id: user.id
+      })
+      offlineManager.addMutation("squad_members", "insert", {
+        squad_id: squadUuid,
+        usuario_id: user.id
+      })
       
       setSquad({ name: "", description: "", capacity: 12 })
       setSquads(atualizados)
@@ -212,7 +263,8 @@ export default function SocialPage() {
     if (isMember) return
 
     try {
-      await supabase.from("squad_members").insert([{ squad_id: squadId, usuario_id: user.id }])
+      const { error } = await supabase.from("squad_members").insert([{ squad_id: squadId, usuario_id: user.id }])
+      if (error) throw error
       setSquadMemberships((prev) => [...prev, squadId])
       carregarSquads()
     } catch (err) {
@@ -231,6 +283,12 @@ export default function SocialPage() {
         return s
       })
       localStorage.setItem("vexx_squads", JSON.stringify(squadsAtualizados))
+
+      // Enfileirar mutação
+      offlineManager.addMutation("squad_members", "insert", {
+        squad_id: squadId,
+        usuario_id: user.id
+      })
       
       setSquadMemberships(membershipsAtualizado)
       setSquads(squadsAtualizados)
@@ -241,7 +299,8 @@ export default function SocialPage() {
   async function leaveSquad(squadId) {
     if (!user) return setError("Faça login para sair da squad")
     try {
-      await supabase.from("squad_members").delete().eq("squad_id", squadId).eq("usuario_id", user.id)
+      const { error } = await supabase.from("squad_members").delete().eq("squad_id", squadId).eq("usuario_id", user.id)
+      if (error) throw error
       setSquadMemberships((prev) => prev.filter((id) => id !== squadId))
       carregarSquads()
     } catch (err) {
@@ -260,6 +319,12 @@ export default function SocialPage() {
         return s
       })
       localStorage.setItem("vexx_squads", JSON.stringify(squadsAtualizados))
+
+      // Enfileirar deleção
+      offlineManager.addMutation("squad_members", "delete", null, [
+        { type: "eq", column: "squad_id", value: squadId },
+        { type: "eq", column: "usuario_id", value: user.id }
+      ])
       
       setSquadMemberships(membershipsAtualizado)
       setSquads(squadsAtualizados)

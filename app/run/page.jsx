@@ -25,6 +25,7 @@ import RunStatus from "@/components/RunStatus";
 import useAuth from "@/hooks/useAuth";
 import { useGamificacao } from "@/hooks/useGamificacao";
 import { supabase } from "@/lib/supabase";
+import { offlineManager } from "@/lib/offlineManager";
 
 export default function RunPage() {
   const { user } = useAuth();
@@ -288,11 +289,69 @@ export default function RunPage() {
     setSavingTreino(true);
     falar("Concluindo missão. Telemetria gravada com sucesso. Ótimo trabalho!");
     
-    try {
-      const tempoFormatado = `${Math.floor(activeTime / 60)}:${(activeTime % 60).toString().padStart(2, "0")}`;
-      const calorias = Math.round(activeDistance * 68);
-      const maxSpeedVal = activePositions.length > 0 ? Math.max(...activePositions.map(p => p.speed || 0)) : 0;
+    const tempoFormatado = `${Math.floor(activeTime / 60)}:${(activeTime % 60).toString().padStart(2, "0")}`;
+    const calorias = Math.round(activeDistance * 68);
+    const maxSpeedVal = activePositions.length > 0 ? Math.max(...activePositions.map(p => p.speed || 0)) : 0;
+    const desc = `Distância: ${activeDistance.toFixed(2)} km\nTempo: ${tempoFormatado}\nRitmo: ${activePace} /km\nCalorias: ${calorias} kcal\nVelocidade Média: ${activeAvgSpeed.toFixed(1)} km/h\nVelocidade Máxima: ${maxSpeedVal.toFixed(1)} km/h`;
 
+    const salvarLocalOffline = () => {
+      // 1. Gravar backup imediato em LocalStorage
+      try {
+        const localRuns = JSON.parse(localStorage.getItem("vexx_runs") || "[]");
+        const novaCorrida = {
+          id: `run-${Date.now()}`,
+          user_id: user.id,
+          created_at: new Date().toISOString(),
+          distancia: Number(activeDistance.toFixed(2)),
+          calorias: calorias,
+          tempo: tempoFormatado,
+          pace: activePace
+        };
+        localStorage.setItem("vexx_runs", JSON.stringify([novaCorrida, ...localRuns]));
+        
+        // Também gravar backup de treinos localmente se houver
+        const localTreinos = JSON.parse(localStorage.getItem("vexx_treinos") || "[]");
+        const novoTreino = {
+          id: `treino-${Date.now()}`,
+          usuario_id: user.id,
+          titulo: "Operação Corrida Tática",
+          autor: username,
+          grupo: "Cardio",
+          descricao: desc,
+          created_at: new Date().toISOString()
+        };
+        localStorage.setItem("vexx_treinos", JSON.stringify([novoTreino, ...localTreinos]));
+      } catch (localErr) {
+        console.error("Falha ao salvar backup local:", localErr);
+      }
+
+      // 2. Enfileirar mutações offline
+      offlineManager.addMutation("treinos", "insert", {
+        usuario_id: user.id,
+        titulo: "Operação Corrida Tática",
+        autor: username,
+        grupo: "Cardio",
+        descricao: desc
+      });
+
+      offlineManager.addMutation("runs", "insert", {
+        user_id: user.id,
+        distancia: Number(activeDistance.toFixed(2)),
+        calorias: calorias,
+        tempo: tempoFormatado,
+        pace: activePace
+      });
+    };
+
+    if (!navigator.onLine) {
+      console.log("Offline detectado ao salvar corrida. Salvando localmente...");
+      salvarLocalOffline();
+      setSavingTreino(false);
+      resetLocalStates();
+      return;
+    }
+
+    try {
       // 1. Inserir na tabela treinos
       const { error } = await supabase
         .from("treinos")
@@ -301,7 +360,7 @@ export default function RunPage() {
           titulo: "Operação Corrida Tática",
           autor: username,
           grupo: "Cardio",
-          descricao: `Distância: ${activeDistance.toFixed(2)} km\nTempo: ${tempoFormatado}\nRitmo: ${activePace} /km\nCalorias: ${calorias} kcal\nVelocidade Média: ${activeAvgSpeed.toFixed(1)} km/h\nVelocidade Máxima: ${maxSpeedVal.toFixed(1)} km/h`,
+          descricao: desc,
         });
 
       if (error) throw error;
@@ -345,7 +404,8 @@ export default function RunPage() {
 
       console.log("✅ Corrida gravada com sucesso!");
     } catch (err) {
-      console.error("❌ Falha ao salvar telemetria da corrida:", err.message);
+      console.error("❌ Falha ao salvar telemetria da corrida, caindo em fallback offline:", err.message);
+      salvarLocalOffline();
     } finally {
       setSavingTreino(false);
       resetLocalStates();

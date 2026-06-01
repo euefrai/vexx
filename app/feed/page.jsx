@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
+import { offlineManager } from "@/lib/offlineManager"
 import TreinoCard from "@/components/TreinoCard"
 import PageHeader from "@/components/PageHeader"
 import Navbar from "@/components/Navbar"
@@ -66,6 +67,21 @@ export default function Feed() {
     inicializarSistema()
   }, [])
 
+  useEffect(() => {
+    const handleSyncComplete = async () => {
+      console.log("[Feed] Evento de sincronização offline recebido. Atualizando relatórios...")
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        carregarTreinos()
+        verificarCheckinEStrike(user)
+        carregarStoriesEChallenges(user)
+      }
+    }
+
+    window.addEventListener("vexx_offline_sync_complete", handleSyncComplete)
+    return () => window.removeEventListener("vexx_offline_sync_complete", handleSyncComplete)
+  }, [])
+
   // 2. LÓGICA DE DADOS
   async function carregarTreinos() {
     const { data, error } = await supabase
@@ -94,33 +110,7 @@ export default function Feed() {
       console.log("Banco sem stories, carregando fallback local...", err.message)
       const localStories = JSON.parse(localStorage.getItem("vexx_stories") || "[]")
       const validStories = localStories.filter(s => new Date(s.expires_at) > new Date())
-
-      if (validStories.length === 0) {
-        const mockStories = [
-          {
-            id: "story-1",
-            usuario_id: "user-2",
-            text: "Correndo 12km sob chuva forte na manhã de hoje! Superação total.",
-            media_url: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=300&auto=format&fit=crop&q=80",
-            created_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 86400000).toISOString(),
-            usuarios: { username: "runner_speed", foto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" }
-          },
-          {
-            id: "story-2",
-            usuario_id: "user-3",
-            text: "Carga máxima batida no terra hoje! 180kg operacionais.",
-            media_url: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=300&auto=format&fit=crop&q=80",
-            created_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 86400000).toISOString(),
-            usuarios: { username: "iron_beast", foto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" }
-          }
-        ]
-        localStorage.setItem("vexx_stories", JSON.stringify(mockStories))
-        setStories(mockStories)
-      } else {
-        setStories(validStories)
-      }
+      setStories(validStories)
     }
 
     // 2. Carregar Challenges
@@ -228,7 +218,7 @@ export default function Feed() {
         created_at: new Date().toISOString(),
         expires_at: expires,
         usuarios: { 
-          username: userData?.username || user.email.split("@")[0], 
+          username: userData?.username || user.email?.split("@")[0] || "atleta", 
           foto: userData?.foto || null 
         }
       }
@@ -236,6 +226,14 @@ export default function Feed() {
       const atualizados = [novoItem, ...localStories]
       localStorage.setItem("vexx_stories", JSON.stringify(atualizados))
       setStories(atualizados.filter(s => new Date(s.expires_at) > new Date()))
+
+      // Registrar mutação na fila unificada offline
+      offlineManager.addMutation("stories", "insert", {
+        usuario_id: user.id,
+        text: novoStoryText,
+        media_url: novoStoryMedia || null,
+        expires_at: expires
+      })
 
       setNovoStoryText("")
       setNovoStoryMedia("")
@@ -293,17 +291,62 @@ export default function Feed() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      if (!navigator.onLine) {
+        // Modo offline ativo
+        if (checkinFeito) {
+          const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+          offlineManager.addMutation("registros_treino", "delete", null, [
+            { type: "eq", column: "usuario_id", value: user.id },
+            { type: "gte", column: "created_at", value: hoje.toISOString() }
+          ])
+          setCheckinFeito(false)
+          setStrike(prev => Math.max(0, prev - 1))
+        } else {
+          offlineManager.addMutation("registros_treino", "insert", { usuario_id: user.id })
+          setCheckinFeito(true)
+          setStrike(prev => prev + 1)
+        }
+        return
+      }
+
       if (checkinFeito) {
         const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
-        await supabase.from("registros_treino").delete().eq("usuario_id", user.id).gte("created_at", hoje.toISOString())
+        const { error } = await supabase.from("registros_treino").delete().eq("usuario_id", user.id).gte("created_at", hoje.toISOString())
+        if (error) throw error
         setCheckinFeito(false)
       } else {
-        await supabase.from("registros_treino").insert([{ usuario_id: user.id }])
+        const { error } = await supabase.from("registros_treino").insert([{ usuario_id: user.id }])
+        if (error) throw error
         setCheckinFeito(true)
         if (adicionarXP) await adicionarXP(user.id, 50)
       }
       verificarCheckinEStrike(user)
-    } catch (e) { alert(e.message) } finally { setLoadingCheckin(false) }
+    } catch (e) {
+      console.error("Falha ao registrar check-in:", e)
+      // Fallback para erro de rede
+      if (e.message?.includes("Failed to fetch") || e.message?.includes("network") || e.status === 0) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          if (checkinFeito) {
+            const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+            offlineManager.addMutation("registros_treino", "delete", null, [
+              { type: "eq", column: "usuario_id", value: user.id },
+              { type: "gte", column: "created_at", value: hoje.toISOString() }
+            ])
+            setCheckinFeito(false)
+            setStrike(prev => Math.max(0, prev - 1))
+          } else {
+            offlineManager.addMutation("registros_treino", "insert", { usuario_id: user.id })
+            setCheckinFeito(true)
+            setStrike(prev => prev + 1)
+          }
+        }
+      } else {
+        alert(e.message)
+      }
+    } finally {
+      setLoadingCheckin(false)
+    }
   }
 
   const treinosFiltrados = treinos.filter(t => 
@@ -430,7 +473,7 @@ export default function Feed() {
 
           <div className="space-y-3">
             {challenges.slice(0, 2).map((ch, idx) => (
-              <div key={ch.id || idx} className="bg-black/35 border border-zinc-855 p-4 rounded-2xl relative">
+              <div key={ch.id || idx} className="bg-black/35 border border-zinc-900 p-4 rounded-2xl relative">
                 <div className="flex justify-between items-start gap-4">
                   <div>
                     <h4 className="text-xs font-black uppercase italic text-zinc-200">{ch.title}</h4>
@@ -484,7 +527,7 @@ export default function Feed() {
               onClick={realizarCheckin} 
               className={`px-4 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all active:scale-95 cursor-pointer ${
                 checkinFeito 
-                  ? "bg-zinc-900 text-zinc-500 border border-zinc-800/80 hover:bg-zinc-850" 
+                  ? "bg-zinc-900 text-zinc-500 border border-zinc-800/80 hover:bg-zinc-800" 
                   : "bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-950/20 hover:bg-emerald-400"
               }`}
             >
@@ -641,7 +684,7 @@ export default function Feed() {
                 </div>
               )}
               
-              <div className="bg-zinc-900/80 border border-zinc-850 p-5 rounded-2xl w-full text-center backdrop-blur-sm">
+              <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-2xl w-full text-center backdrop-blur-sm">
                 <p className="text-sm font-bold text-white leading-relaxed">
                   {stories[activeStoryIdx]?.text}
                 </p>
@@ -682,7 +725,7 @@ export default function Feed() {
                 value={novoStoryText}
                 onChange={(e) => setNovoStoryText(e.target.value)}
                 placeholder="O que está acontecendo no treino hoje?"
-                className="w-full bg-zinc-900 border border-zinc-850 p-4 rounded-2xl text-xs font-semibold outline-none text-zinc-100 focus:border-emerald-500 transition-all placeholder:text-zinc-650 resize-none"
+                className="w-full bg-zinc-900 border border-zinc-800/80 p-4 rounded-2xl text-xs font-semibold outline-none text-zinc-100 focus:border-emerald-500 transition-all placeholder:text-zinc-650 resize-none"
                 rows={3}
               />
 
@@ -693,7 +736,7 @@ export default function Feed() {
                 </label>
                 
                 {imagePreview ? (
-                  <div className="relative w-full h-40 rounded-2xl overflow-hidden border border-zinc-850 bg-zinc-950 flex items-center justify-center">
+                  <div className="relative w-full h-40 rounded-2xl overflow-hidden border border-zinc-800/80 bg-zinc-950 flex items-center justify-center">
                     <img src={imagePreview} className="w-full h-full object-cover" alt="Story preview" />
                     <button
                       type="button"
