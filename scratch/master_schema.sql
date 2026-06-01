@@ -1,6 +1,6 @@
 -- ==========================================================
 -- SCRIPT MESTRE DE INICIALIZAÇÃO E PERMISSÕES - VEXX SQUAD
--- Copie e cole todo este script no SQL Editor do painel Supabase
+-- Copie e cole todo este script no painel SQL Editor do Supabase
 -- e execute uma única vez para preparar o banco de dados completo.
 -- ==========================================================
 
@@ -213,12 +213,3 @@ CREATE POLICY "Acesso total likes" ON public.likes FOR ALL TO public USING (true
 CREATE POLICY "Acesso total seguidores" ON public.seguidores FOR ALL TO public USING (true) WITH CHECK (true);
 CREATE POLICY "Acesso total usuarios_conquistas" ON public.usuarios_conquistas FOR ALL TO public USING (true) WITH CHECK (true);
 CREATE POLICY "Acesso total challenge_participants" ON public.challenge_participants FOR ALL TO public USING (true) WITH CHECK (true);
-
--- ==========================================
--- 5. CONFIGURAÇÃO DE REPLICAÇÃO EM TEMPO REAL
--- ==========================================
--- Remove e adiciona para garantir a publicação correta de real-time
-ALTER publication supabase_realtime DROP TABLE IF EXISTS public.squad_mensagens;
-ALTER publication supabase_realtime DROP TABLE IF EXISTS public.mensagens;
-ALTER publication supabase_realtime ADD TABLE public.squad_mensagens;
-ALTER publication supabase_realtime ADD TABLE public.mensagens;
