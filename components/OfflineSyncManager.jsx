@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { toast } from "react-toastify"
 import { offlineManager } from "@/lib/offlineManager"
+import { supabase } from "@/lib/supabase"
 
 export default function OfflineSyncManager() {
   useEffect(() => {
@@ -34,15 +35,22 @@ export default function OfflineSyncManager() {
     // Estado inicial de carregamento da aplicação
     if (!navigator.onLine) {
       handleOffline()
-    } else {
-      // Tentar sincronizar qualquer resquício na fila ao carregar a página
-      offlineManager.syncQueue()
     }
+
+    // Ouvinte para mudanças no estado de autenticação (garante sessão carregada)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`[OfflineSyncManager] Evento Auth: ${event}`)
+      if (session && navigator.onLine) {
+        console.log("[OfflineSyncManager] Sessão autenticada ativa. Tentando sincronizar...")
+        offlineManager.syncQueue()
+      }
+    })
 
     // Limpeza de ouvintes
     return () => {
       window.removeEventListener("online", handleOnline)
       window.removeEventListener("offline", handleOffline)
+      if (subscription) subscription.unsubscribe()
     }
   }, [])
 

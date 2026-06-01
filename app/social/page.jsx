@@ -60,16 +60,38 @@ export default function SocialPage() {
   async function carregarStories() {
     try {
       const agora = new Date().toISOString()
-      const { data, error } = await supabase
+      const { data: rawStories, error: storiesErr } = await supabase
         .from("stories")
-        .select("*, usuarios:usuario_id (username, foto)")
+        .select("*")
         .gt("expires_at", agora)
         .order("created_at", { ascending: false })
 
-      if (error) throw error
-      setStories(data || [])
+      if (storiesErr) throw storiesErr
+
+      let mappedStories = []
+      if (rawStories && rawStories.length > 0) {
+        const userIds = [...new Set(rawStories.map(s => s.usuario_id))]
+        const { data: perfis, error: perfisErr } = await supabase
+          .from("usuarios")
+          .select("id, username, foto")
+          .in("id", userIds)
+
+        if (perfisErr) throw perfisErr
+
+        const perfisMap = {}
+        perfis?.forEach(p => {
+          perfisMap[p.id] = p
+        })
+
+        mappedStories = rawStories.map(s => ({
+          ...s,
+          usuarios: perfisMap[s.usuario_id] || { username: "atleta", foto: null }
+        }))
+      }
+
+      setStories(mappedStories)
     } catch (err) {
-      console.log("Banco sem stories, carregando fallback local no social...")
+      console.log("Falha ao carregar stories no social, carregando fallback local...", err.message)
       const localStories = JSON.parse(localStorage.getItem("vexx_stories") || "[]")
       setStories(localStories.filter(s => new Date(s.expires_at) > new Date()))
     }
@@ -77,16 +99,41 @@ export default function SocialPage() {
 
   async function carregarChallenges() {
     try {
-      const { data, error } = await supabase
+      const { data: rawChallenges, error: challengesErr } = await supabase
         .from("challenges")
-        .select("*, usuarios:owner_id (username, foto)")
+        .select("*")
         .eq("status", "open")
         .order("created_at", { ascending: false })
 
-      if (error) throw error
-      setChallenges(data || [])
+      if (challengesErr) throw challengesErr
+
+      let mappedChallenges = []
+      if (rawChallenges && rawChallenges.length > 0) {
+        const ownerIds = [...new Set(rawChallenges.filter(c => c.owner_id).map(c => c.owner_id))]
+        let perfisMap = {}
+        
+        if (ownerIds.length > 0) {
+          const { data: perfis, error: perfisErr } = await supabase
+            .from("usuarios")
+            .select("id, username, foto")
+            .in("id", ownerIds)
+
+          if (perfisErr) throw perfisErr
+
+          perfis?.forEach(p => {
+            perfisMap[p.id] = p
+          })
+        }
+
+        mappedChallenges = rawChallenges.map(c => ({
+          ...c,
+          usuarios: c.owner_id ? (perfisMap[c.owner_id] || { username: "atleta", foto: null }) : { username: "atleta", foto: null }
+        }))
+      }
+
+      setChallenges(mappedChallenges)
     } catch (err) {
-      console.log("Banco sem challenges, carregando fallback local no social...")
+      console.log("Falha ao carregar challenges no social, carregando fallback local...", err.message)
       const localChallenges = JSON.parse(localStorage.getItem("vexx_challenges") || "[]")
       setChallenges(localChallenges.filter(c => c.status === "open"))
     }

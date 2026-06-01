@@ -156,15 +156,55 @@ export default function AdminMaster() {
   async function carregarDadosDesafiosESquads() {
     setLoadingDesafiosSquads(true)
     try {
+      // 1. Buscar challenges e squads de forma plana
       const [challengesRes, squadsRes] = await Promise.all([
-        supabase.from("challenges").select("*, usuarios:owner_id (username)").order("created_at", { ascending: false }),
-        supabase.from("squads").select("*, usuarios:owner_id (username), squad_members (usuario_id)").order("created_at", { ascending: false })
+        supabase.from("challenges").select("*").order("created_at", { ascending: false }),
+        supabase.from("squads").select("*, squad_members (usuario_id)").order("created_at", { ascending: false })
       ])
 
-      setChallengesList(challengesRes.data || [])
-      setSquadsList(squadsRes.data || [])
+      if (challengesRes.error) throw challengesRes.error
+      if (squadsRes.error) throw squadsRes.error
+
+      const rawChallenges = challengesRes.data || []
+      const rawSquads = squadsRes.data || []
+
+      // 2. Extrair proprietários (owners) únicos de ambas as tabelas
+      const ownerIds = [
+        ...new Set([
+          ...rawChallenges.filter(c => c.owner_id).map(c => c.owner_id),
+          ...rawSquads.filter(s => s.owner_id).map(s => s.owner_id)
+        ])
+      ]
+
+      let perfisMap = {}
+      if (ownerIds.length > 0) {
+        const { data: perfis, error: perfisErr } = await supabase
+          .from("usuarios")
+          .select("id, username")
+          .in("id", ownerIds)
+
+        if (perfisErr) throw perfisErr
+
+        perfis?.forEach(p => {
+          perfisMap[p.id] = p
+        })
+      }
+
+      // 3. Mapear perfis na memória
+      const mappedChallenges = rawChallenges.map(c => ({
+        ...c,
+        usuarios: c.owner_id ? (perfisMap[c.owner_id] || { username: "atleta" }) : { username: "atleta" }
+      }))
+
+      const mappedSquads = rawSquads.map(s => ({
+        ...s,
+        usuarios: s.owner_id ? (perfisMap[s.owner_id] || { username: "líder" }) : { username: "líder" }
+      }))
+
+      setChallengesList(mappedChallenges)
+      setSquadsList(mappedSquads)
     } catch (err) {
-      console.error(err)
+      console.error("Erro ao carregar dados de desafios/squads no admin:", err)
     } finally {
       setLoadingDesafiosSquads(false)
     }
