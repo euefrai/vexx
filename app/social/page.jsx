@@ -6,7 +6,7 @@ import { offlineManager } from "@/lib/offlineManager"
 import { useGamificacao } from "@/hooks/useGamificacao"
 import PageHeader from "@/components/PageHeader"
 import Navbar from "@/components/Navbar"
-import { Users, Sparkles, Trophy, Plus, LogOut, CheckCircle, ShieldAlert, Send } from "lucide-react"
+import { Users, Sparkles, Trophy, Plus, LogOut, CheckCircle, ShieldAlert, Send, Trash2 } from "lucide-react"
 import { motion } from "framer-motion"
 
 const HOUR = 1000 * 60 * 60
@@ -262,6 +262,44 @@ export default function SocialPage() {
     }
   }
 
+  async function excluirStory(storyId) {
+    if (!storyId) return
+    const confirmacao = window.confirm("Deseja realmente excluir este story?")
+    if (!confirmacao) return
+
+    try {
+      if (!navigator.onLine) {
+        throw new Error("Offline")
+      }
+
+      // Online: Deleta diretamente do Supabase
+      const { error } = await supabase
+        .from("stories")
+        .delete()
+        .eq("id", storyId)
+
+      if (error) throw error
+
+      // Atualiza o estado local
+      setStories(prev => prev.filter(s => s.id !== storyId))
+    } catch (err) {
+      console.log("Falha ao deletar online no Social, deletando localmente...", err.message)
+
+      // Atualiza de forma otimista o estado
+      setStories(prev => prev.filter(s => s.id !== storyId))
+
+      // Remove do LocalStorage
+      const localStories = JSON.parse(localStorage.getItem("vexx_stories") || "[]")
+      const atualizados = localStories.filter(s => s.id !== storyId)
+      localStorage.setItem("vexx_stories", JSON.stringify(atualizados))
+
+      // Enfileira na fila offline do offlineManager
+      offlineManager.addMutation("stories", "delete", null, [
+        { type: "eq", column: "id", value: storyId }
+      ])
+    }
+  }
+
   async function criarChallenge() {
     if (!user) return setError("Faça login para criar um desafio")
     if (!challenge.title.trim()) return setError("Título do desafio é obrigatório")
@@ -499,7 +537,16 @@ export default function SocialPage() {
             <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-wider col-span-full py-4 text-center">Nenhum story ativo no momento</p>
           )}
           {storiesAtivas.map((s) => (
-            <div key={s.id} className="bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-900/80 flex flex-col justify-between">              
+            <div key={s.id} className="bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-900/80 flex flex-col justify-between relative group hover:border-zinc-800 transition-all duration-300">              
+              {s.usuario_id === user?.id && (
+                <button
+                  onClick={() => excluirStory(s.id)}
+                  className="absolute top-2.5 right-2.5 text-zinc-650 hover:text-rose-500 active:scale-90 transition-all cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  title="Excluir Story"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
               <div>
                 <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-2">@{s.usuarios?.username || "anon"}</p>
                 <p className="text-xs text-zinc-300 font-medium leading-relaxed mb-3 break-words">{s.text}</p>

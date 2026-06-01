@@ -12,6 +12,8 @@ import Link from "next/link"
 import { useGamificacao } from "@/hooks/useGamificacao"
 import { useRanks } from "@/hooks/useRanks" 
 import { motion, AnimatePresence } from "framer-motion"
+import { Trash2 } from "lucide-react"
+
 
 const SEED_TREINOS = [
   {
@@ -92,6 +94,7 @@ const SEED_TREINOS = [
 ];
 
 export default function Feed() {
+  const [user, setUser] = useState(null)
   const [treinos, setTreinos] = useState([])
   const [loading, setLoading] = useState(true)
   const [listaDeRanks, setListaDeRanks] = useState([])
@@ -109,6 +112,12 @@ export default function Feed() {
   const [challenges, setChallenges] = useState([])
   const [showStoryModal, setShowStoryModal] = useState(false)
   const [activeStoryIdx, setActiveStoryIdx] = useState(null)
+  
+  // Estados Premium de Visualização de Stories
+  const [progress, setProgress] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
+  const [particles, setParticles] = useState([])
+  const [pressTimer, setPressTimer] = useState(0)
   
   // Criação de Story
   const [novoStoryText, setNovoStoryText] = useState("")
@@ -132,13 +141,14 @@ export default function Feed() {
         const ranksBuscados = await getRanks()
         setListaDeRanks(ranksBuscados)
         
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        setUser(currentUser)
         
         // Carrega treinos, checkins, stories e desafios em paralelo
         await Promise.all([
           carregarTreinos(),
-          verificarCheckinEStrike(user),
-          carregarStoriesEChallenges(user)
+          verificarCheckinEStrike(currentUser),
+          carregarStoriesEChallenges(currentUser)
         ])
       } catch (error) {
         console.error("Erro na inicialização:", error)
@@ -152,11 +162,12 @@ export default function Feed() {
   useEffect(() => {
     const handleSyncComplete = async () => {
       console.log("[Feed] Evento de sincronização offline recebido. Atualizando relatórios...")
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (currentUser) {
+        setUser(currentUser)
         carregarTreinos()
-        verificarCheckinEStrike(user)
-        carregarStoriesEChallenges(user)
+        verificarCheckinEStrike(currentUser)
+        carregarStoriesEChallenges(currentUser)
       }
     }
 
@@ -488,6 +499,8 @@ export default function Feed() {
 
   // --- NAVEGAÇÃO DOS STORIES (ESTILO INSTAGRAM/WHATSAPP) ---
   const nextStory = useCallback(() => {
+    setProgress(0)
+    setIsPaused(false)
     if (activeStoryIdx < stories.length - 1) {
       setActiveStoryIdx(prev => prev + 1)
     } else {
@@ -497,10 +510,111 @@ export default function Feed() {
   }, [activeStoryIdx, stories.length])
 
   const prevStory = useCallback(() => {
+    setProgress(0)
+    setIsPaused(false)
     if (activeStoryIdx > 0) {
       setActiveStoryIdx(prev => prev - 1)
     }
   }, [activeStoryIdx])
+
+  // Temporizador dos Stories estilo Instagram (5 segundos por story)
+  useEffect(() => {
+    if (!showStoryModal || activeStoryIdx === null) {
+      setProgress(0)
+      return
+    }
+
+    if (isPaused) return
+
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval)
+          nextStory()
+          return 0
+        }
+        return prev + 1 // 50ms * 100 = 5000ms (5 segundos)
+      })
+    }, 50)
+
+    return () => clearInterval(interval)
+  }, [showStoryModal, activeStoryIdx, isPaused, nextStory])
+
+  // Lógica de Exclusão de Story (Modos Online e Offline Resiliente)
+  async function excluirStory(storyId) {
+    if (!storyId) return
+    const confirmacao = window.confirm("Deseja realmente excluir este story?")
+    if (!confirmacao) return
+
+    // Fecha o modal e reseta os estados de progresso
+    setShowStoryModal(false)
+    setActiveStoryIdx(null)
+    setProgress(0)
+    setIsPaused(false)
+
+    try {
+      if (!navigator.onLine) {
+        throw new Error("Offline")
+      }
+
+      // Online: Deleta do Supabase
+      const { error } = await supabase
+        .from("stories")
+        .delete()
+        .eq("id", storyId)
+
+      if (error) throw error
+
+      // Atualiza o estado
+      setStories(prev => prev.filter(s => s.id !== storyId))
+    } catch (err) {
+      console.log("Falha ao deletar online. Deletando localmente e enfileirando mutação...", err.message)
+      
+      // Atualiza estado local de forma otimista
+      setStories(prev => prev.filter(s => s.id !== storyId))
+
+      // Remove do LocalStorage
+      const localStories = JSON.parse(localStorage.getItem("vexx_stories") || "[]")
+      const atualizados = localStories.filter(s => s.id !== storyId)
+      localStorage.setItem("vexx_stories", JSON.stringify(atualizados))
+
+      // Enfileira na fila offline do offlineManager
+      offlineManager.addMutation("stories", "delete", null, [
+        { type: "eq", column: "id", value: storyId }
+      ])
+    }
+  }
+
+  // Envio de reações rápidas com partículas
+  function enviarReacao(emoji) {
+    const novaParticula = {
+      id: `part-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      emoji,
+      x: Math.random() * 80 + 10 // Posição horizontal aleatória no modal
+    }
+    
+    setParticles(prev => [...prev, novaParticula])
+
+    // Remove da memória após a conclusão da animação (1.6 segundos)
+    setTimeout(() => {
+      setParticles(prev => prev.filter(p => p.id !== novaParticula.id))
+    }, 1600)
+  }
+
+  // Manipuladores de Toque/Clique Contínuo para Pausar o Story (Hold-to-Pause)
+  const handlePressStart = () => {
+    setIsPaused(true)
+    setPressTimer(Date.now())
+  }
+
+  const handlePressEnd = (action) => {
+    setIsPaused(false)
+    const duration = Date.now() - pressTimer
+    if (duration < 250) {
+      // Se for toque rápido, navega
+      action()
+    }
+  }
 
   const handleTouchStart = (e) => {
     setTouchStartX(e.changedTouches[0].clientX)
@@ -857,14 +971,22 @@ export default function Feed() {
             className="fixed inset-0 bg-black/95 backdrop-blur-md z-[500] flex flex-col justify-between p-4"
           >
             {/* Tap Gestures Overlay (Left 30% goes back, Right 70% goes forward) */}
-            <div className="absolute inset-x-0 top-20 bottom-16 z-[501] flex select-none">
+            <div className="absolute inset-x-0 top-24 bottom-36 z-[501] flex select-none pointer-events-auto">
               <div 
-                onClick={(e) => { e.stopPropagation(); prevStory(); }}
+                onMouseDown={handlePressStart}
+                onTouchStart={handlePressStart}
+                onMouseUp={() => handlePressEnd(prevStory)}
+                onTouchEnd={() => handlePressEnd(prevStory)}
+                onMouseLeave={() => setIsPaused(false)}
                 className="w-[30%] h-full cursor-pointer active:bg-white/5 transition-all"
                 title="Story Anterior"
               />
               <div 
-                onClick={(e) => { e.stopPropagation(); nextStory(); }}
+                onMouseDown={handlePressStart}
+                onTouchStart={handlePressStart}
+                onMouseUp={() => handlePressEnd(nextStory)}
+                onTouchEnd={() => handlePressEnd(nextStory)}
+                onMouseLeave={() => setIsPaused(false)}
                 className="w-[70%] h-full cursor-pointer active:bg-white/5 transition-all"
                 title="Próximo Story"
               />
@@ -874,13 +996,9 @@ export default function Feed() {
             <div className="w-full max-w-md mx-auto space-y-4 pt-4 relative z-[502]">
               {/* Barra de progresso */}
               <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: "0%" }} 
-                  animate={{ width: "100%" }} 
-                  transition={{ duration: 6, ease: "linear" }}
-                  onAnimationComplete={nextStory}
-                  className="h-full bg-emerald-500"
-                  key={activeStoryIdx} // Reseta a animação ao mudar de story
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-75 ease-linear"
+                  style={{ width: `${progress}%` }}
                 />
               </div>
 
@@ -899,18 +1017,29 @@ export default function Feed() {
                     <p className="text-[7px] text-zinc-500 font-bold uppercase tracking-widest">Story Atleta</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => { setShowStoryModal(false); setActiveStoryIdx(null); }}
-                  className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-white font-black hover:bg-zinc-800 border border-zinc-800 pointer-events-auto"
-                  style={{ position: 'relative', zIndex: 600 }}
-                >
-                  ✕
-                </button>
+
+                <div className="flex items-center gap-2 pointer-events-auto" style={{ position: 'relative', zIndex: 600 }}>
+                  {stories[activeStoryIdx]?.usuario_id === user?.id && (
+                    <button 
+                      onClick={() => excluirStory(stories[activeStoryIdx]?.id)}
+                      className="w-8 h-8 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 flex items-center justify-center border border-rose-500/20 transition-all active:scale-95 cursor-pointer animate-pulse"
+                      title="Excluir Story"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => { setShowStoryModal(false); setActiveStoryIdx(null); setProgress(0); setIsPaused(false); }}
+                    className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-white font-black hover:bg-zinc-800 border border-zinc-800"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Conteúdo Central */}
-            <div className="flex-1 w-full max-w-md mx-auto flex flex-col items-center justify-center py-6 relative z-[502] pointer-events-none">
+            <div className="flex-1 w-full max-w-md mx-auto flex flex-col items-center justify-center py-4 relative z-[502] pointer-events-none">
               {stories[activeStoryIdx]?.media_url && (
                 <div className="w-full h-[50vh] max-h-[380px] rounded-3xl overflow-hidden mb-6 border border-zinc-900 shadow-2xl bg-zinc-950">
                   <img 
@@ -928,11 +1057,49 @@ export default function Feed() {
               </div>
             </div>
 
+            {/* Barra de Reações Rápidas */}
+            <div className="w-full max-w-md mx-auto relative z-[506] flex flex-col items-center gap-2 bg-zinc-900/30 border border-zinc-900/60 p-3 rounded-2xl backdrop-blur-md pb-4 pointer-events-auto mb-2">
+              <span className="text-[7px] font-black uppercase tracking-widest text-zinc-500">Reagir com energia</span>
+              <div className="flex justify-around w-full">
+                {["🔥", "💪", "🫡", "💯", "🚀"].map(emoji => (
+                  <button
+                    key={emoji}
+                    onClick={() => enviarReacao(emoji)}
+                    className="text-xl hover:scale-125 active:scale-95 transition-transform p-2 bg-zinc-950/40 rounded-xl border border-zinc-900/80 hover:border-emerald-500/30 cursor-pointer"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Footer */}
-            <div className="w-full max-w-md mx-auto text-center pb-6 relative z-[502]">
+            <div className="w-full max-w-md mx-auto text-center pb-4 relative z-[502]">
               <span className="text-[7.5px] font-bold text-zinc-500 uppercase tracking-widest">
                 VEXX ATHLETICS STORIES // Expira em 24h
               </span>
+            </div>
+
+            {/* Partículas de Reação Flutuantes */}
+            <div className="absolute inset-0 z-[505] pointer-events-none overflow-hidden">
+              {particles.map(p => (
+                <motion.span
+                  key={p.id}
+                  initial={{ y: "85%", x: `${p.x}%`, opacity: 1, scale: 1 }}
+                  animate={{ 
+                    y: "-10%", 
+                    x: `${p.x + (Math.random() * 30 - 15)}%`, 
+                    opacity: 0, 
+                    scale: 2,
+                    rotate: Math.random() * 120 - 60
+                  }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                  className="absolute text-4xl select-none"
+                  style={{ bottom: "10%", left: 0 }}
+                >
+                  {p.emoji}
+                </motion.span>
+              ))}
             </div>
           </motion.div>
         )}
