@@ -12,7 +12,7 @@ import Link from "next/link"
 import { useGamificacao } from "@/hooks/useGamificacao"
 import { useRanks } from "@/hooks/useRanks" 
 import { motion, AnimatePresence } from "framer-motion"
-import { Trash2 } from "lucide-react"
+import { Trash2, Users, MessageSquare, Plus } from "lucide-react"
 
 
 const SEED_TREINOS = [
@@ -107,6 +107,10 @@ export default function Feed() {
   const [filtroPeriodo, setFiltroPeriodo] = useState("Todos")
   const [showFiltros, setShowFiltros] = useState(false)
 
+  // Esquadrão do Usuário
+  const [minhaSquad, setMinhaSquad] = useState(null)
+  const [loadingSquad, setLoadingSquad] = useState(true)
+
   // Stories e Desafios
   const [stories, setStories] = useState([])
   const [challenges, setChallenges] = useState([])
@@ -144,11 +148,12 @@ export default function Feed() {
         const { data: { user: currentUser } } = await supabase.auth.getUser()
         setUser(currentUser)
         
-        // Carrega treinos, checkins, stories e desafios em paralelo
+        // Carrega treinos, checkins, stories, desafios e squad em paralelo
         await Promise.all([
           carregarTreinos(),
           verificarCheckinEStrike(currentUser),
-          carregarStoriesEChallenges(currentUser)
+          carregarStoriesEChallenges(currentUser),
+          carregarMinhaSquad(currentUser)
         ])
       } catch (error) {
         console.error("Erro na inicialização:", error)
@@ -168,6 +173,7 @@ export default function Feed() {
         carregarTreinos()
         verificarCheckinEStrike(currentUser)
         carregarStoriesEChallenges(currentUser)
+        carregarMinhaSquad(currentUser)
       }
     }
 
@@ -263,6 +269,38 @@ export default function Feed() {
       } else {
         setChallenges(openChallenges)
       }
+    }
+  }
+
+  async function carregarMinhaSquad(user) {
+    if (!user) return
+    try {
+      setLoadingSquad(true)
+      const { data, error } = await supabase
+        .from("squad_members")
+        .select("squad_id, squads (id, name, description)")
+        .eq("usuario_id", user.id)
+        .limit(1)
+      
+      if (error) throw error
+
+      if (data && data.length > 0 && data[0].squads) {
+        setMinhaSquad(data[0].squads)
+      } else {
+        setMinhaSquad(null)
+      }
+    } catch (err) {
+      console.log("Erro ao carregar squad no feed, checando cache local...", err.message)
+      const localSquads = JSON.parse(localStorage.getItem("vexx_squads") || "[]")
+      const localMemberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${user.id}`) || "[]")
+      const squadMembro = localSquads.find(s => s.owner_id === user.id || localMemberships.includes(s.id))
+      if (squadMembro) {
+        setMinhaSquad(squadMembro)
+      } else {
+        setMinhaSquad(null)
+      }
+    } finally {
+      setLoadingSquad(false)
     }
   }
 
@@ -740,6 +778,63 @@ export default function Feed() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* WIDGET DE ESQUADRÃO TÁTICO */}
+        <div className="mb-6 p-5 bg-gradient-to-br from-zinc-900/35 to-zinc-950/80 border border-zinc-900 rounded-3xl relative overflow-hidden backdrop-blur-md">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-[40px] rounded-full pointer-events-none" />
+          
+          <div className="flex justify-between items-center mb-4 relative z-10">
+            <div>
+              <h3 className="font-black text-[10px] text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-blue-400" /> Esquadrão de Elite
+              </h3>
+              <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Sua guarnição tática de treinamento</p>
+            </div>
+            {minhaSquad && (
+              <span className="text-[8px] font-black bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2.5 py-0.5 rounded-lg uppercase tracking-wide flex items-center gap-1">
+                <span className="w-1 h-1 bg-blue-500 rounded-full animate-ping"></span> Ativo
+              </span>
+            )}
+          </div>
+
+          {loadingSquad ? (
+            <div className="text-center py-6 text-[8px] font-black text-zinc-600 uppercase tracking-wider animate-pulse">
+              Carregando sinal da squad...
+            </div>
+          ) : minhaSquad ? (
+            <div className="bg-black/35 border border-zinc-900 p-4 rounded-2xl relative">
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <h4 className="text-xs font-black uppercase italic text-zinc-200">{minhaSquad.name}</h4>
+                  <p className="text-[9px] text-zinc-400 mt-1 leading-relaxed font-medium">{minhaSquad.description || "Canal de comunicação do esquadrão."}</p>
+                </div>
+                <Link href={`/mensagens/squad/${minhaSquad.id}`} className="shrink-0">
+                  <span className="inline-block text-[8px] font-black bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-xl transition-all active:scale-95 uppercase tracking-wider cursor-pointer shadow-[0_4px_15px_rgba(37,99,235,0.2)]">
+                    Chat Squad
+                  </span>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-zinc-950/40 border border-dashed border-zinc-900 p-5 rounded-2xl text-center">
+              <p className="text-zinc-500 text-[9px] font-bold uppercase mb-4 leading-relaxed max-w-[280px] mx-auto">
+                Nenhum esquadrão localizado. Una-se a outros atletas para maximizar seu ganho de XP e conquistar novas patentes.
+              </p>
+              <div className="flex gap-2">
+                <Link href="/social" className="flex-1">
+                  <span className="w-full text-center inline-block text-[8px] font-black bg-zinc-900 border border-zinc-800 text-zinc-300 px-3.5 py-2 rounded-xl transition-all active:scale-95 uppercase tracking-wider cursor-pointer hover:border-zinc-700">
+                    Explorar
+                  </span>
+                </Link>
+                <Link href="/social" className="flex-1">
+                  <span className="w-full text-center inline-block text-[8px] font-black bg-blue-600/10 border border-blue-500/20 text-blue-400 px-3.5 py-2 rounded-xl transition-all active:scale-95 uppercase tracking-wider cursor-pointer hover:bg-blue-600/20">
+                    Criar Squad
+                  </span>
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* CARD DE CHECK-IN */}

@@ -1,13 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import Navbar from "@/components/Navbar"
 import PageHeader from "@/components/PageHeader"
+import { Search, MessageSquare, Users, MessageCircle, Plus, ChevronRight } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 
 export default function ListaMensagens() {
   const [abaAtiva, setAbaAtiva] = useState("diretas")
+  const [busca, setBusca] = useState("")
   const [conversas, setConversas] = useState([])
   const [seguindo, setSeguindo] = useState([])
   const [squads, setSquads] = useState([])
@@ -74,7 +77,6 @@ export default function ListaMensagens() {
 
   async function carregarEsquadroes(user) {
     try {
-      // Tenta carregar do Supabase
       const { data, error } = await supabase
         .from("squad_members")
         .select(`
@@ -99,13 +101,11 @@ export default function ListaMensagens() {
     } catch (err) {
       console.log("Banco Supabase offline ou sem tabelas de squads, carregando fallback local...", err.message)
       
-      // Fallback LocalStorage
       const localSquads = JSON.parse(localStorage.getItem("vexx_squads") || "[]")
       const localMemberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${user.id}`) || "[]")
       
       const minhasSquads = localSquads.filter(s => s.owner_id === user.id || localMemberships.includes(s.id))
       
-      // Se não tiver nenhuma cadastrada localmente, populamos duas squads fictícias premium padrão
       if (minhasSquads.length === 0) {
         const mockSquads = [
           { id: "squad-alpha-tactical", name: "Alpha Tactical", description: "Esquadrão focado em treinos de corrida de alta intensidade e maratonas de rua.", capacity: 12, owner_id: user.id },
@@ -120,149 +120,244 @@ export default function ListaMensagens() {
     }
   }
 
+  // Filtragem dinâmica de chats e squads em tempo real
+  const conversasFiltradas = useMemo(() => {
+    return conversas.filter(c => c.username?.toLowerCase().includes(busca.toLowerCase()) || c.ultimaMsg?.toLowerCase().includes(busca.toLowerCase()))
+  }, [conversas, busca])
+
+  const squadsFiltrados = useMemo(() => {
+    return squads.filter(s => s.name?.toLowerCase().includes(busca.toLowerCase()) || s.description?.toLowerCase().includes(busca.toLowerCase()))
+  }, [squads, busca])
+
   return (
-    <div className="min-h-screen bg-black text-white font-sans">
-      <div className="max-w-md mx-auto p-4 pb-24">
-        <PageHeader icon="💌" title="Mensagens" subtitle="Comunique-se direto com sua squad" color="blue" />
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans relative overflow-x-hidden">
+      <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
+
+      <div className="max-w-md mx-auto p-4 pb-28">
+        <PageHeader icon={<MessageSquare className="w-7 h-7 text-blue-400" />} title="Mensagens" subtitle="Comunique-se direto com sua squad" color="blue" />
+
+        {/* PESQUISA DE OPERAÇÃO EM TEMPO REAL */}
+        <div className="relative mb-5 mt-2">
+          <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search className="w-4 h-4 text-zinc-600" />
+          </span>
+          <input 
+            type="text" 
+            placeholder="Localizar combatente ou esquadrão..." 
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full bg-zinc-900/35 border border-zinc-900 rounded-2xl py-3.5 pl-11 pr-4 text-xs font-semibold tracking-wide text-zinc-200 placeholder:text-zinc-650 outline-none focus:border-blue-500/30 focus:bg-zinc-900/50 transition-all placeholder:font-medium placeholder:uppercase" 
+          />
+        </div>
 
         {/* SELETOR DE ABAS TÁTICO */}
-        <div className="flex bg-zinc-900/40 p-1 rounded-2xl border border-zinc-800/80 mb-6 backdrop-blur-md">
+        <div className="flex bg-zinc-900/40 p-1 rounded-2xl border border-zinc-900 mb-6 backdrop-blur-md relative z-10">
           <button 
-            onClick={() => setAbaAtiva("diretas")} 
-            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${abaAtiva === "diretas" ? "bg-blue-500 text-black shadow-lg" : "text-zinc-500 hover:text-zinc-300"}`}
+            onClick={() => { setAbaAtiva("diretas"); setBusca(""); }} 
+            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+              abaAtiva === "diretas" 
+                ? "bg-blue-500 text-black shadow-lg shadow-blue-950/20" 
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
           >
-            Mensagens Diretas
+            <MessageCircle className="w-3.5 h-3.5" /> Mensagens Diretas
           </button>
           <button 
-            onClick={() => setAbaAtiva("esquadroes")} 
-            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${abaAtiva === "esquadroes" ? "bg-blue-500 text-black shadow-lg" : "text-zinc-500 hover:text-zinc-300"}`}
+            onClick={() => { setAbaAtiva("esquadroes"); setBusca(""); }} 
+            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+              abaAtiva === "esquadroes" 
+                ? "bg-blue-500 text-black shadow-lg shadow-blue-950/20" 
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
           >
-            Meus Esquadrões
+            <Users className="w-3.5 h-3.5" /> Meus Esquadrões
           </button>
         </div>
 
         {/* ABA: MENSAGENS DIRETAS */}
-        {abaAtiva === "diretas" && (
-          <div>
-            {/* CARROSSEL DE QUEM EU SIGO */}
-            {!loading && seguindo.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-[10px] font-black uppercase text-zinc-600 mb-3 tracking-widest ml-1">
-                  Iniciar nova conversa
-                </h2>
-                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-                  {seguindo.map(u => (
-                    <Link href={`/mensagens/${u.id}`} key={u.id} className="flex flex-col items-center gap-2 shrink-0">
-                      <div className="w-16 h-16 rounded-full p-0.5 border-2 border-green-500/30 overflow-hidden bg-zinc-900 shrink-0">
-                        <img 
-                          src={u.foto || "https://via.placeholder.com/150"} 
-                          className="w-full h-full rounded-full object-cover"
-                          alt={u.username}
-                        />
-                      </div>
-                      <span className="text-[9px] font-bold text-zinc-500 truncate w-16 text-center">
-                        @{u.username}
-                      </span>
-                    </Link>
-                  ))}
+        <AnimatePresence mode="wait">
+          {abaAtiva === "diretas" && (
+            <motion.div
+              key="aba-diretas"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+            >
+              {/* CARROSSEL DE QUEM EU SIGO (INICIAR CONVERSA) */}
+              {!loading && seguindo.length > 0 && !busca && (
+                <div className="mb-6">
+                  <h2 className="text-[9px] font-black uppercase text-zinc-500 mb-3 tracking-widest ml-1 block">
+                    Iniciar nova conversa
+                  </h2>
+                  <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar px-1">
+                    {seguindo.map(u => (
+                      <Link href={`/mensagens/${u.id}`} key={u.id} className="flex flex-col items-center gap-1.5 shrink-0 active:scale-95 transition-transform group">
+                        <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-blue-500/20 to-teal-500/20 group-hover:from-blue-500/40 group-hover:to-teal-500/40 transition-all overflow-hidden flex items-center justify-center shadow-lg relative">
+                          <div className="w-full h-full rounded-full border border-black overflow-hidden bg-zinc-900">
+                            <img 
+                              src={u.foto || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
+                              className="w-full h-full object-cover"
+                              alt={u.username}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-[8.5px] font-bold text-zinc-500 truncate w-16 text-center group-hover:text-zinc-300 transition-colors">
+                          @{u.username}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* LISTA DE CONVERSAS ATIVAS */}
-            <h2 className="text-[10px] font-black uppercase text-zinc-600 mb-3 tracking-widest ml-1">Conversas Recentes</h2>
-            
-            {loading ? (
-              <div className="flex justify-center py-20 animate-pulse text-zinc-500 font-bold uppercase text-[10px]">
-                Sincronizando...
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {conversas.length === 0 ? (
-                  <div className="text-center py-10 bg-zinc-900/20 rounded-[2rem] border border-dashed border-zinc-800">
-                    <p className="text-zinc-600 text-xs font-bold uppercase">Sem histórico recente.</p>
-                  </div>
-                ) : (
-                  conversas.map(chat => (
-                    <Link href={`/mensagens/${chat.id}`} key={chat.id} className="block group">
-                      <div className="flex items-center gap-4 bg-zinc-900/40 p-4 rounded-[1.5rem] border border-zinc-800/50 group-hover:bg-zinc-900 transition-all active:scale-[0.98]">
-                        <div className="relative shrink-0 w-14 h-14">
-                          <img 
-                            src={chat.foto || "https://via.placeholder.com/150"} 
-                            className="w-full h-full rounded-full object-cover border border-zinc-700" 
-                            alt={chat.username}
-                          />
-                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full shadow-lg"></div>
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-center mb-1">
-                            <h3 className="font-black text-sm truncate uppercase italic text-white">{chat.username}</h3>
-                            <span className="text-[9px] font-bold text-zinc-600">{chat.data}</span>
-                          </div>
-                          <p className="text-xs text-zinc-400 truncate font-medium">{chat.ultimaMsg}</p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))
+              {/* LISTA DE CONVERSAS ATIVAS */}
+              <div className="flex justify-between items-center mb-3.5 ml-1">
+                <h2 className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">
+                  {busca ? "Resultados da Pesquisa" : "Conversas Recentes"}
+                </h2>
+                {conversas.length > 0 && (
+                  <span className="text-[8px] font-bold uppercase text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/10">
+                    {conversasFiltradas.length} Ativas
+                  </span>
                 )}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* ABA: ESQUADRÕES */}
-        {abaAtiva === "esquadroes" && (
-          <div>
-            <h2 className="text-[10px] font-black uppercase text-zinc-600 mb-3 tracking-widest ml-1">Canais Operacionais</h2>
-            
-            {loading ? (
-              <div className="flex justify-center py-20 animate-pulse text-zinc-500 font-bold uppercase text-[10px]">
-                Sincronizando Esquadrões...
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {squads.length === 0 ? (
-                  <div className="text-center py-12 bg-zinc-900/20 rounded-[2.5rem] border border-dashed border-zinc-800 p-6">
-                    <p className="text-zinc-600 text-xs font-bold uppercase mb-2">Você não faz parte de nenhuma squad.</p>
-                    <Link href="/social">
-                      <span className="inline-block text-[9px] bg-blue-500 text-black font-black uppercase tracking-wider px-4 py-2 rounded-xl active:scale-95 cursor-pointer">
-                        Explorar Esquadrões
-                      </span>
-                    </Link>
-                  </div>
-                ) : (
-                  squads.map(sq => (
-                    <Link href={`/mensagens/squad/${sq.id}`} key={sq.id} className="block group">
-                      <div className="flex items-center gap-4 bg-zinc-900/40 p-4 rounded-[1.5rem] border border-zinc-800/50 group-hover:bg-zinc-900 transition-all active:scale-[0.98]">
-                        <div className="relative shrink-0 w-14 h-14 bg-gradient-to-br from-blue-500/20 to-indigo-600/30 rounded-full flex items-center justify-center border border-blue-500/30 shadow-md">
-                          <span className="text-blue-400 text-base font-black italic uppercase">
-                            {sq.name ? sq.name.substring(0, 2) : "SQ"}
+              
+              {loading ? (
+                <div className="text-center py-20 flex flex-col items-center gap-3">
+                   <div className="w-5 h-5 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                   <span className="text-zinc-600 font-bold text-[9px] uppercase tracking-widest">Sincronizando Mensagens...</span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {conversasFiltradas.length === 0 ? (
+                    <div className="text-center py-12 bg-zinc-900/15 rounded-3xl border border-dashed border-zinc-900 p-6 flex flex-col items-center justify-center gap-3">
+                      <span className="text-xl">💬</span>
+                      <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider leading-relaxed">
+                        {busca ? "Nenhum combatente localizado." : "Nenhuma transmissão recente aberta."}
+                      </p>
+                      {!busca && (
+                        <Link href="/explorar">
+                          <span className="text-[8.5px] bg-blue-500/10 border border-blue-500/20 text-blue-400 font-black uppercase tracking-wider px-4 py-2 rounded-xl active:scale-95 cursor-pointer block hover:bg-blue-500/15">
+                            Explorar Atletas
                           </span>
-                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-blue-500 border-2 border-black rounded-full shadow-lg animate-pulse"></div>
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-center mb-1">
-                            <h3 className="font-black text-sm truncate uppercase italic text-white">{sq.name}</h3>
-                            <span className="text-[8px] font-black bg-blue-500/10 border border-blue-500/25 text-blue-400 px-2 py-0.5 rounded uppercase">
-                              Membro
-                            </span>
+                        </Link>
+                      )}
+                    </div>
+                  ) : (
+                    conversasFiltradas.map(chat => (
+                      <Link href={`/mensagens/${chat.id}`} key={chat.id} className="block group">
+                        <div className="flex items-center gap-4 bg-zinc-900/20 p-4 rounded-3xl border border-zinc-900 group-hover:border-zinc-800/80 group-hover:bg-zinc-900/40 transition-all duration-300 active:scale-[0.98]">
+                          <div className="relative shrink-0 w-12 h-12">
+                            <div className="w-full h-full rounded-full overflow-hidden border border-zinc-850 bg-zinc-900">
+                              <img 
+                                src={chat.foto || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
+                                className="w-full h-full object-cover" 
+                                alt={chat.username}
+                              />
+                            </div>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-zinc-950 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)] animate-pulse"></div>
                           </div>
-                          <p className="text-xs text-zinc-400 truncate font-medium">{sq.description || "Canal de comunicação do esquadrão."}</p>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center mb-1">
+                              <h3 className="font-black text-xs truncate uppercase italic text-zinc-100 group-hover:text-blue-400 transition-colors">@{chat.username}</h3>
+                              <span className="text-[8px] font-black text-zinc-650 uppercase">{chat.data}</span>
+                            </div>
+                            <p className="text-xs text-zinc-400 truncate font-medium">{chat.ultimaMsg}</p>
+                          </div>
+                          
+                          <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0" />
                         </div>
-                      </div>
-                    </Link>
-                  ))
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* ABA: ESQUADRÕES */}
+          {abaAtiva === "esquadroes" && (
+            <motion.div
+              key="aba-esquadroes"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+            >
+              <div className="flex justify-between items-center mb-3.5 ml-1">
+                <h2 className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Canais Operacionais</h2>
+                {squads.length > 0 && (
+                  <span className="text-[8px] font-bold uppercase text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/10">
+                    {squadsFiltrados.length} Canais
+                  </span>
                 )}
               </div>
-            )}
-          </div>
-        )}
+              
+              {loading ? (
+                <div className="text-center py-20 flex flex-col items-center gap-3">
+                   <div className="w-5 h-5 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                   <span className="text-zinc-600 font-bold text-[9px] uppercase tracking-widest">Sincronizando Esquadrões...</span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {squadsFiltrados.length === 0 ? (
+                    <div className="text-center py-12 bg-zinc-900/15 rounded-3xl border border-dashed border-zinc-900 p-6 flex flex-col items-center justify-center gap-3">
+                      <span className="text-xl">🛡️</span>
+                      <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider leading-relaxed">
+                        {busca ? "Nenhum canal localizado." : "Você não faz parte de nenhuma squad ativa."}
+                      </p>
+                      {!busca && (
+                        <div className="flex gap-2">
+                          <Link href="/social">
+                            <span className="text-[8.5px] bg-blue-500 text-black font-black uppercase tracking-wider px-4 py-2 rounded-xl active:scale-95 cursor-pointer block">
+                              Explorar Esquadrões
+                            </span>
+                          </Link>
+                          <Link href="/social">
+                            <span className="text-[8.5px] bg-zinc-900 border border-zinc-800 text-zinc-350 font-black uppercase tracking-wider px-4 py-2 rounded-xl active:scale-95 cursor-pointer block hover:border-zinc-700">
+                              Criar Squad
+                            </span>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    squadsFiltrados.map(sq => (
+                      <Link href={`/mensagens/squad/${sq.id}`} key={sq.id} className="block group">
+                        <div className="flex items-center gap-4 bg-zinc-900/20 p-4 rounded-3xl border border-zinc-900 group-hover:border-zinc-800/80 group-hover:bg-zinc-900/40 transition-all duration-300 active:scale-[0.98]">
+                          <div className="relative shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500/20 to-indigo-600/30 rounded-2xl flex items-center justify-center border border-blue-500/30 shadow-md">
+                            <span className="text-blue-400 text-base font-black italic uppercase">
+                              {sq.name ? sq.name.substring(0, 2) : "SQ"}
+                            </span>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-500 border-2 border-zinc-950 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.4)] animate-pulse"></div>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center mb-1">
+                              <h3 className="font-black text-xs truncate uppercase italic text-zinc-100 group-hover:text-blue-400 transition-colors">{sq.name}</h3>
+                              <span className="text-[7px] font-black bg-blue-500/10 border border-blue-500/25 text-blue-400 px-2 py-0.5 rounded uppercase tracking-wide">
+                                Membro
+                              </span>
+                            </div>
+                            <p className="text-xs text-zinc-400 truncate font-medium">{sq.description || "Canal de comunicação do esquadrão."}</p>
+                          </div>
+                          
+                          <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+                        </div>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <footer className="mt-16 mb-8 text-center">
-          <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] opacity-50">
-            © 2026 @eu.efrai - Todos os direitos reservados.
+        <footer className="mt-16 mb-8 text-center opacity-35">
+          <p className="text-[9px] text-zinc-650 font-bold uppercase tracking-[0.2em]">
+            SQUAD SYSTEM v2.0 // VEXX ATHLETICS
           </p>
         </footer>
       </div>
