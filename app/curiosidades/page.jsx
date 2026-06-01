@@ -1,19 +1,28 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PageHeader from "@/components/PageHeader";
 import Navbar from "@/components/Navbar";
 import { TrendingUp, Users, Zap, Target, Sparkles, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
+import { useGamificacao } from "@/hooks/useGamificacao";
 
 export default function Curiosidades() {
+  const router = useRouter();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { avaliarEConquistar } = useGamificacao();
 
   useEffect(() => {
     const carregarCuriosidades = async () => {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await avaliarEConquistar(user.id, "curiosidades_visit");
+        }
+
         const agora = new Date();
         const umaSemanaatrás = new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -34,16 +43,28 @@ export default function Curiosidades() {
         }
 
         // Total de usuários ativos
-        const { data: usuariosAtivos } = await supabase
-          .from("registros_treino")
-          .select("usuario_id")
-          .gte("created_at", umaSemanaatrás.toISOString());
+        let usuariosAtivos = [];
+        try {
+          const { data } = await supabase
+            .from("registros_treino")
+            .select("usuario_id")
+            .gte("created_at", umaSemanaatrás.toISOString());
+          usuariosAtivos = data || [];
+        } catch (err) {
+          console.log("Supabase offline ou sem registros_treino. Usando fallbacks...");
+        }
 
         // Total de treinos
-        const { data: treinos } = await supabase
-          .from("treinos")
-          .select("id")
-          .gte("created_at", umaSemanaatrás.toISOString());
+        let treinos = [];
+        try {
+          const { data } = await supabase
+            .from("treinos")
+            .select("id")
+            .gte("created_at", umaSemanaatrás.toISOString());
+          treinos = data || [];
+        } catch (err) {
+          console.log("Supabase offline ou sem treinos. Usando fallbacks...");
+        }
 
         // Top corrida
         const topRun = runsData && runsData.length > 0 ? runsData.reduce((max, r) => (r.distancia > max.distancia ? r : max)) : null;
@@ -215,7 +236,10 @@ export default function Curiosidades() {
           <p className="text-[11px] text-zinc-400 mb-4">
             Superar o recorde de distância acumulada da squad. O Top 3 ganha badges exclusivos.
           </p>
-          <button className="w-full bg-rose-500 hover:bg-rose-600 text-black font-extrabold py-2.5 px-4 rounded-xl text-[10px] uppercase tracking-wider transition duration-300">
+          <button 
+            onClick={() => router.push("/social")}
+            className="w-full bg-rose-500 hover:bg-rose-600 text-black font-extrabold py-2.5 px-4 rounded-xl text-[10px] uppercase tracking-wider transition duration-300 cursor-pointer"
+          >
             Aceitar Desafio
           </button>
         </motion.div>

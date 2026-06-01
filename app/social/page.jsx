@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { offlineManager } from "@/lib/offlineManager"
+import { useGamificacao } from "@/hooks/useGamificacao"
 import PageHeader from "@/components/PageHeader"
 import Navbar from "@/components/Navbar"
 import { Users, Sparkles, Trophy, Plus, LogOut, CheckCircle, ShieldAlert, Send } from "lucide-react"
@@ -16,12 +17,15 @@ export default function SocialPage() {
   const [challenges, setChallenges] = useState([])
   const [squads, setSquads] = useState([])
   const [squadMemberships, setSquadMemberships] = useState([])
+  const [challengeMemberships, setChallengeMemberships] = useState({})
   const [error, setError] = useState("")
 
   const [storyText, setStoryText] = useState("")
   const [storyMedia, setStoryMedia] = useState("")
   const [challenge, setChallenge] = useState({ title: "", description: "", goal: "", reward: "" })
   const [squad, setSquad] = useState({ name: "", description: "", capacity: 12 })
+
+  const { avaliarEConquistar } = useGamificacao()
 
   useEffect(() => {
     async function init() {
@@ -31,6 +35,7 @@ export default function SocialPage() {
       carregarChallenges()
       carregarSquads()
       carregarSquadMemberships(user?.id)
+      carregarChallengeMemberships(user?.id)
     }
     init()
   }, [])
@@ -44,6 +49,7 @@ export default function SocialPage() {
         carregarChallenges()
         carregarSquads()
         carregarSquadMemberships(user.id)
+        carregarChallengeMemberships(user.id)
       }
     }
 
@@ -116,7 +122,101 @@ export default function SocialPage() {
       const memberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${usrId}`) || "[]")
       setSquadMemberships(memberships)
     }
-  }  async function publicarStory() {
+  }
+
+  async function carregarChallengeMemberships(usrId) {
+    if (!usrId) return
+    try {
+      const { data, error } = await supabase
+        .from("challenge_participants")
+        .select("challenge_id, status")
+        .eq("usuario_id", usrId)
+      
+      if (error) throw error
+      const mapping = {}
+      data?.forEach(m => {
+        mapping[m.challenge_id] = m.status
+      })
+      setChallengeMemberships(mapping)
+    } catch (err) {
+      const mapping = JSON.parse(localStorage.getItem(`vexx_challenge_memberships_${usrId}`) || "{}")
+      setChallengeMemberships(mapping)
+    }
+  }
+
+  async function joinChallenge(challengeId) {
+    if (!user) return setError("Faça login para entrar no desafio")
+    try {
+      const { error } = await supabase.from("challenge_participants").insert([{ challenge_id: challengeId, usuario_id: user.id, status: "joined" }])
+      if (error) throw error
+      setChallengeMemberships(prev => ({ ...prev, [challengeId]: "joined" }))
+      
+      // Avaliar gamificação
+      await avaliarEConquistar(user.id, "challenge_accept")
+    } catch (err) {
+      console.log("Entrando no desafio localmente...")
+      const local = JSON.parse(localStorage.getItem(`vexx_challenge_memberships_${user.id}`) || "{}")
+      local[challengeId] = "joined"
+      localStorage.setItem(`vexx_challenge_memberships_${user.id}`, JSON.stringify(local))
+      setChallengeMemberships(prev => ({ ...prev, [challengeId]: "joined" }))
+
+      // Enfileirar mutação
+      offlineManager.addMutation("challenge_participants", "insert", {
+        challenge_id: challengeId,
+        usuario_id: user.id,
+        status: "joined"
+      })
+
+      await avaliarEConquistar(user.id, "challenge_accept")
+    }
+  }
+
+  async function completeChallenge(challengeId) {
+    if (!user) return setError("Faça login para concluir o desafio")
+    try {
+      const { error } = await supabase
+        .from("challenge_participants")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("challenge_id", challengeId)
+        .eq("usuario_id", user.id)
+      
+      if (error) throw error
+      setChallengeMemberships(prev => ({ ...prev, [challengeId]: "completed" }))
+      
+      // Avaliar conquistas e conceder prêmio
+      await avaliarEConquistar(user.id, "challenge_complete")
+      
+      // Registrar no histórico de conclusões locais para contagem
+      const localCompletes = JSON.parse(localStorage.getItem(`vexx_challenge_completes_${user.id}`) || "[]")
+      if (!localCompletes.includes(challengeId)) {
+        localStorage.setItem(`vexx_challenge_completes_${user.id}`, JSON.stringify([...localCompletes, challengeId]))
+      }
+    } catch (err) {
+      console.log("Concluindo desafio localmente...")
+      const local = JSON.parse(localStorage.getItem(`vexx_challenge_memberships_${user.id}`) || "{}")
+      local[challengeId] = "completed"
+      localStorage.setItem(`vexx_challenge_memberships_${user.id}`, JSON.stringify(local))
+      setChallengeMemberships(prev => ({ ...prev, [challengeId]: "completed" }))
+
+      const localCompletes = JSON.parse(localStorage.getItem(`vexx_challenge_completes_${user.id}`) || "[]")
+      if (!localCompletes.includes(challengeId)) {
+        localStorage.setItem(`vexx_challenge_completes_${user.id}`, JSON.stringify([...localCompletes, challengeId]))
+      }
+
+      // Enfileirar mutação
+      offlineManager.addMutation("challenge_participants", "update", {
+        status: "completed",
+        completed_at: new Date().toISOString()
+      }, [
+        { type: "eq", column: "challenge_id", value: challengeId },
+        { type: "eq", column: "usuario_id", value: user.id }
+      ])
+
+      await avaliarEConquistar(user.id, "challenge_complete")
+    }
+  }
+
+  async function publicarStory() {
     if (!user) return setError("Faça login para publicar um story")
     if (!storyText.trim()) return setError("Escreva algo para o story")
 
@@ -127,6 +227,7 @@ export default function SocialPage() {
       setStoryText("")
       setStoryMedia("")
       carregarStories()
+      await avaliarEConquistar(user.id, "story")
     } catch (err) {
       console.log("Salvando story localmente no social...")
       const expires = new Date(Date.now() + 24 * HOUR).toISOString()
@@ -157,6 +258,7 @@ export default function SocialPage() {
       setStoryText("")
       setStoryMedia("")
       setError("")
+      await avaliarEConquistar(user.id, "story")
     }
   }
 
@@ -211,6 +313,8 @@ export default function SocialPage() {
       setSquad({ name: "", description: "", capacity: 12 })
       carregarSquads()
       carregarSquadMemberships(user.id)
+      await avaliarEConquistar(user.id, "squad_create")
+      await avaliarEConquistar(user.id, "squad_join")
     } catch (err) {
       console.log("Salvando squad localmente no social...")
       const localSquads = JSON.parse(localStorage.getItem("vexx_squads") || "[]")
@@ -254,6 +358,8 @@ export default function SocialPage() {
       setSquads(atualizados)
       setSquadMemberships(membershipsAtualizado)
       setError("")
+      await avaliarEConquistar(user.id, "squad_create")
+      await avaliarEConquistar(user.id, "squad_join")
     }
   }
 
@@ -262,11 +368,15 @@ export default function SocialPage() {
     const isMember = squadMemberships.includes(squadId)
     if (isMember) return
 
+    const targetSquad = squads.find(s => s.id === squadId)
+    const count = targetSquad?.squad_members?.length || 0
+
     try {
       const { error } = await supabase.from("squad_members").insert([{ squad_id: squadId, usuario_id: user.id }])
       if (error) throw error
       setSquadMemberships((prev) => [...prev, squadId])
       carregarSquads()
+      await avaliarEConquistar(user.id, "squad_join", { membrosCount: count + 1 })
     } catch (err) {
       console.log("Entrando em squad localmente...")
       const localMemberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${user.id}`) || "[]")
@@ -293,6 +403,7 @@ export default function SocialPage() {
       setSquadMemberships(membershipsAtualizado)
       setSquads(squadsAtualizados)
       setError("")
+      await avaliarEConquistar(user.id, "squad_join", { membrosCount: count + 1 })
     }
   }
 
@@ -457,9 +568,32 @@ export default function SocialPage() {
                 </span>
               </div>
               <p className="text-zinc-400 text-xs font-medium leading-relaxed mb-3">{c.description}</p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-wider pt-2 border-t border-zinc-900">
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-wider pt-2 border-t border-zinc-900 mb-3">
                 <span>Meta: <span className="text-zinc-300">{c.goal}</span></span>
                 <span>Recompensa: <span className="text-amber-400">{c.reward}</span></span>
+              </div>
+
+              {/* Botões de Ação do Desafio */}
+              <div className="flex gap-2">
+                {!challengeMemberships[c.id] ? (
+                  <button 
+                    onClick={() => joinChallenge(c.id)}
+                    className="flex-1 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition duration-300 cursor-pointer"
+                  >
+                    Participar do Desafio 🎯
+                  </button>
+                ) : challengeMemberships[c.id] === "joined" ? (
+                  <button 
+                    onClick={() => completeChallenge(c.id)}
+                    className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-zinc-950 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition duration-300 shadow-md shadow-emerald-500/10 cursor-pointer"
+                  >
+                    Marcar como Concluído 🎖️
+                  </button>
+                ) : (
+                  <div className="flex-1 bg-emerald-500/5 border border-emerald-500/10 text-emerald-400 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider text-center">
+                    Desafio Concluído! 🏆
+                  </div>
+                )}
               </div>
             </div>
           ))}

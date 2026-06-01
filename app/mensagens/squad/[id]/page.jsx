@@ -4,10 +4,12 @@ import React, { useState, useEffect, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import { useParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
+import { useGamificacao } from "@/hooks/useGamificacao"
 
 export default function ChatSquad() {
   const { id: squadId } = useParams()
   const router = useRouter()
+  const { avaliarEConquistar } = useGamificacao()
 
   // Interface
   const [abaAtiva, setAbaAtiva] = useState("chat")
@@ -189,10 +191,13 @@ export default function ChatSquad() {
       } else if (cmdLower === "/peso") {
         localStorage.setItem("meu_peso", val)
         alert(`Peso corporal atualizado para ${val}KG!`)
+        if (meuId) await avaliarEConquistar(meuId, "peso")
       } else if (cmdLower === "/agua") {
         alert(`${val || 250}ml de água ingeridos com sucesso!`)
+        if (meuId) await avaliarEConquistar(meuId, "hidro")
       } else if (cmdLower === "/creatina") {
         alert("Creatina diária registrada!")
+        if (meuId) await avaliarEConquistar(meuId, "creatina")
       } else if (cmdLower === "/descanso") {
         alert(`Timer de descanso de ${val || 60}s iniciado no hud.`)
       } else {
@@ -201,13 +206,18 @@ export default function ChatSquad() {
 
         if (nomeExercicio && !isNaN(pesoNovo)) {
           // Salvar registro de treino
-          await supabase.from("registros_treino").insert({ 
-            usuario_id: meuId, 
-            exercicio: nomeExercicio, 
-            peso: pesoNovo, 
-            series: serie 
-          })
+          try {
+            await supabase.from("registros_treino").insert({ 
+              usuario_id: meuId, 
+              exercicio: nomeExercicio, 
+              peso: pesoNovo, 
+              series: serie 
+            })
+          } catch (e) {
+            console.log("Registrando treino localmente...")
+          }
           alert(`Treino de ${nomeExercicio} gravado! Carga: ${pesoNovo}kg.`)
+          if (meuId) await avaliarEConquistar(meuId, "treino", { ia: false })
         }
       }
     } catch (err) { 

@@ -7,51 +7,7 @@ import Navbar from "@/components/Navbar";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Flame, Trophy, Target, TrendingUp, Zap, Calendar, Activity, Sparkles, Award } from "lucide-react";
 import { motion } from "framer-motion";
-
-const BADGES = {
-  "primeira-corrida": {
-    icon: Trophy,
-    nome: "Debutante",
-    descricao: "Completar primeira corrida",
-    reward: 50,
-  },
-  "streak-7": {
-    icon: Flame,
-    nome: "Semana de Fogo",
-    descricao: "7 dias seguidos com atividade",
-    reward: 100,
-  },
-  "streak-30": {
-    icon: Award,
-    nome: "Mês de Ouro",
-    descricao: "30 dias de streak",
-    reward: 500,
-  },
-  "km-100": {
-    icon: Target,
-    nome: "Centista",
-    descricao: "Completar 100 km totais",
-    reward: 200,
-  },
-  "km-1000": {
-    icon: Zap,
-    nome: "Lenda",
-    descricao: "Completar 1000 km",
-    reward: 1000,
-  },
-  "treino-10": {
-    icon: Activity,
-    nome: "Musculação",
-    descricao: "Completar 10 treinos",
-    reward: 150,
-  },
-  "compartilhamento": {
-    icon: Sparkles,
-    nome: "Influenciador",
-    descricao: "Compartilhar 5 vezes",
-    reward: 75,
-  },
-};
+import { useGamificacao, BADGES_CATALOG } from "@/hooks/useGamificacao";
 
 export default function Dashboard() {
   const [userData, setUserData] = useState(null);
@@ -186,17 +142,32 @@ export default function Dashboard() {
 
         setStreak(streakCount);
 
-        const badgesDesbloqueados = [];
-        if (runs && runs.length > 0) {
-          badgesDesbloqueados.push("primeira-corrida");
+        // Instancia a avaliação de conquistas
+        const { avaliarEConquistar } = useGamificacao();
+        
+        // Disparar avaliações automáticas de marcos e streaks
+        if (user.id) {
+          await avaliarEConquistar(user.id, "streak", { streak: streakCount });
+          await avaliarEConquistar(user.id, "run", { distancia: Math.max(...(runs?.map(r => r.distancia) || [0])) });
+          await avaliarEConquistar(user.id, "treino", { ia: false });
         }
-        if (streakCount >= 7) badgesDesbloqueados.push("streak-7");
-        if (streakCount >= 30) badgesDesbloqueados.push("streak-30");
-        if (totKm >= 100) badgesDesbloqueados.push("km-100");
-        if (totKm >= 1000) badgesDesbloqueados.push("km-1000");
-        if (treinos && treinos.length >= 10) badgesDesbloqueados.push("treino-10");
 
-        setBadges(badgesDesbloqueados);
+        // Carregar conquistas oficiais do banco
+        let unlockedIds = [];
+        try {
+          const { data, error } = await supabase
+            .from("usuarios_conquistas")
+            .select("conquista_id")
+            .eq("usuario_id", user.id);
+          
+          if (error) throw error;
+          unlockedIds = data?.map(c => c.conquista_id) || [];
+        } catch (dbErr) {
+          console.log("Dashboard carregando conquistas locais offline...");
+          unlockedIds = JSON.parse(localStorage.getItem(`vexx_conquistas_${user.id}`) || "[]");
+        }
+
+        setBadges(unlockedIds);
       } catch (error) {
         console.error("Erro ao buscar dashboard:", error);
       } finally {
@@ -371,13 +342,12 @@ export default function Dashboard() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {badges.map((badgeId) => {
-                const badge = BADGES[badgeId];
+                const badge = BADGES_CATALOG[badgeId];
                 if (!badge) return null;
-                const BadgeIcon = badge.icon;
                 return (
-                  <div key={badgeId} className="bg-zinc-900/20 border border-amber-500/10 rounded-xl p-4 flex flex-col items-center justify-center">
-                    <BadgeIcon className="w-8 h-8 text-amber-400 mb-2" />
-                    <p className="text-xs font-bold text-amber-400 text-center uppercase tracking-wide leading-none">{badge.nome}</p>
+                  <div key={badgeId} className="bg-zinc-900/20 border border-amber-500/10 rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                    <span className="text-3xl mb-2 select-none">{badge.icon}</span>
+                    <p className="text-xs font-bold text-amber-400 uppercase tracking-wide leading-none">{badge.nome}</p>
                     <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider text-center mt-2">+{badge.reward} XP</p>
                   </div>
                 );
@@ -388,14 +358,13 @@ export default function Dashboard() {
           <div className="mt-4">
             <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-3">Próximos Objetivos:</p>
             <div className="grid grid-cols-2 gap-3">
-              {Object.entries(BADGES)
+              {Object.entries(BADGES_CATALOG)
                 .filter(([id]) => !badges.includes(id))
                 .slice(0, 4)
                 .map(([id, badge]) => {
-                  const BadgeIcon = badge.icon;
                   return (
                     <div key={id} className="bg-zinc-900/10 border border-zinc-900/60 rounded-xl p-3.5 opacity-40 flex items-center gap-3">
-                      <BadgeIcon className="w-6 h-6 text-zinc-500" />
+                      <span className="text-2xl select-none">{badge.icon}</span>
                       <div className="flex flex-col">
                         <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide leading-none">{badge.nome}</p>
                         <p className="text-[8px] text-zinc-600 font-semibold uppercase tracking-wider mt-1">+{badge.reward} XP</p>

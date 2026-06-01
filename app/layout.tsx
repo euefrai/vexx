@@ -5,6 +5,7 @@ import InstallPrompt from "@/components/InstallPrompt";
 import UpdatePrompt from "@/components/UpdatePrompt";
 import RegisterSW from "@/components/RegisterSW";
 import OfflineSyncManager from "@/components/OfflineSyncManager";
+import GlobalAchievementListener from "@/components/GlobalAchievementListener";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -47,6 +48,7 @@ export default function RootLayout({
       >
         <RegisterSW />
         <OfflineSyncManager />
+        <GlobalAchievementListener />
         <UpdatePrompt />
         <main>{children}</main>
         <InstallPrompt />

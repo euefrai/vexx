@@ -15,7 +15,7 @@ function ConteudoNovoTreino() {
   const treinoId = searchParams.get("id")
   const iaTreino = searchParams.get("ia") // 🔥 CAPTURA O TREINO DA IA
 
-  const { adicionarXP } = useGamificacao()
+  const { adicionarXP, avaliarEConquistar } = useGamificacao()
 
   const [titulo, setTitulo] = useState("")
   const [autor, setAutor] = useState("") 
@@ -169,6 +169,7 @@ function ConteudoNovoTreino() {
         if (error) throw error
         const xpTotal = 100 + (exercicios.length * 20)
         if (adicionarXP) await adicionarXP(user.id, xpTotal)
+        if (avaliarEConquistar) await avaliarEConquistar(user.id, "treino", { ia: !!iaTreino })
         showToast(`Missão Finalizada! +${xpTotal} XP 🔥`, "success")
       }
       

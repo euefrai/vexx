@@ -29,7 +29,7 @@ import { offlineManager } from "@/lib/offlineManager";
 
 export default function RunPage() {
   const { user } = useAuth();
-  const { adicionarXP } = useGamificacao();
+  const { adicionarXP, avaliarEConquistar } = useGamificacao();
 
   // 📡 GPS TRACKING REAL HOOK
   const {
@@ -400,6 +400,9 @@ export default function RunPage() {
       // 2. Adicionar XP real de Atleta (+500 XP)
       if (adicionarXP) {
         await adicionarXP(user.id, 500);
+      }
+      if (avaliarEConquistar) {
+        await avaliarEConquistar(user.id, "run", { distancia: activeDistance });
       }
 
       console.log("✅ Corrida gravada com sucesso!");
