@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Navbar from "@/components/Navbar"
 import AdminGuard from "@/components/AdminGuard"
 import PageHeader from "@/components/PageHeader"
+import { BADGES_CATALOG } from "@/hooks/useGamificacao"
 import { 
   Shield, Users, Trophy, Flame, Zap, Sparkles, Activity, Trash2, Plus, 
   Search, ShieldAlert, Award, Calendar, Check, X, RefreshCw, BarChart2,
@@ -37,6 +38,13 @@ export default function AdminMaster() {
   const [challengesList, setChallengesList] = useState([])
   const [squadsList, setSquadsList] = useState([])
   const [loadingDesafiosSquads, setLoadingDesafiosSquads] = useState(false)
+  const [squadExpandida, setSquadExpandida] = useState(null)
+
+  // --- GESTÃO DE CONQUISTAS (CONQUISTAS) ---
+  const [selectedUserIdConquistas, setSelectedUserIdConquistas] = useState("")
+  const [userConquistasList, setUserConquistasList] = useState([])
+  const [loadingUserConquistas, setLoadingUserConquistas] = useState(false)
+  const [conquistaParaDar, setConquistaParaDar] = useState("")
 
   // --- GESTÃO LOGS (VIGILÂNCIA) ---
   const [logs, setLogs] = useState([])
@@ -49,7 +57,17 @@ export default function AdminMaster() {
     if (abaAtiva === "arsenal") carregarDadosArsenal()
     if (abaAtiva === "desafios_squads") carregarDadosDesafiosESquads()
     if (abaAtiva === "vigilancia") carregarLogs()
+    if (abaAtiva === "conquistas") carregarUsuarios()
   }, [abaAtiva])
+
+  useEffect(() => {
+    if (selectedUserIdConquistas) {
+      carregarConquistasDoUsuario(selectedUserIdConquistas)
+    } else {
+      setUserConquistasList([])
+    }
+  }, [selectedUserIdConquistas])
+
 
   // --- CARREGAR METRICAS GLOBAIS ---
   async function carregarMetricasGlobais() {
@@ -168,20 +186,24 @@ export default function AdminMaster() {
       const rawChallenges = challengesRes.data || []
       const rawSquads = squadsRes.data || []
 
-      // 2. Extrair proprietários (owners) únicos de ambas as tabelas
-      const ownerIds = [
-        ...new Set([
-          ...rawChallenges.filter(c => c.owner_id).map(c => c.owner_id),
-          ...rawSquads.filter(s => s.owner_id).map(s => s.owner_id)
-        ])
-      ]
+      // 2. Extrair proprietários (owners) e membros únicos de ambas as tabelas
+      const allUserIds = new Set()
+      rawChallenges.forEach(c => { if (c.owner_id) allUserIds.add(c.owner_id) })
+      rawSquads.forEach(s => {
+        if (s.owner_id) allUserIds.add(s.owner_id)
+        s.squad_members?.forEach(m => {
+          if (m.usuario_id) allUserIds.add(m.usuario_id)
+        })
+      })
+
+      const userIdsArray = Array.from(allUserIds)
 
       let perfisMap = {}
-      if (ownerIds.length > 0) {
+      if (userIdsArray.length > 0) {
         const { data: perfis, error: perfisErr } = await supabase
           .from("usuarios")
           .select("id, username")
-          .in("id", ownerIds)
+          .in("id", userIdsArray)
 
         if (perfisErr) throw perfisErr
 
@@ -198,7 +220,11 @@ export default function AdminMaster() {
 
       const mappedSquads = rawSquads.map(s => ({
         ...s,
-        usuarios: s.owner_id ? (perfisMap[s.owner_id] || { username: "líder" }) : { username: "líder" }
+        usuarios: s.owner_id ? (perfisMap[s.owner_id] || { username: "líder" }) : { username: "líder" },
+        membros: (s.squad_members || []).map(m => ({
+          usuario_id: m.usuario_id,
+          username: perfisMap[m.usuario_id]?.username || "operador"
+        }))
       }))
 
       setChallengesList(mappedChallenges)
@@ -209,6 +235,124 @@ export default function AdminMaster() {
       setLoadingDesafiosSquads(false)
     }
   }
+
+  async function removerMembroSquad(squadId, usuarioId) {
+    if (!confirm("Remover este membro da Squad?")) return
+    try {
+      const { error } = await supabase
+        .from("squad_members")
+        .delete()
+        .eq("squad_id", squadId)
+        .eq("usuario_id", usuarioId)
+
+      if (error) throw error
+      alert("Membro removido com sucesso!")
+      carregarDadosDesafiosESquads()
+    } catch (err) {
+      console.error("Erro ao remover membro da squad:", err)
+      alert("Erro ao remover membro da squad")
+    }
+  }
+
+  // --- GESTÃO DE CONQUISTAS (CONQUISTAS) ---
+  async function carregarConquistasDoUsuario(uid) {
+    if (!uid) return
+    setLoadingUserConquistas(true)
+    try {
+      const { data, error } = await supabase
+        .from("usuarios_conquistas")
+        .select("id, conquista_id, created_at")
+        .eq("usuario_id", uid)
+
+      if (error) throw error
+      setUserConquistasList(data || [])
+    } catch (err) {
+      console.error("Erro ao carregar conquistas do usuário:", err)
+    } finally {
+      setLoadingUserConquistas(false)
+    }
+  }
+
+  async function concederConquista(uid, conquistaId) {
+    if (!uid || !conquistaId) return alert("Selecione um operador e uma conquista!")
+    const badge = BADGES_CATALOG[conquistaId]
+    if (!badge) return alert("Conquista não encontrada no catálogo!")
+
+    const jaPossui = userConquistasList.some(c => c.conquista_id === conquistaId)
+    if (jaPossui) return alert("Este operador já possui esta conquista!")
+
+    try {
+      // 1. Inserir conquista
+      const { error: insErr } = await supabase
+        .from("usuarios_conquistas")
+        .insert({ usuario_id: uid, conquista_id: conquistaId })
+
+      if (insErr) throw insErr
+
+      // 2. Adicionar recompensa de XP e recalcular nível
+      const { data: userProfile, error: profileErr } = await supabase
+        .from("usuarios")
+        .select("xp")
+        .eq("id", uid)
+        .single()
+
+      if (profileErr) throw profileErr
+
+      const novoXP = (userProfile?.xp || 0) + badge.reward
+      const novoNivel = Math.floor(novoXP / 500) + 1
+
+      const { error: xpErr } = await supabase
+        .from("usuarios")
+        .update({ xp: novoXP, nivel: novoNivel })
+        .eq("id", uid)
+
+      if (xpErr) throw xpErr
+
+      // 3. Registrar log de atividade
+      await supabase.from("logs_atividades").insert({
+        usuario_id: uid,
+        tipo_evento: "conquista_concedida",
+        descricao: `Comando concedeu manualmente a conquista "${badge.nome}" (+${badge.reward} XP)`
+      })
+
+      alert(`Conquista "${badge.nome}" concedida com sucesso! +${badge.reward} XP adicionados.`)
+      
+      carregarConquistasDoUsuario(uid)
+      carregarUsuarios()
+    } catch (err) {
+      console.error("Erro ao conceder conquista:", err)
+      alert("Falha ao conceder conquista")
+    }
+  }
+
+  async function revogarConquista(uid, conquistaId, registroId) {
+    if (!confirm("Revogar esta conquista? O XP correspondente NÃO será removido automaticamente para evitar níveis negativos ou inconsistências (ajuste o XP manualmente se necessário). Deseja prosseguir?")) return
+    const badge = BADGES_CATALOG[conquistaId]
+
+    try {
+      const { error } = await supabase
+        .from("usuarios_conquistas")
+        .delete()
+        .eq("id", registroId)
+
+      if (error) throw error
+
+      // Registrar log de atividade
+      await supabase.from("logs_atividades").insert({
+        usuario_id: uid,
+        tipo_evento: "conquista_revogada",
+        descricao: `Comando revogou manualmente a conquista "${badge?.nome || conquistaId}"`
+      })
+
+      alert("Conquista revogada com sucesso!")
+      carregarConquistasDoUsuario(uid)
+      carregarUsuarios()
+    } catch (err) {
+      console.error("Erro ao revogar conquista:", err)
+      alert("Falha ao revogar conquista")
+    }
+  }
+
 
   async function alternarStatusDesafio(id, statusAtual) {
     const novoStatus = statusAtual === "open" ? "closed" : "open"
@@ -351,6 +495,7 @@ export default function AdminMaster() {
               { id: "usuarios", label: "Operadores", icon: Users, activeColor: "border-indigo-500/30 bg-indigo-500/5 text-indigo-400" },
               { id: "arsenal", label: "Arsenal Ranks", icon: Trophy, activeColor: "border-emerald-500/30 bg-emerald-500/5 text-emerald-400" },
               { id: "desafios_squads", label: "Desafios & Squads", icon: Award, activeColor: "border-amber-500/30 bg-amber-500/5 text-amber-400" },
+              { id: "conquistas", label: "Conquistas", icon: Sparkles, activeColor: "border-yellow-500/30 bg-yellow-500/5 text-yellow-400" },
               { id: "vigilancia", label: "Vigilância Logs", icon: ShieldAlert, activeColor: "border-rose-500/30 bg-rose-500/5 text-rose-400" }
             ].map(tab => {
               const TabIcon = tab.icon
@@ -419,19 +564,24 @@ export default function AdminMaster() {
                       <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-4 flex items-center gap-2">
                         <Wrench className="w-4 h-4 text-rose-400" /> Ações Rápidas do Administrador
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                         <button onClick={() => setAbaAtiva("usuarios")} className="p-4 bg-zinc-950 rounded-xl border border-zinc-900 hover:border-zinc-800 text-left transition duration-300">
                           <p className="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-1">Buscar & Ajustar Operadores</p>
                           <p className="text-[10px] text-zinc-500">Mudar patentes, adicionar ou remover XP e modular acessos em lote.</p>
                         </button>
                         <button onClick={() => setAbaAtiva("desafios_squads")} className="p-4 bg-zinc-950 rounded-xl border border-zinc-900 hover:border-zinc-800 text-left transition duration-300">
                           <p className="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-1">Moderador de Desafios & Squads</p>
-                          <p className="text-[10px] text-zinc-500">Excluir esquadrões lotados, moderar membros e deletar desafios vencidos.</p>
+                          <p className="text-[10px] text-zinc-500">Excluir esquadrões, gerenciar/remover membros e moderar desafios ativos.</p>
+                        </button>
+                        <button onClick={() => setAbaAtiva("conquistas")} className="p-4 bg-zinc-950 rounded-xl border border-zinc-900 hover:border-zinc-800 text-left transition duration-300">
+                          <p className="text-xs font-bold text-zinc-200 uppercase tracking-wider mb-1">Gestor de Conquistas</p>
+                          <p className="text-[10px] text-zinc-500">Conceder ou revogar insígnias de operadores do catálogo de gamificação.</p>
                         </button>
                       </div>
                     </div>
                   </>
                 )}
+
               </motion.div>
             )}
 
@@ -759,9 +909,51 @@ export default function AdminMaster() {
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
+
+                              {/* PAINEL DE MEMBROS EXPANSIBILIZADO */}
+                              <div className="border-t border-zinc-900/50 pt-2 mt-1">
+                                <button
+                                  onClick={() => setSquadExpandida(squadExpandida === s.id ? null : s.id)}
+                                  className="w-full text-center text-[9px] font-extrabold uppercase tracking-wider text-indigo-400 hover:text-indigo-300 py-1.5 bg-zinc-900/20 rounded-lg hover:bg-zinc-900/40 transition flex items-center justify-center gap-1"
+                                >
+                                  {squadExpandida === s.id ? "Ocultar Membros" : "Ver Membros da Squad"}
+                                </button>
+
+                                <AnimatePresence>
+                                  {squadExpandida === s.id && (
+                                    <motion.div
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: "auto" }}
+                                      exit={{ opacity: 0, height: 0 }}
+                                      className="mt-3.5 space-y-2 overflow-hidden"
+                                    >
+                                      {(!s.membros || s.membros.length === 0) ? (
+                                        <p className="text-zinc-600 text-[8px] uppercase tracking-wider text-center py-2">Nenhum membro extra nesta squad.</p>
+                                      ) : (
+                                        s.membros.map(m => (
+                                          <div key={m.usuario_id} className="flex justify-between items-center bg-zinc-950 p-2 rounded-lg border border-zinc-900/50">
+                                            <span className="text-[10px] font-bold text-zinc-300">@{m.username}</span>
+                                            {m.usuario_id !== s.owner_id ? (
+                                              <button
+                                                onClick={() => removerMembroSquad(s.id, m.usuario_id)}
+                                                className="text-[8px] font-extrabold uppercase tracking-wider bg-rose-500/10 border border-rose-500/20 text-rose-400 px-2 py-0.5 rounded hover:bg-rose-500 hover:text-black transition"
+                                              >
+                                                Remover
+                                              </button>
+                                            ) : (
+                                              <span className="text-[8px] font-extrabold uppercase tracking-wider bg-zinc-905 border border-zinc-800 text-zinc-500 px-2 py-0.5 rounded">Líder</span>
+                                            )}
+                                          </div>
+                                        ))
+                                      )}
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
                             </div>
                           )
                         })
+
                       )}
                     </div>
                   </div>
@@ -770,7 +962,128 @@ export default function AdminMaster() {
               </motion.div>
             )}
 
-            {/* 5. VIGILÂNCIA & LOGS */}
+            {/* 5. GESTÃO DE CONQUISTAS (CONQUISTAS) */}
+            {abaAtiva === 'conquistas' && (
+              <motion.div key="conquistas" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  
+                  {/* CONCEDER CONQUISTA */}
+                  <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5 space-y-4">
+                    <h2 className="text-xs font-bold text-yellow-450 uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-yellow-400" /> Conceder Conquista Manual
+                    </h2>
+
+                    <div className="space-y-4">
+                      {/* 1. SELECIONAR OPERADOR */}
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block">Selecionar Operador</label>
+                        <select
+                          value={selectedUserIdConquistas}
+                          onChange={e => setSelectedUserIdConquistas(e.target.value)}
+                          className="w-full bg-zinc-950 border border-zinc-900 text-xs font-bold p-3 rounded-xl outline-none uppercase tracking-wider text-white focus:border-zinc-800"
+                        >
+                          <option value="">-- SELECIONE UM OPERADOR --</option>
+                          {usuarios.map(u => (
+                            <option key={u.id} value={u.id}>
+                              @{u.username} (XP: {u.xp})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* 2. SELECIONAR BADGE */}
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest block">Selecionar Medalha / Conquista</label>
+                        <select
+                          value={conquistaParaDar}
+                          onChange={e => setConquistaParaDar(e.target.value)}
+                          className="w-full bg-zinc-950 border border-zinc-900 text-xs font-bold p-3 rounded-xl outline-none uppercase tracking-wider text-white focus:border-zinc-800"
+                        >
+                          <option value="">-- SELECIONE UMA CONQUISTA --</option>
+                          {Object.entries(BADGES_CATALOG).map(([key, b]) => (
+                            <option key={key} value={key}>
+                              {b.icon} {b.nome} (+{b.reward} XP - {b.categoria})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* PREVIEW DA CONQUISTA SELECIONADA */}
+                      {conquistaParaDar && BADGES_CATALOG[conquistaParaDar] && (
+                        <div className="p-4 rounded-xl border border-zinc-900 bg-zinc-950/80 flex items-center gap-3.5">
+                          <span className="text-2xl">{BADGES_CATALOG[conquistaParaDar].icon}</span>
+                          <div>
+                            <p className="font-extrabold uppercase text-xs text-white">{BADGES_CATALOG[conquistaParaDar].nome}</p>
+                            <p className="text-[10px] text-zinc-400 mt-0.5">{BADGES_CATALOG[conquistaParaDar].descricao}</p>
+                            <p className="text-[8px] font-bold text-yellow-500 uppercase tracking-wider mt-1">Recompensa: +{BADGES_CATALOG[conquistaParaDar].reward} XP</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => concederConquista(selectedUserIdConquistas, conquistaParaDar)}
+                        disabled={!selectedUserIdConquistas || !conquistaParaDar}
+                        className="w-full bg-yellow-500 disabled:bg-zinc-900 disabled:text-zinc-600 disabled:border-zinc-850 hover:bg-yellow-600 text-black font-extrabold py-3.5 rounded-xl text-[10px] uppercase tracking-wider transition"
+                      >
+                        Conceder Conquista & Recompensa
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* VISUALIZAR / REVOGAR CONQUISTAS */}
+                  <div className="bg-zinc-900/20 backdrop-blur-sm border border-zinc-900 rounded-xl p-5 space-y-4">
+                    <h2 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                      Conquistas Ativas do Operador
+                    </h2>
+
+                    {!selectedUserIdConquistas ? (
+                      <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-wider text-center py-12">
+                        Selecione um operador na coluna ao lado para auditar suas conquistas.
+                      </p>
+                    ) : loadingUserConquistas ? (
+                      <div className="flex justify-center py-12">
+                        <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    ) : userConquistasList.length === 0 ? (
+                      <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-wider text-center py-12">
+                        Este operador ainda não possui nenhuma conquista no registro.
+                      </p>
+                    ) : (
+                      <div className="space-y-3.5 max-h-[400px] overflow-y-auto pr-1 scrollbar-none">
+                        {userConquistasList.map(item => {
+                          const badge = BADGES_CATALOG[item.conquista_id] || {
+                            nome: item.conquista_id,
+                            descricao: "Conquista personalizada / desconhecida",
+                            icon: "🏅"
+                          }
+                          return (
+                            <div key={item.id} className="p-3.5 bg-zinc-950 border border-zinc-900 rounded-xl flex justify-between items-center gap-3">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xl">{badge.icon}</span>
+                                <div>
+                                  <p className="font-extrabold uppercase text-zinc-200 text-xs">{badge.nome}</p>
+                                  <p className="text-[9px] text-zinc-500">{badge.descricao}</p>
+                                  <p className="text-[8px] text-zinc-650 font-bold uppercase mt-0.5">Adquirida em: {new Date(item.created_at).toLocaleDateString()}</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => revogarConquista(selectedUserIdConquistas, item.conquista_id, item.id)}
+                                className="text-zinc-600 hover:text-rose-500 transition duration-300"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </motion.div>
+            )}
+
+            {/* 6. VIGILÂNCIA & LOGS */}
             {abaAtiva === 'vigilancia' && (
               <motion.div key="vigilancia" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
                 
