@@ -5,8 +5,27 @@ import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import Navbar from "@/components/Navbar"
 import PageHeader from "@/components/PageHeader"
-import { Search, MessageSquare, Users, MessageCircle, Plus, ChevronRight } from "lucide-react"
+import { Search, MessageSquare, Users, MessageCircle, ChevronRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+
+// Componente utilitário para renderizar foto ou iniciais do usuário com design premium
+function RenderUserAvatar({ usuario, size = "w-12 h-12 text-xs" }) {
+  if (usuario?.foto) {
+    return (
+      <div className={`${size} rounded-full border border-zinc-850 overflow-hidden shrink-0 bg-zinc-900`}>
+        <img src={usuario.foto} className="w-full h-full object-cover" alt="avatar" />
+      </div>
+    )
+  }
+  
+  const username = usuario?.username || "atleta"
+  const initials = username.substring(0, 2).toUpperCase()
+  return (
+    <div className={`${size} rounded-full border border-zinc-850 overflow-hidden shrink-0 bg-zinc-900 flex items-center justify-center font-black tracking-tighter text-blue-400 select-none`}>
+      {initials}
+    </div>
+  )
+}
 
 export default function ListaMensagens() {
   const [abaAtiva, setAbaAtiva] = useState("diretas")
@@ -65,7 +84,7 @@ export default function ListaMensagens() {
         setConversas(Object.values(chatsAgrupados))
       }
 
-      // 3. Carregar Esquadrões (Squads) do Usuário com Fallback robusto
+      // 3. Carregar Esquadrões (Squads) do Usuário com Junções no Cliente
       await carregarEsquadroes(user)
 
     } catch (error) {
@@ -77,27 +96,29 @@ export default function ListaMensagens() {
 
   async function carregarEsquadroes(user) {
     try {
-      const { data, error } = await supabase
+      // 1. Buscar membros de forma plana
+      const { data: membersRes, error: membersErr } = await supabase
         .from("squad_members")
-        .select(`
-          squad_id,
-          squads (
-            id,
-            name,
-            description,
-            capacity,
-            owner_id
-          )
-        `)
+        .select("squad_id")
         .eq("usuario_id", user.id)
       
-      if (error) throw error
+      if (membersErr) throw membersErr
 
-      if (data && data.length > 0) {
-        setSquads(data.map(m => m.squads).filter(Boolean))
-      } else {
-        setSquads([])
+      const squadIds = membersRes?.map(m => m.squad_id).filter(Boolean) || []
+      
+      let minhasSquads = []
+      if (squadIds.length > 0) {
+        // 2. Buscar squads em lote
+        const { data: squadsRes, error: squadsErr } = await supabase
+          .from("squads")
+          .select("id, name, description, capacity, owner_id")
+          .in("id", squadIds)
+        
+        if (squadsErr) throw squadsErr
+        minhasSquads = squadsRes || []
       }
+
+      setSquads(minhasSquads)
     } catch (err) {
       console.log("Banco Supabase offline ou sem tabelas de squads, carregando fallback local...", err.message)
       
@@ -105,18 +126,7 @@ export default function ListaMensagens() {
       const localMemberships = JSON.parse(localStorage.getItem(`vexx_squad_members_${user.id}`) || "[]")
       
       const minhasSquads = localSquads.filter(s => s.owner_id === user.id || localMemberships.includes(s.id))
-      
-      if (minhasSquads.length === 0) {
-        const mockSquads = [
-          { id: "squad-alpha-tactical", name: "Alpha Tactical", description: "Esquadrão focado em treinos de corrida de alta intensidade e maratonas de rua.", capacity: 12, owner_id: user.id },
-          { id: "squad-iron-body", name: "Iron Body Builders", description: "Operações táticas de calistenia pesada, musculação e ganho de força bruta.", capacity: 15, owner_id: "outro" }
-        ]
-        localStorage.setItem("vexx_squads", JSON.stringify(mockSquads))
-        localStorage.setItem(`vexx_squad_members_${user.id}`, JSON.stringify(["squad-alpha-tactical", "squad-iron-body"]))
-        setSquads(mockSquads)
-      } else {
-        setSquads(minhasSquads)
-      }
+      setSquads(minhasSquads)
     }
   }
 
@@ -146,7 +156,7 @@ export default function ListaMensagens() {
             placeholder="Localizar combatente ou esquadrão..." 
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="w-full bg-zinc-900/35 border border-zinc-900 rounded-2xl py-3.5 pl-11 pr-4 text-xs font-semibold tracking-wide text-zinc-200 placeholder:text-zinc-650 outline-none focus:border-blue-500/30 focus:bg-zinc-900/50 transition-all placeholder:font-medium placeholder:uppercase" 
+            className="w-full bg-zinc-900/35 border border-zinc-900 rounded-2xl py-3.5 pl-11 pr-4 text-xs font-semibold tracking-wide text-zinc-200 placeholder:text-zinc-655 outline-none focus:border-blue-500/30 focus:bg-zinc-900/50 transition-all placeholder:font-medium placeholder:uppercase" 
           />
         </div>
 
@@ -154,7 +164,7 @@ export default function ListaMensagens() {
         <div className="flex bg-zinc-900/40 p-1 rounded-2xl border border-zinc-900 mb-6 backdrop-blur-md relative z-10">
           <button 
             onClick={() => { setAbaAtiva("diretas"); setBusca(""); }} 
-            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer border-none ${
               abaAtiva === "diretas" 
                 ? "bg-blue-500 text-black shadow-lg shadow-blue-950/20" 
                 : "text-zinc-500 hover:text-zinc-300"
@@ -164,7 +174,7 @@ export default function ListaMensagens() {
           </button>
           <button 
             onClick={() => { setAbaAtiva("esquadroes"); setBusca(""); }} 
-            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer border-none ${
               abaAtiva === "esquadroes" 
                 ? "bg-blue-500 text-black shadow-lg shadow-blue-950/20" 
                 : "text-zinc-500 hover:text-zinc-300"
@@ -192,15 +202,9 @@ export default function ListaMensagens() {
                   </h2>
                   <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar px-1">
                     {seguindo.map(u => (
-                      <Link href={`/mensagens/${u.id}`} key={u.id} className="flex flex-col items-center gap-1.5 shrink-0 active:scale-95 transition-transform group">
+                      <Link href={`/mensagens/${u.id}`} key={u.id} className="flex flex-col items-center gap-1.5 shrink-0 active:scale-95 transition-transform group text-decoration-none">
                         <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-blue-500/20 to-teal-500/20 group-hover:from-blue-500/40 group-hover:to-teal-500/40 transition-all overflow-hidden flex items-center justify-center shadow-lg relative">
-                          <div className="w-full h-full rounded-full border border-black overflow-hidden bg-zinc-900">
-                            <img 
-                              src={u.foto || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
-                              className="w-full h-full object-cover"
-                              alt={u.username}
-                            />
-                          </div>
+                          <RenderUserAvatar usuario={u} size="w-full h-full" />
                         </div>
                         <span className="text-[8.5px] font-bold text-zinc-500 truncate w-16 text-center group-hover:text-zinc-300 transition-colors">
                           @{u.username}
@@ -226,7 +230,7 @@ export default function ListaMensagens() {
               {loading ? (
                 <div className="text-center py-20 flex flex-col items-center gap-3">
                    <div className="w-5 h-5 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                   <span className="text-zinc-600 font-bold text-[9px] uppercase tracking-widest">Sincronizando Mensagens...</span>
+                   <span className="text-zinc-600 font-bold text-[9px] uppercase tracking-widest">Sincronizando Transmissões...</span>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -246,16 +250,10 @@ export default function ListaMensagens() {
                     </div>
                   ) : (
                     conversasFiltradas.map(chat => (
-                      <Link href={`/mensagens/${chat.id}`} key={chat.id} className="block group">
+                      <Link href={`/mensagens/${chat.id}`} key={chat.id} className="block group text-decoration-none">
                         <div className="flex items-center gap-4 bg-zinc-900/20 p-4 rounded-3xl border border-zinc-900 group-hover:border-zinc-800/80 group-hover:bg-zinc-900/40 transition-all duration-300 active:scale-[0.98]">
                           <div className="relative shrink-0 w-12 h-12">
-                            <div className="w-full h-full rounded-full overflow-hidden border border-zinc-850 bg-zinc-900">
-                              <img 
-                                src={chat.foto || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
-                                className="w-full h-full object-cover" 
-                                alt={chat.username}
-                              />
-                            </div>
+                            <RenderUserAvatar usuario={chat} size="w-full h-full" />
                             <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-zinc-950 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)] animate-pulse"></div>
                           </div>
                           
@@ -310,12 +308,12 @@ export default function ListaMensagens() {
                       </p>
                       {!busca && (
                         <div className="flex gap-2">
-                          <Link href="/social">
+                          <Link href="/social" className="text-decoration-none">
                             <span className="text-[8.5px] bg-blue-500 text-black font-black uppercase tracking-wider px-4 py-2 rounded-xl active:scale-95 cursor-pointer block">
                               Explorar Esquadrões
                             </span>
                           </Link>
-                          <Link href="/social">
+                          <Link href="/social" className="text-decoration-none">
                             <span className="text-[8.5px] bg-zinc-900 border border-zinc-800 text-zinc-350 font-black uppercase tracking-wider px-4 py-2 rounded-xl active:scale-95 cursor-pointer block hover:border-zinc-700">
                               Criar Squad
                             </span>
@@ -325,7 +323,7 @@ export default function ListaMensagens() {
                     </div>
                   ) : (
                     squadsFiltrados.map(sq => (
-                      <Link href={`/mensagens/squad/${sq.id}`} key={sq.id} className="block group">
+                      <Link href={`/mensagens/squad/${sq.id}`} key={sq.id} className="block group text-decoration-none">
                         <div className="flex items-center gap-4 bg-zinc-900/20 p-4 rounded-3xl border border-zinc-900 group-hover:border-zinc-800/80 group-hover:bg-zinc-900/40 transition-all duration-300 active:scale-[0.98]">
                           <div className="relative shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500/20 to-indigo-600/30 rounded-2xl flex items-center justify-center border border-blue-500/30 shadow-md">
                             <span className="text-blue-400 text-base font-black italic uppercase">

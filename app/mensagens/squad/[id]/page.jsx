@@ -6,6 +6,25 @@ import { useParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useGamificacao } from "@/hooks/useGamificacao"
 
+// Componente para renderizar foto ou iniciais do usuário com design premium
+function RenderAvatar({ usuario, size = "w-8.5 h-8.5 text-[10px]" }) {
+  if (usuario?.foto) {
+    return (
+      <div className={`${size} rounded-full border border-zinc-800 overflow-hidden shrink-0 bg-zinc-900`}>
+        <img src={usuario.foto} className="w-full h-full object-cover" alt="avatar" />
+      </div>
+    )
+  }
+  
+  const username = usuario?.username || "atleta"
+  const initials = username.substring(0, 2).toUpperCase()
+  return (
+    <div className={`${size} rounded-full border border-zinc-800 overflow-hidden shrink-0 bg-zinc-900 flex items-center justify-center font-black tracking-tighter text-blue-400 select-none`}>
+      {initials}
+    </div>
+  )
+}
+
 export default function ChatSquad() {
   const { id: squadId } = useParams()
   const router = useRouter()
@@ -60,14 +79,21 @@ export default function ChatSquad() {
   useEffect(() => {
     iniciarSessao()
 
-    // Inscrever em tempo real
+    // Inscrever em tempo real de forma otimizada para esta squad específica
     const canal = supabase
       .channel(`squad_chat_${squadId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'squad_mensagens' }, () => {
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'squad_mensagens',
+        filter: `squad_id=eq.${squadId}`
+      }, () => {
         carregarMensagens()
       }).subscribe()
 
-    return () => supabase.removeChannel(canal)
+    return () => {
+      supabase.removeChannel(canal)
+    }
   }, [meuId, squadId])
 
   useEffect(() => {
@@ -105,23 +131,37 @@ export default function ChatSquad() {
       if (error) throw error
       setSquadInfo(sq)
 
-      // Carregar membros
+      // Carregar membros da squad de forma plana (evita falhas PGRST200)
       const { data: mems, error: memsErr } = await supabase
         .from("squad_members")
-        .select("usuario_id, usuarios (id, username, foto)")
+        .select("usuario_id")
         .eq("squad_id", squadId)
       
       if (memsErr) throw memsErr
-      setMembros(mems?.map(m => m.usuarios).filter(Boolean) || [])
+
+      const userIds = mems?.map(m => m.usuario_id).filter(Boolean) || []
+      
+      let membrosPerfis = []
+      if (userIds.length > 0) {
+        const { data: perfis, error: perfisErr } = await supabase
+          .from("usuarios")
+          .select("id, username, foto")
+          .in("id", userIds)
+        
+        if (perfisErr) throw perfisErr
+        membrosPerfis = perfis || []
+      }
+
+      setMembros(membrosPerfis)
 
     } catch (err) {
-      console.log("Banco sem suporte a tabelas de squads. Usando mock local...", err.message)
+      console.log("Falha ao carregar squads ou membros via banco, usando fallback local...", err.message)
       
-      // Fallback
+      // Fallback local limpo
       const localSquads = JSON.parse(localStorage.getItem("vexx_squads") || "[]")
       const sq = localSquads.find(s => s.id === squadId) || {
         id: squadId,
-        name: squadId.includes("alpha") ? "Alpha Tactical" : "Iron Body Builders",
+        name: "Squad Operacional",
         description: "Esquadrão tático de operações fitness de alto rendimento.",
         capacity: 12
       }
@@ -129,52 +169,52 @@ export default function ChatSquad() {
 
       // Carregar membros locais
       const mockMembro1 = { id: usrId, username: meuNome || "operador", foto: null }
-      const mockMembro2 = { id: "user-2", username: "cardio_commander", foto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" }
-      const mockMembro3 = { id: "user-3", username: "iron_beast", foto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" }
-      setMembros([mockMembro1, mockMembro2, mockMembro3])
+      setMembros([mockMembro1])
     }
   }
 
   async function carregarMensagens(usrId = meuId) {
     try {
+      // 1. Carrega as mensagens do banco de forma plana
       const { data: msgs, error } = await supabase
         .from("squad_mensagens")
-        .select("*, usuarios:usuario_id (id, username, foto)")
+        .select("*")
         .eq("squad_id", squadId)
         .order("created_at", { ascending: true })
 
       if (error) throw error
-      setMensagens(msgs || [])
+      const rawMsgs = msgs || []
+
+      // 2. Resolve os perfis no cliente para evitar erros PGRST200
+      const userIds = [...new Set(rawMsgs.map(m => m.usuario_id).filter(Boolean))]
+
+      let perfisMap = {}
+      if (userIds.length > 0) {
+        const { data: perfis, error: perfisErr } = await supabase
+          .from("usuarios")
+          .select("id, username, foto")
+          .in("id", userIds)
+
+        if (!perfisErr && perfis) {
+          perfis.forEach(p => {
+            perfisMap[p.id] = p
+          })
+        }
+      }
+
+      // 3. Mapeia perfil em cada mensagem
+      const mappedMsgs = rawMsgs.map(m => ({
+        ...m,
+        usuarios: perfisMap[m.usuario_id] || { username: "atleta", foto: null }
+      }))
+
+      setMensagens(mappedMsgs)
     } catch (err) {
-      console.log("Falha ao ler squad_mensagens do banco, usando fallback local...")
+      console.log("Falha ao ler squad_mensagens do banco, usando fallback local...", err.message)
       
       const localKey = `vexx_squad_msgs_${squadId}`
       const localMsgs = JSON.parse(localStorage.getItem(localKey) || "[]")
-      
-      if (localMsgs.length === 0) {
-        const mockMsgs = [
-          {
-            id: "msg-1",
-            created_at: new Date(Date.now() - 3600000).toISOString(),
-            squad_id: squadId,
-            usuario_id: "user-2",
-            texto: "BEM-VINDO AO CANAL DA SQUAD. Sensores operacionais ativos.",
-            usuarios: { id: "user-2", username: "cardio_commander", foto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" }
-          },
-          {
-            id: "msg-2",
-            created_at: new Date(Date.now() - 1800000).toISOString(),
-            squad_id: squadId,
-            usuario_id: "user-3",
-            texto: "Hoje o treino de perna foi no limite! Foco total.",
-            usuarios: { id: "user-3", username: "iron_beast", foto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" }
-          }
-        ]
-        localStorage.setItem(localKey, JSON.stringify(mockMsgs))
-        setMensagens(mockMsgs)
-      } else {
-        setMensagens(localMsgs)
-      }
+      setMensagens(localMsgs)
     }
   }
 
@@ -185,27 +225,39 @@ export default function ChatSquad() {
     const val = partes[1]
     const serie = partes[2] || "3x10"
 
+    let msgSistema = ""
+
     try {
       if (cmdLower === "/help") {
         setShowHelpModal(true)
+        setNovaMensagem("")
+        setShowComandos(false)
+        return
       } else if (cmdLower === "/peso") {
-        localStorage.setItem("meu_peso", val)
-        alert(`Peso corporal atualizado para ${val}KG!`)
-        if (meuId) await avaliarEConquistar(meuId, "peso")
+        const pesoVal = parseFloat(val)
+        if (isNaN(pesoVal)) return alert("Utilize o formato: /peso [valor]")
+        localStorage.setItem("meu_peso", pesoVal)
+        msgSistema = `⚖️ Atualizei meu peso corporal para ${pesoVal} kg!`
+        if (meuId) {
+          await supabase.from("usuarios").update({ peso: pesoVal }).eq("id", meuId).catch(() => {})
+          await avaliarEConquistar(meuId, "peso")
+        }
       } else if (cmdLower === "/agua") {
-        alert(`${val || 250}ml de água ingeridos com sucesso!`)
+        const qtdAgua = parseInt(val) || 250
+        msgSistema = `💧 Registrei o consumo de ${qtdAgua} ml de água!`
         if (meuId) await avaliarEConquistar(meuId, "hidro")
       } else if (cmdLower === "/creatina") {
-        alert("Creatina diária registrada!")
+        msgSistema = `🧪 Dose diária de creatina registrada para o dia de hoje!`
         if (meuId) await avaliarEConquistar(meuId, "creatina")
       } else if (cmdLower === "/descanso") {
-        alert(`Timer de descanso de ${val || 60}s iniciado no hud.`)
+        const tempo = parseInt(val) || 60
+        msgSistema = `⏳ Cronômetro tático de descanso iniciado: ${tempo} segundos!`
       } else {
         const nomeExercicio = cmdRaw.replace("/", "").replace(/_/g, " ").trim()
         const pesoNovo = parseFloat(val)
 
         if (nomeExercicio && !isNaN(pesoNovo)) {
-          // Salvar registro de treino
+          msgSistema = `🏋️ Treino registrado: ${nomeExercicio} | Carga: ${pesoNovo} kg | Séries: ${serie}`
           try {
             await supabase.from("registros_treino").insert({ 
               usuario_id: meuId, 
@@ -216,8 +268,37 @@ export default function ChatSquad() {
           } catch (e) {
             console.log("Registrando treino localmente...")
           }
-          alert(`Treino de ${nomeExercicio} gravado! Carga: ${pesoNovo}kg.`)
           if (meuId) await avaliarEConquistar(meuId, "treino", { ia: false })
+        } else {
+          return alert("Comando inválido. Digite /help para visualizar os comandos operacionais.")
+        }
+      }
+
+      // Envia a mensagem com os detalhes do progresso para o chat da Squad
+      if (msgSistema) {
+        try {
+          const { error } = await supabase.from("squad_mensagens").insert({
+            squad_id: squadId,
+            usuario_id: meuId,
+            texto: msgSistema
+          })
+          if (error) throw error
+          await carregarMensagens()
+        } catch (err) {
+          console.log("Gravando mensagem de comando em canal local...")
+          const localKey = `vexx_squad_msgs_${squadId}`
+          const localMsgs = JSON.parse(localStorage.getItem(localKey) || "[]")
+          const novaMsg = {
+            id: `msg-${Date.now()}`,
+            created_at: new Date().toISOString(),
+            squad_id: squadId,
+            usuario_id: meuId,
+            texto: msgSistema,
+            usuarios: { id: meuId, username: meuNome || "operador", foto: null }
+          }
+          const listaAtualizada = [...localMsgs, novaMsg]
+          localStorage.setItem(localKey, JSON.stringify(listaAtualizada))
+          setMensagens(listaAtualizada)
         }
       }
     } catch (err) { 
@@ -236,7 +317,7 @@ export default function ChatSquad() {
     setNovaMensagem("")
 
     try {
-      // 1. Tenta salvar na Supabase
+      // 1. Salva na Supabase
       const { error } = await supabase.from("squad_mensagens").insert({
         squad_id: squadId,
         usuario_id: meuId,
@@ -280,7 +361,7 @@ export default function ChatSquad() {
             ‹
           </button>
           <div>
-            <h2 className="text-xs font-black uppercase italic tracking-tighter text-blue-400">{squadInfo?.name || "CANAL SQUAD"}</h2>
+            <h2 className="text-xs font-black uppercase italic tracking-tighter text-blue-400">{squadInfo?.name || "SQUAD OPERACIONAL"}</h2>
             <p className="text-[7.5px] font-bold text-zinc-500 uppercase tracking-widest animate-pulse flex items-center gap-1 mt-0.5">
               <span className="w-1 h-1 bg-blue-500 rounded-full animate-ping"></span> Sinal Criptografado
             </p>
@@ -351,6 +432,7 @@ export default function ChatSquad() {
       <AnimatePresence mode="wait">
         {abaAtiva === "chat" ? (
           <motion.div 
+            key="chat_tab"
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
@@ -368,15 +450,7 @@ export default function ChatSquad() {
                     transition={{ duration: 0.15 }}
                     className={`flex gap-3 ${souEu ? "justify-end" : "justify-start"}`}
                   >
-                    {!souEu && (
-                      <div className="w-8.5 h-8.5 rounded-full border border-zinc-800 overflow-hidden shrink-0 bg-zinc-900 mt-1">
-                        <img 
-                          src={msg.usuarios?.foto || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
-                          className="w-full h-full object-cover" 
-                          alt="avatar" 
-                        />
-                      </div>
-                    )}
+                    {!souEu && <RenderAvatar usuario={msg.usuarios} />}
                     
                     <div className="max-w-[78%]">
                       {!souEu && (
@@ -413,7 +487,7 @@ export default function ChatSquad() {
                     <button 
                       key={item.cmd} 
                       onClick={() => { setNovaMensagem(`${item.cmd} `); setShowComandos(false); }} 
-                      className="w-full flex justify-between p-4 hover:bg-blue-600 hover:text-white group rounded-xl transition-all mb-0.5 text-left cursor-pointer"
+                      className="w-full flex justify-between p-4 hover:bg-blue-600 hover:text-white group rounded-xl transition-all mb-0.5 text-left cursor-pointer border-none"
                     >
                       <span className="text-[10px] font-black text-zinc-300 group-hover:text-white italic">{item.cmd}</span>
                       <span className="text-[7px] text-zinc-650 group-hover:text-white/50 font-black uppercase">Selecionar</span>
@@ -434,15 +508,17 @@ export default function ChatSquad() {
                 placeholder="DIGITE OU USE '/' PARA COMANDOS..." 
                 className="flex-1 bg-zinc-900 border border-zinc-850 rounded-2xl p-4 text-[10px] font-black uppercase outline-none focus:border-blue-500 transition-all placeholder:text-zinc-600 text-zinc-100" 
               />
-              <button className="bg-blue-600 text-white w-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-[0_0_15px_rgba(59,130,246,0.35)] cursor-pointer active:scale-95 transition-all">›</button>
+              <button className="bg-blue-600 text-white w-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-[0_0_15px_rgba(59,130,246,0.35)] cursor-pointer active:scale-95 transition-all border-none">›</button>
             </form>
           </motion.div>
         ) : (
           
           /* ABA: MEMBROS */
           <motion.div 
+            key="membros_tab"
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: 10 }}
             className="flex-1 overflow-y-auto p-4 space-y-4"
           >
             <h3 className="text-[8px] font-black text-zinc-500 uppercase tracking-widest ml-2">Integrantes do Esquadrão</h3>
@@ -451,13 +527,7 @@ export default function ChatSquad() {
               {membros.map((m, idx) => (
                 <div key={m.id || idx} className="bg-zinc-900/20 border border-zinc-900 hover:border-zinc-800 p-4 rounded-3xl flex items-center justify-between transition-all duration-300">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full border border-zinc-800 overflow-hidden bg-zinc-950">
-                      <img 
-                        src={m.foto || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
-                        className="w-full h-full object-cover" 
-                        alt={m.username} 
-                      />
-                    </div>
+                    <RenderAvatar usuario={m} size="w-11 h-11 text-xs" />
                     <div>
                       <p className="text-xs font-black uppercase text-zinc-200 italic">@{m.username}</p>
                       <p className="text-[7px] font-bold text-emerald-400 uppercase tracking-widest mt-0.5 flex items-center gap-1">
