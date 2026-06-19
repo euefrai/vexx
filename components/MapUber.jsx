@@ -112,7 +112,7 @@ const MapUber = ({
             position: absolute;
             width: 70px;
             height: 70px;
-            border: 2.5px solid #00e0ff;
+            border: 2.5px solid #10b981;
             border-radius: 50%;
             opacity: 0;
             animation: radar-pulse 3s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
@@ -162,8 +162,8 @@ const MapUber = ({
             height: 0;
             border-left: 9px solid transparent;
             border-right: 9px solid transparent;
-            border-bottom: 20px solid #00ff9f;
-            filter: drop-shadow(0 0 6px rgba(0, 255, 159, 0.9)) drop-shadow(0 1.5px 3px rgba(0, 0, 0, 0.5));
+            border-bottom: 20px solid #10b981;
+            filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.9)) drop-shadow(0 1.5px 3px rgba(0, 0, 0, 0.5));
             transform: translateY(-5px);
           "></div>
         </div>
@@ -198,8 +198,8 @@ const MapUber = ({
             position: absolute;
             top: -22px;
             background: #0f172a;
-            border: 1px solid #00e0ff;
-            color: #00e0ff;
+            border: 1px solid #10b981;
+            color: #10b981;
             font-size: 8px;
             font-weight: 900;
             padding: 1.5px 4.5px;
@@ -287,19 +287,20 @@ const MapUber = ({
 
         // Polilinhas neon do percurso
         polylineGlowRef.current = L.polyline([], {
-          color: "#00ff9f",
-          weight: 12,
-          opacity: 0.35,
+          color: "#10b981",
+          weight: 18,
+          opacity: 0.25,
           lineCap: "round",
           lineJoin: "round",
         }).addTo(mapRef.current);
 
         polylineRef.current = L.polyline([], {
-          color: "#00e0ff",
-          weight: 4.5,
-          opacity: 0.9,
+          color: "#34d399",
+          weight: 5,
+          opacity: 1,
           lineCap: "round",
           lineJoin: "round",
+          className: "route-path-flow",
         }).addTo(mapRef.current);
 
         mapInstanceRef.current = mapRef.current;
@@ -366,9 +367,9 @@ const MapUber = ({
 
         // Polyline de Rota com Classe CSS animada para criar setas/traços em movimento pelas ruas
         routeRef.current = L.polyline(route, {
-          color: "#00e0ff",
-          weight: 5.5,
-          opacity: 0.85,
+          color: "#34d399",
+          weight: 6,
+          opacity: 0.9,
           lineCap: "round",
           lineJoin: "round",
           className: "route-path-flow",
@@ -650,7 +651,7 @@ const MapUber = ({
         .route-path-flow {
           stroke-dasharray: 10, 14;
           animation: route-flow 1.1s linear infinite;
-          filter: drop-shadow(0 0 5px rgba(0, 224, 255, 0.95));
+          filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.9));
         }
 
         @keyframes falling-rain {
