@@ -620,28 +620,82 @@ export default function RunPage() {
         )}
       </AnimatePresence>
 
-      {/* 📱 MOBILE BOTTOM DRAWER HUD (Para aparelhos celulares e touch com AnimatePresence) */}
+      {/* 📱 MOBILE BOTTOM DRAWER HUD — Gaveta Arrastável Premium (3 estados: mini/meio/expandido) */}
       <AnimatePresence>
         {!isHudCollapsed && (
           <motion.div
-            className="absolute bottom-20 left-4 right-4 z-40 lg:hidden flex flex-col bg-zinc-950/85 backdrop-blur-xl border border-white/10 p-4 rounded-3xl shadow-2xl max-h-[48vh] overflow-y-auto"
-            initial={{ y: 250, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 250, opacity: 0 }}
-            transition={{ type: "spring", damping: 25 }}
+            className="fixed bottom-0 left-0 right-0 z-40 lg:hidden flex flex-col bg-gradient-to-t from-zinc-950/98 via-zinc-950/95 to-zinc-950/88 backdrop-blur-2xl border-t border-white/[0.08] rounded-t-[2rem] shadow-[0_-20px_60px_rgba(0,0,0,0.85)]"
+            style={{ maxHeight: "78vh", touchAction: "none" }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={0.15}
+            onDragEnd={(_, info) => {
+              // Arrastar para baixo com velocidade ou offset → recolher HUD
+              if (info.offset.y > 100 || info.velocity.y > 500) {
+                setIsHudCollapsed(true);
+                falar("Painel recolhido.");
+              }
+            }}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 32, stiffness: 300 }}
           >
-            <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck size={14} className="text-emerald-400" />
-                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider">HUD Móvel ({username})</span>
-              </div>
-              
-              {isSimulando && (
-                <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[8px] font-black rounded-lg">Simulação</span>
-              )}
+            {/* ─── Drag Handle (Indicador de Arrasto) ─── */}
+            <div className="flex justify-center pt-2.5 pb-1 cursor-grab active:cursor-grabbing">
+              <div className="w-10 h-1 bg-white/20 rounded-full" />
             </div>
 
-            <div className="space-y-3 overflow-y-auto max-h-[40vh] pr-1">
+            {/* ─── Barra de Status Compacta (Sempre Visível) ─── */}
+            <div className="flex items-center justify-between px-5 pb-3 pt-1">
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <ShieldCheck size={14} className="text-emerald-400" />
+                  {isActive && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />}
+                </div>
+                <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider">{username}</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {isSimulando && (
+                  <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[8px] font-black rounded-lg animate-pulse">SIM</span>
+                )}
+                {isActive && (
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500/10 border border-rose-500/25 rounded-full">
+                    <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
+                    <span className="text-[8px] text-rose-400 font-black uppercase tracking-widest">REC</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ─── Mini Stats Bar (Métricas Rápidas Sempre Visíveis) ─── */}
+            <div className="flex items-center justify-around px-4 pb-3 border-b border-white/5">
+              <div className="text-center">
+                <p className="text-lg font-black text-white leading-none">{activeDistance.toFixed(2)}</p>
+                <p className="text-[7px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">KM</p>
+              </div>
+              <div className="w-px h-8 bg-white/10" />
+              <div className="text-center">
+                <p className="text-lg font-black text-white leading-none">
+                  {`${Math.floor(activeTime / 60).toString().padStart(2, "0")}:${(activeTime % 60).toString().padStart(2, "0")}`}
+                </p>
+                <p className="text-[7px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">TEMPO</p>
+              </div>
+              <div className="w-px h-8 bg-white/10" />
+              <div className="text-center">
+                <p className="text-lg font-black text-white leading-none">{activePace}</p>
+                <p className="text-[7px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">/KM</p>
+              </div>
+              <div className="w-px h-8 bg-white/10" />
+              <div className="text-center">
+                <p className="text-lg font-black text-emerald-400 leading-none">{activeSpeed > 0 ? activeSpeed.toFixed(1) : "0.0"}</p>
+                <p className="text-[7px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">KM/H</p>
+              </div>
+            </div>
+
+            {/* ─── Corpo Expansível do Drawer ─── */}
+            <div className="flex-1 overflow-y-auto px-4 pt-3 pb-6 space-y-3" style={{ maxHeight: "55vh" }}>
               {!showSummary ? (
                 <RunTracker
                   isActive={isActive}
@@ -671,9 +725,9 @@ export default function RunPage() {
               {isActive && activeDistance > 0 && (
                 <button
                   onClick={() => setShowSummary(!showSummary)}
-                  className="w-full py-2.5 bg-white/5 border border-white/5 text-white font-bold rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 bg-gradient-to-r from-white/5 to-white/[0.02] border border-white/10 text-white font-bold rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:from-white/10 transition-all active:scale-[0.98]"
                 >
-                  <Zap size={12} />
+                  <Zap size={12} className="text-emerald-400" />
                   {showSummary ? "Voltar ao Rastreamento" : "Painel Analítico"}
                 </button>
               )}
@@ -682,14 +736,16 @@ export default function RunPage() {
         )}
       </AnimatePresence>
 
-      {/* 👁️ BOTÃO FLOATING PARA RECOLHER/EXPANDIR HUD (Foco 100% no Mapa Fullscreen) */}
+      {/* 👁️ BOTÃO FLOATING PARA RECOLHER/EXPANDIR HUD */}
+      {/* Mobile: mostra apenas quando recolhido (drawer se fecha por arrasto) */}
+      {/* Desktop: mostra sempre */}
       <button
         onClick={() => {
           const nextState = !isHudCollapsed;
           setIsHudCollapsed(nextState);
-          falar(nextState ? "Painel de telemetria recolhido para visualização de mapa." : "Painel de telemetria ativo.");
+          falar(nextState ? "Painel recolhido." : "Painel ativo.");
         }}
-        className="absolute bottom-[80px] lg:bottom-[150px] right-4 sm:right-6 z-[402] flex items-center justify-center w-11 h-11 bg-zinc-900/95 hover:bg-zinc-800 text-white rounded-full shadow-2xl border border-white/10 backdrop-blur-md transition-all active:scale-90 hover:scale-105"
+        className={`absolute right-4 sm:right-6 z-[402] flex items-center justify-center w-12 h-12 bg-zinc-900/95 hover:bg-zinc-800 text-white rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.6)] border border-white/10 backdrop-blur-md transition-all active:scale-90 hover:scale-105 ${isHudCollapsed ? 'bottom-6' : 'bottom-6 lg:bottom-[150px]'} ${!isHudCollapsed ? 'hidden lg:flex' : 'flex'}`}
         title={isHudCollapsed ? "Expandir HUD" : "Recolher HUD"}
       >
         <motion.div
@@ -701,8 +757,8 @@ export default function RunPage() {
         </motion.div>
       </button>
 
-      {/* FLOAT RECORDING INDICATOR */}
-      <div className="absolute bottom-6 right-6 lg:right-auto lg:left-6 z-50 flex gap-2">
+      {/* FLOAT RECORDING INDICATOR (Desktop only — mobile has it in drawer) */}
+      <div className="absolute bottom-6 left-6 z-50 hidden lg:flex gap-2">
         {isActive && (
           <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-full shadow-2xl animate-pulse">
             <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping" />

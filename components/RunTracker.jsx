@@ -117,48 +117,68 @@ export default function RunTracker({
         <RunChart positions={positions} />
       </div>
 
-      {/* PAINEL DE CONTROLES TÁTEIS */}
+      {/* PAINEL DE CONTROLES TÁTEIS — Premium */}
       <div className="flex flex-col gap-3 pt-3 border-t border-white/5">
         
         {/* Controles de Ação de Corrida */}
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center gap-5">
           
-          {/* Botão Reset / Reiniciar */}
+          {/* Botão Reset / Finalizar */}
           {distance > 0 && (
             <motion.button
               onClick={resetTracking}
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              className="p-3.5 bg-zinc-900 border border-white/5 text-zinc-400 hover:text-red-400 hover:border-red-500/20 transition-all rounded-full"
+              whileHover={{ scale: 1.12 }}
+              whileTap={{ scale: 0.88 }}
+              className="p-3.5 bg-zinc-900/80 border border-white/[0.06] text-zinc-500 hover:text-rose-400 hover:border-rose-500/25 hover:bg-rose-500/5 transition-all rounded-full shadow-lg"
               title="Finalizar Treino"
             >
               <RotateCcw size={16} />
             </motion.button>
           )}
 
-          {/* Botão Start / Pause Principal (Gigante Circular) */}
+          {/* Botão Start / Pause Principal (Pulsação Premium) */}
           {!isActive ? (
             <motion.button
               onClick={startTracking}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.94 }}
               disabled={!isGPSConnected && !isSimulando}
-              className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all ${
-                isGPSConnected || isSimulando
-                  ? "bg-gradient-to-r from-emerald-400 to-teal-500 text-zinc-950 shadow-emerald-500/25 hover:shadow-emerald-500/45"
-                  : "bg-zinc-800 text-zinc-500 border border-white/5 cursor-not-allowed"
-              }`}
+              className="relative group"
             >
-              <Play size={20} fill="currentColor" className="ml-1" />
+              {/* Glow ring pulsante por trás do botão */}
+              {(isGPSConnected || isSimulando) && (
+                <motion.div
+                  className="absolute inset-0 rounded-full bg-emerald-500/20"
+                  animate={{ scale: [1, 1.35, 1], opacity: [0.6, 0, 0.6] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  style={{ filter: "blur(8px)" }}
+                />
+              )}
+              <div className={`relative w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all ${
+                isGPSConnected || isSimulando
+                  ? "bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 text-zinc-950 shadow-emerald-500/30 group-hover:shadow-emerald-500/50"
+                  : "bg-zinc-800 text-zinc-500 border border-white/5 cursor-not-allowed"
+              }`}>
+                <Play size={22} fill="currentColor" className="ml-1" />
+              </div>
             </motion.button>
           ) : (
             <motion.button
               onClick={pauseTracking}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-14 h-14 bg-gradient-to-r from-amber-400 to-orange-500 text-zinc-950 rounded-full flex items-center justify-center shadow-2xl shadow-orange-500/25 hover:shadow-orange-500/45"
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.94 }}
+              className="relative"
             >
-              <Pause size={20} fill="currentColor" />
+              {/* Glow ring de pausa */}
+              <motion.div
+                className="absolute inset-0 rounded-full bg-amber-500/20"
+                animate={{ scale: [1, 1.25, 1], opacity: [0.4, 0, 0.4] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                style={{ filter: "blur(6px)" }}
+              />
+              <div className="relative w-16 h-16 bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 text-zinc-950 rounded-full flex items-center justify-center shadow-2xl shadow-orange-500/30">
+                <Pause size={22} fill="currentColor" />
+              </div>
             </motion.button>
           )}
 
@@ -166,9 +186,9 @@ export default function RunTracker({
           {isActive && (
             <motion.button
               onClick={() => setIsLocked(true)}
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              className="p-3.5 bg-zinc-900 border border-white/5 text-zinc-400 hover:text-purple-400 hover:border-purple-500/20 transition-all rounded-full"
+              whileHover={{ scale: 1.12 }}
+              whileTap={{ scale: 0.88 }}
+              className="p-3.5 bg-zinc-900/80 border border-white/[0.06] text-zinc-500 hover:text-purple-400 hover:border-purple-500/25 hover:bg-purple-500/5 transition-all rounded-full shadow-lg"
               title="Proteger Tela"
             >
               <Lock size={16} />
@@ -177,10 +197,10 @@ export default function RunTracker({
         </div>
 
         {/* ⚙️ SIMULADOR E STATUS */}
-        <div className="flex items-center justify-between text-[10px] text-zinc-500 font-extrabold uppercase tracking-wider px-1 bg-zinc-950/45 p-2 rounded-2xl border border-white/5">
+        <div className="flex items-center justify-between text-[10px] text-zinc-500 font-extrabold uppercase tracking-wider px-1 bg-zinc-900/30 p-2.5 rounded-2xl border border-white/[0.04]">
           {/* Status GPS */}
           <div className="flex items-center gap-1.5">
-            <span className={`w-1.5 h-1.5 rounded-full ${isGPSConnected ? "bg-emerald-400 animate-pulse" : "bg-red-500"}`} />
+            <span className={`w-2 h-2 rounded-full ${isGPSConnected ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"}`} />
             <span>GPS: {isGPSConnected ? "Ativo" : "Offline"}</span>
           </div>
 
@@ -188,9 +208,9 @@ export default function RunTracker({
           {onToggleSimulado && (
             <button
               onClick={onToggleSimulado}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl transition-all border ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all border ${
                 isSimulando
-                  ? "bg-purple-500/10 border-purple-500/35 text-purple-300 font-black"
+                  ? "bg-purple-500/10 border-purple-500/35 text-purple-300 font-black shadow-[0_0_12px_rgba(168,85,247,0.15)]"
                   : "bg-transparent border-white/5 hover:border-white/10 text-zinc-400"
               }`}
             >

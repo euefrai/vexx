@@ -219,39 +219,130 @@ const MapUber = ({
     });
   }, []);
 
-  const createDestinationIcon = useCallback((L) => {
+  // 🔮 ÍCONE DE DESTINO PREMIUM "BEACON" — Pilar neon com pulso e feixe de luz
+  const createDestinationIcon = useCallback((L, destName) => {
+    const label = destName || 'DESTINO';
     return L.divIcon({
       html: `
         <div style="
+          position: relative;
           display: flex;
-          justify-content: center;
+          flex-direction: column;
           align-items: center;
-          animation: pulse-destination 2s infinite;
+          pointer-events: none;
         ">
-          <!-- Círculo externo pulsante -->
+          <!-- Label flutuante acima do beacon -->
           <div style="
             position: absolute;
-            width: 28px;
-            height: 28px;
-            background: radial-gradient(circle, #ff3366, #e63946);
+            top: -18px;
+            background: linear-gradient(135deg, #ff3366, #a855f7);
+            color: #fff;
+            font-size: 7px;
+            font-weight: 900;
+            padding: 2px 7px;
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            white-space: nowrap;
+            box-shadow: 0 2px 10px rgba(168, 85, 247, 0.6), 0 0 20px rgba(255, 51, 102, 0.3);
+            z-index: 30;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          ">${label}</div>
+
+          <!-- Anéis concêntricos pulsantes magenta -->
+          <div style="
+            position: absolute;
+            top: 18px;
+            width: 80px;
+            height: 80px;
+            border: 2px solid #ff3366;
             border-radius: 50%;
-            filter: drop-shadow(0 0 12px rgba(255, 51, 102, 0.9));
-            border: 3.5px solid white;
-            box-shadow: 0 0 0 6px rgba(255, 51, 102, 0.35);
+            opacity: 0;
+            animation: beacon-pulse 2.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
           "></div>
           <div style="
-            position: relative;
-            width: 8px;
-            height: 8px;
-            background: white;
+            position: absolute;
+            top: 18px;
+            width: 80px;
+            height: 80px;
+            border: 2px solid #a855f7;
             border-radius: 50%;
+            opacity: 0;
+            animation: beacon-pulse 2.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+            animation-delay: 0.9s;
+          "></div>
+          <div style="
+            position: absolute;
+            top: 18px;
+            width: 80px;
+            height: 80px;
+            border: 1.5px solid #ff3366;
+            border-radius: 50%;
+            opacity: 0;
+            animation: beacon-pulse 2.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+            animation-delay: 1.8s;
+          "></div>
+
+          <!-- Feixe vertical de luz (beam of light) -->
+          <div style="
+            position: absolute;
+            top: -50px;
+            width: 6px;
+            height: 70px;
+            background: linear-gradient(to top, rgba(255, 51, 102, 0.7), rgba(168, 85, 247, 0.3), transparent);
+            border-radius: 3px;
+            filter: blur(3px);
+            z-index: 5;
+            animation: beacon-beam 2.5s ease-in-out infinite alternate;
+          "></div>
+
+          <!-- Pilar / Haste vertical do pin -->
+          <div style="
+            position: absolute;
+            top: 2px;
+            width: 4px;
+            height: 56px;
+            background: linear-gradient(to bottom, #a855f7, #ff3366, rgba(255, 51, 102, 0.2));
+            border-radius: 2px;
             z-index: 10;
+            box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+          "></div>
+
+          <!-- Cabeça do beacon — esfera principal com glow -->
+          <div style="
+            position: relative;
+            top: -4px;
+            width: 22px;
+            height: 22px;
+            background: radial-gradient(circle at 35% 35%, #ff6b9d, #ff3366, #a855f7);
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.9);
+            z-index: 20;
+            box-shadow:
+              0 0 14px rgba(255, 51, 102, 0.9),
+              0 0 30px rgba(168, 85, 247, 0.5),
+              inset 0 -3px 6px rgba(0, 0, 0, 0.3);
+            animation: beacon-head-glow 2s ease-in-out infinite alternate;
+          "></div>
+
+          <!-- Ponto de ancoragem na base -->
+          <div style="
+            position: absolute;
+            top: 54px;
+            width: 10px;
+            height: 10px;
+            background: radial-gradient(circle, rgba(255, 51, 102, 0.8), transparent);
+            border-radius: 50%;
+            z-index: 8;
+            filter: blur(2px);
           "></div>
         </div>
       `,
-      className: "uber-destination-marker",
-      iconSize: [40, 40],
-      iconAnchor: [20, 20],
+      className: "uber-destination-beacon",
+      iconSize: [80, 80],
+      iconAnchor: [40, 58],
     });
   }, []);
 
@@ -306,11 +397,13 @@ const MapUber = ({
         mapInstanceRef.current = mapRef.current;
         setIsMapReady(true);
 
-        // Click no mapa para ADICIONAR ou ALTERAR destino livremente a qualquer instante
+        // Click no mapa para ADICIONAR ou SUBSTITUIR destino livremente a qualquer instante
         mapRef.current.on("click", (e) => {
+          // Limpa cache de rota anterior para forçar novo traçado
           if (destinationRef.current) {
-            console.debug("[MapUber] Destino já ativo. Clique bloqueado. Use o botão Limpar.");
-            return;
+            routeCacheRef.current = null;
+            lastDestinationRef.current = null;
+            console.debug("[MapUber] Substituindo destino anterior por novo ponto.");
           }
           if (onDestinationSelectRef.current) {
             onDestinationSelectRef.current({
@@ -459,7 +552,7 @@ const MapUber = ({
     }
   }, [effectivePosition, heading, currentSpeed, isMapReady, createUserIcon, currentPosition]);
 
-  // 4️⃣ Marcador de Destino Dragável
+  // 4️⃣ Marcador de Destino Dragável + fitBounds para visão panorâmica
   useEffect(() => {
     const L = LRef.current;
     if (!mapRef.current || !destination || !L || !isMapReady) return;
@@ -470,11 +563,14 @@ const MapUber = ({
 
     destinationMarkerRef.current = L.marker(
       [destination.lat, destination.lng],
-      { icon: createDestinationIcon(L), draggable: false }
+      { icon: createDestinationIcon(L, destination.name), draggable: true }
     ).addTo(mapRef.current);
 
     destinationMarkerRef.current.on("dragend", (e) => {
       const pos = e.target.getLatLng();
+      // Limpa cache de rota para forçar novo traçado ao arrastar
+      routeCacheRef.current = null;
+      lastDestinationRef.current = null;
       if (onDestinationSelectRef.current) {
         onDestinationSelectRef.current({
           lat: pos.lat,
@@ -484,7 +580,19 @@ const MapUber = ({
       }
     });
 
+    // fitBounds — enquadrar atleta + destino com visão panorâmica (bird's-eye)
     if (currentPosition) {
+      const bounds = L.latLngBounds(
+        [currentPosition.lat, currentPosition.lng],
+        [destination.lat, destination.lng]
+      );
+      mapRef.current.fitBounds(bounds, {
+        padding: [80, 80],
+        animate: true,
+        duration: 0.8,
+        maxZoom: 16,
+      });
+
       const dist = getDistanceSimple(
         currentPosition.lat,
         currentPosition.lng,
@@ -628,6 +736,46 @@ const MapUber = ({
           100% { filter: drop-shadow(0 0 6px rgba(255, 51, 102, 0.7)); }
         }
 
+        @keyframes beacon-pulse {
+          0% {
+            transform: scale(0.2);
+            opacity: 0.7;
+          }
+          50% {
+            opacity: 0.35;
+          }
+          100% {
+            transform: scale(1.8);
+            opacity: 0;
+          }
+        }
+
+        @keyframes beacon-head-glow {
+          0% {
+            box-shadow:
+              0 0 14px rgba(255, 51, 102, 0.9),
+              0 0 30px rgba(168, 85, 247, 0.5),
+              inset 0 -3px 6px rgba(0, 0, 0, 0.3);
+          }
+          100% {
+            box-shadow:
+              0 0 22px rgba(255, 51, 102, 1),
+              0 0 45px rgba(168, 85, 247, 0.7),
+              inset 0 -3px 6px rgba(0, 0, 0, 0.3);
+          }
+        }
+
+        @keyframes beacon-beam {
+          0% {
+            opacity: 0.4;
+            height: 60px;
+          }
+          100% {
+            opacity: 0.8;
+            height: 75px;
+          }
+        }
+
         @keyframes radar-pulse {
           0% {
             transform: scale(0.3);
@@ -675,6 +823,9 @@ const MapUber = ({
         style={{ height: "100%", background: "#0a0a0f" }}
       />
 
+      {/* Vinheta cinematográfica premium sobre o mapa */}
+      <div className="absolute inset-0 pointer-events-none z-[103]" style={{ boxShadow: 'inset 0 0 120px 40px rgba(0,0,0,0.5)' }} />
+
       {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-[999]">
           <div className="text-center p-6 bg-zinc-900 border border-red-500/30 rounded-2xl max-w-sm">
@@ -707,31 +858,36 @@ const MapUber = ({
       )}
 
       {destination && showRouteInfo && !isReplaying && (
-        <div className="absolute top-20 left-4 bg-zinc-950/85 backdrop-blur-md border border-white/10 px-4 py-3.5 rounded-2xl z-[401] shadow-2xl shadow-black/85 max-w-xs transition-all duration-300">
-          <p className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse" />
-            Rastreamento de Destino
-          </p>
-          <p className="text-xs font-bold text-white mb-2 truncate">{destination.name}</p>
-          <div className="space-y-1.5 border-t border-white/5 pt-2 font-medium">
-            {distanceStartToDest !== null && (
-              <div className="flex justify-between items-center text-[10px] text-zinc-400">
-                <span className="font-semibold uppercase text-[8px] tracking-wider text-zinc-500">Dist. Planejada</span>
-                <span className="text-purple-300 font-extrabold">{distanceStartToDest.toFixed(2)} km</span>
+        <div className="absolute top-20 left-4 z-[401] max-w-[200px] transition-all duration-300">
+          {/* Borda com gradiente neon glow */}
+          <div className="rounded-2xl p-[1px] bg-gradient-to-br from-purple-500/60 via-pink-500/30 to-transparent shadow-2xl shadow-purple-950/40">
+            <div className="bg-zinc-950/90 backdrop-blur-xl rounded-2xl px-3.5 py-3">
+              <p className="text-[8px] font-black text-purple-400/80 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full animate-pulse" />
+                Rastreamento Ativo
+              </p>
+              <p className="text-[11px] font-extrabold text-white truncate mb-2 leading-tight" title={destination.name}>{destination.name}</p>
+              <div className="space-y-1 border-t border-white/5 pt-1.5">
+                {distanceStartToDest !== null && (
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="font-semibold uppercase text-[7px] tracking-wider text-zinc-500">Planejada</span>
+                    <span className="text-purple-300 font-extrabold">{distanceStartToDest.toFixed(2)} km</span>
+                  </div>
+                )}
+                {distanceToDestination !== null && (
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="font-semibold uppercase text-[7px] tracking-wider text-zinc-500">Restante</span>
+                    <span className="text-emerald-400 font-extrabold">{distanceToDestination.toFixed(2)} km</span>
+                  </div>
+                )}
+                {eta !== null && (
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="font-semibold uppercase text-[7px] tracking-wider text-zinc-500">ETA</span>
+                    <span className="text-blue-400 font-extrabold">~{eta} min</span>
+                  </div>
+                )}
               </div>
-            )}
-            {distanceToDestination !== null && (
-              <div className="flex justify-between items-center text-[10px] text-zinc-400">
-                <span className="font-semibold uppercase text-[8px] tracking-wider text-zinc-500">Restante</span>
-                <span className="text-emerald-400 font-extrabold">{distanceToDestination.toFixed(2)} km</span>
-              </div>
-            )}
-            {eta !== null && (
-              <div className="flex justify-between items-center text-[10px] text-zinc-400">
-                <span className="font-semibold uppercase text-[8px] tracking-wider text-zinc-500">Tempo (ETA)</span>
-                <span className="text-blue-400 font-extrabold">~{eta} min</span>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
