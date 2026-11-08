@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { z } from "zod";
+import { analisarImagemYolo } from "@/lib/yoloVision";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -8,13 +9,21 @@ const openai = new OpenAI({
 
 const requestSchema = z.object({
   image: z.string().min(1, "Imagem é obrigatória"),
-  tipo: z.enum(["comida", "rotulo"], { errorMap: () => ({ message: "Tipo deve ser 'comida' ou 'rotulo'" }) }),
+  tipo: z.enum(["comida", "rotulo", "yolo", "objetos", "jogo"], {
+    errorMap: () => ({ message: "Tipo deve ser 'comida', 'rotulo', 'yolo', 'objetos' ou 'jogo'" }),
+  }),
 });
 
 export async function POST(req) {
   try {
     const body = await req.json();
     const { image, tipo } = requestSchema.parse(body); // Validação com zod
+
+    // 🎯 Se for modo direto YOLO (visão computacional, detecção de objetos/jogos/alvos)
+    if (tipo === "yolo" || tipo === "objetos" || tipo === "jogo") {
+      const yoloResult = await analisarImagemYolo(image);
+      return NextResponse.json(yoloResult);
+    }
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: "API Key não configurada no servidor." }, { status: 500 });
